@@ -24,6 +24,11 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // The address behind a player's username is synthetic and must never be shown
+  // (see lib/auth.js). The username is already in the session's user metadata —
+  // set at sign-up, and by the admin snippet — so no extra query is needed.
+  const displayName = session?.user?.user_metadata?.display_name ?? '';
+
   // Pick the most recent game the player can see.
   useEffect(() => {
     if (!supabase || !session) return;
@@ -76,7 +81,7 @@ export default function App() {
       <header className="top">
         <h1>HS Battleships</h1>
         <div className="who">
-          <span>{session.user.email}</span>
+          <span>{displayName || 'Signed in'}</span>
           <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>

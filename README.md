@@ -77,6 +77,25 @@ npm run dev --prefix web
 
 The dev server runs on **port 5174**, so it can sit alongside HighSocietyScape on 5173.
 
+## Sign-in: username only, no email
+
+Players sign in with a **username and password**. There is no email anywhere in
+the flow. Supabase Auth keys on email, so the username is mapped to a synthetic
+address at `@players.hs-battleships.invalid` that players never see or type
+(`web/src/lib/auth.js`). `.invalid` is IANA-reserved, so no mail can ever reach a
+real domain.
+
+The trade-off, accepted deliberately: **there is no self-service password reset**,
+because there is no mailbox to send a link to. An admin resets passwords — see
+`supabase/admin/player-accounts.sql`, which also covers creating accounts and
+putting players on teams.
+
+> **Required setting:** turn **off** Authentication → Sign In / Providers → Email →
+> "Confirm email" in the Supabase dashboard. Otherwise Supabase tries to send a
+> confirmation to an address that cannot receive one, and sign-ups fail with
+> `email rate limit exceeded`. Accounts created through the admin SQL work either
+> way, since they set `email_confirmed_at` directly.
+
 ### Demo data
 
 A "Demo Match" game exists in the Battleships project with both fleets placed,
