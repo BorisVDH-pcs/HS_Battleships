@@ -30,18 +30,25 @@ jobs:
 
       - run: npm ci --prefix web
 
-      # The anon key is designed to be public (RLS is what protects the data),
-      # but it still lives in repo secrets rather than in source so it can be
-      # rotated without a commit.
+      # The project URL and anon key are public by design — Vite inlines them into
+      # the bundle either way — so they are committed in web/.env.production and no
+      # repo secret is required to deploy.
+      #
+      # Secrets of the same name still override them when set, which is the escape
+      # hatch for rotating the key without a commit. They are read under different
+      # names here because an unset secret expands to an empty string, and an empty
+      # VITE_* variable in the environment would beat the .env.production file
+      # rather than fall back to it.
       - name: Build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SECRET_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SECRET_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "::error::Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY repo secrets."
-            echo "Add them under Settings > Secrets and variables > Actions."
-            exit 1
+          if [ -n "$SECRET_SUPABASE_URL" ]; then
+            export VITE_SUPABASE_URL="$SECRET_SUPABASE_URL"
+          fi
+          if [ -n "$SECRET_SUPABASE_ANON_KEY" ]; then
+            export VITE_SUPABASE_ANON_KEY="$SECRET_SUPABASE_ANON_KEY"
           fi
           npm run build --prefix web
 

@@ -31,7 +31,7 @@ players, captains and admins alike.
 | Live updates | Supabase Realtime on `game_events` |
 | Frontend | Vite + React |
 | Notifications | Discord relay driven off the `game_events` feed |
-| Hosting | Netlify / Vercel |
+| Hosting | GitHub Pages, built by `.github/workflows/deploy.yml` |
 
 ## Why the logic lives in the database
 
@@ -76,6 +76,22 @@ npm run dev --prefix web
 ```
 
 The dev server runs on **port 5174**, so it can sit alongside HighSocietyScape on 5173.
+
+## Deploying
+
+Every push to `main` builds the site and publishes it to
+**https://borisvdh-pcs.github.io/HS_Battleships/**.
+
+The Supabase project URL and anon key live in `web/.env.production`, committed on
+purpose: Vite inlines them into the bundle, so they are public the moment the site
+is served either way. RLS and the security-definer RPCs are what protect the data —
+not the secrecy of the anon key. Repo secrets named `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` override the file if you ever want to rotate the key
+without a commit, but none are needed for a working deploy.
+
+> **One-time setting:** GitHub → Settings → Pages → Source must be **"GitHub
+> Actions"**, not "Deploy from a branch" — `dist/` is gitignored, so branch mode
+> would serve the README instead of the app.
 
 ## Sign-in: username only, no email
 
