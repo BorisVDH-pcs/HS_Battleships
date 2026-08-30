@@ -149,6 +149,22 @@ themselves instead of sitting on a board that no longer exists.
 Once active, the Fleets card becomes a live spectator view: one board per team,
 its ships plus incoming shots, with sunk/hit counts, updating over Realtime.
 
+### What the admin can see that players cannot
+
+Two views, both fed by `admin_list_*` definer functions that raise
+`Admins only` server-side, so neither is reachable by faking a client flag.
+
+- **Tiles card -> Show board / Show as list** — all 100 squares with their real
+  names and rules. The grid answers "what is on G7"; the list is for
+  proofreading a fresh import against the sheet. Both stay available once the
+  game is `active`, when *editing* tiles is refused. Either view flags squares
+  that have no tile rather than rendering a silent gap.
+- **Both fleets at once** (`AdminBoards`) — one board per team showing that
+  team's ships plus the shots the opponent has taken at them.
+
+Between them these are the game's two secrets, which is why the admin account
+is separate from every player account and `is_admin` is grantable only by SQL.
+
 ### What players see
 
 - **Signed up, no team yet:** "You are not assigned to a team yet. Come back once
