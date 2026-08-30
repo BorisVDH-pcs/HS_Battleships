@@ -45,6 +45,51 @@ values (
 
 
 -- ============================================================
+-- Create the dedicated ADMIN account
+-- ============================================================
+-- Keep this separate from your own player account. An admin can read every
+-- tile's task and both fleets (admin_list_tiles / admin_list_ship_cells), so an
+-- account that both runs the event and plays in it would be able to see the
+-- answers for its own team. Separate accounts keep that impossible rather than
+-- merely discouraged.
+--
+-- Sign in with the username, same as any player — the difference is only the
+-- is_admin flag. Do not add this account to a team; the roster picker hides
+-- admin accounts for exactly that reason.
+
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change,
+  email_change_token_new, email_change_token_current,
+  phone_change, phone_change_token, reauthentication_token
+)
+values (
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  -- vvv choose the admin username and a STRONG password vvv
+  'hs_admin' || '@players.hs-battleships.invalid',
+  crypt('choose-a-strong-password', gen_salt('bf')),
+  now(), now(), now(),
+  '{"provider":"email","providers":["email"]}',
+  jsonb_build_object('display_name', 'HS Admin'),
+  '', '', '', '', '', '', '', ''
+);
+
+-- Then grant it. The flag is deliberately NOT settable from the app: the
+-- profiles_self policy blocks a user changing their own is_admin.
+update profiles set is_admin = true where display_name = 'HS Admin';
+
+-- Who currently has admin?
+select display_name, is_admin from profiles where is_admin;
+
+-- Revoke:
+-- update profiles set is_admin = false where display_name = 'HS Admin';
+
+
+-- ============================================================
 -- Reset a player's password
 -- ============================================================
 -- There is no self-service reset (no real mailbox), so this is the mechanism.

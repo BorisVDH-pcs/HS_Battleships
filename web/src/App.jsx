@@ -52,7 +52,13 @@ export default function App() {
       .select('is_admin')
       .eq('id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
+      .then(({ data }) => {
+        const admin = Boolean(data?.is_admin);
+        setIsAdmin(admin);
+        // A dedicated admin account plays for nobody, so the board is not what
+        // they came for. Players are unaffected — they never see the tabs.
+        if (admin) setTab('admin');
+      });
   }, [session]);
 
   const game = useGame(gameId, session);

@@ -312,7 +312,9 @@ function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
               .filter((m) => gameTeams.some((g) => g.id === m.team_id))
               .map((m) => m.profile_id)
           );
-          const free = profiles.filter((p) => !taken.has(p.id));
+          // Admin accounts are run-the-event accounts, not players — keep them
+          // out of the picker so nobody drafts the organiser onto a team.
+          const free = profiles.filter((p) => !taken.has(p.id) && !p.is_admin);
           return (
             <div key={t.id}>
               <h3>{t.name}</h3>
