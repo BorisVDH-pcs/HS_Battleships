@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
-  adminOpenPlacement, adminListTiles, adminListShipCells, adminDeleteGame,
+  adminOpenPlacement, adminListTiles, adminListShipCells, adminDeleteGame, adminResetGame,
   adminAdjustScore, adminListScoreEvents, adminDeleteScoreEvent, adminSetScoring,
 } from '../lib/supabase.js';
 import FleetPlacer from './FleetPlacer.jsx';
@@ -153,6 +153,47 @@ export default function Admin() {
                 Start game
               </button>
             </div>
+
+            {/* The way back out of a started game. Without it the only undo was
+                Delete, which takes the 100 tiles and the roster with it. */}
+            {(game.status === 'active' || game.status === 'finished') && (
+              <div className="row" style={{ marginTop: '.8rem' }}>
+                <button
+                  className="danger"
+                  disabled={busy}
+                  onClick={() => {
+                    if (!window.confirm(
+                      `Reset "${game.name}" back to placement?\n\n` +
+                      'Cleared: every claim and shot, the activity feed, manual score ' +
+                      'adjustments, the winner, and both fleets.\n' +
+                      'Kept: the 100 tiles and the roster.\n\n' +
+                      'This cannot be undone.'
+                    )) return;
+                    run(() => adminResetGame(game.id, true),
+                        'Game reset. Fleets need placing again.');
+                  }}
+                >
+                  Reset to placement
+                </button>
+                <button
+                  className="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    if (!window.confirm(
+                      `Replay "${game.name}" with the same fleets?\n\n` +
+                      'Cleared: every claim and shot, the activity feed, manual score ' +
+                      'adjustments, and the winner.\n' +
+                      'Kept: the 100 tiles, the roster, and both fleets as placed.\n\n' +
+                      'This cannot be undone.'
+                    )) return;
+                    run(() => adminResetGame(game.id, false),
+                        'Game reset with fleets intact — press Start game when ready.');
+                  }}
+                >
+                  Reset, keep fleets
+                </button>
+              </div>
+            )}
           </section>
 
           <Tiles

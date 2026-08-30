@@ -90,6 +90,13 @@ export const adminListShipCells = (gameId) =>
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 
+/**
+ * Roll a game back to placement. Keeps the tiles and the roster; clears claims,
+ * the feed, manual score adjustments, the winner, and (by default) the fleets.
+ */
+export const adminResetGame = (gameId, clearFleets = true) =>
+  rpc('admin_reset_game', { p_game_id: gameId, p_clear_fleets: clearFleets });
+
 // ---- Scoring -------------------------------------------------------------
 // Totals are derived (see the `team_scores` function); these only touch the manual
 // adjustments layered on top, which is the sheet's "+1" button.

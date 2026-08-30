@@ -70,6 +70,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0009_scoring.sql` | Scoring weights on `games`, the `team_scores` view, the four score RPCs, and `score_events` taken off world-read |
 | `0010_views_to_functions.sql` | `tiles_for_me` and `team_scores` become `security definer` **functions** |
 | `0011_drop_definer_views.sql` | Drops the two views, once the frontend calling the functions is live |
+| `0012_game_reset_event_type.sql` | Adds the `game_reset` event type (split from 0013 for the same reason as 0008) |
+| `0013_reset_game.sql` | `admin_reset_game` — roll a started game back to placement without losing tiles or roster |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -117,7 +119,7 @@ event and played in it could see its own team's answers. So:
 | `hs_admin` (HS Admin) | **admin** | Boris holds the password; not recorded anywhere, including here |
 | `demo` | captain, Kriegsmarine | throwaway |
 | `Lil Sod` | captain, Flikkerlikkers | throwaway |
-| `Soft Papi` | member, Kriegsmarine | created by Boris to test signup; assigned during testing |
+| `Soft Papi` | **captain**, Kriegsmarine | created by Boris to test signup; promoted while testing |
 
 All four are test accounts except `hs_admin`. Delete the demo data before a real
 event — see gaps below.
@@ -136,6 +138,13 @@ All in the app, signed in as the admin:
 6. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
 7. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
    and award or dock points by hand with a reason. Every adjustment can be undone
+
+If it goes wrong mid-match, **Reset to placement** rolls the game back without
+losing the tiles or the roster — the two things that take real time to set up.
+**Reset, keep fleets** does the same but leaves both fleets standing, so you can
+replay immediately. Both clear every claim, the feed, the manual adjustments and
+the winner, and both emit a `game_reset` event, so open player pages notice by
+themselves instead of sitting on a board that no longer exists.
 
 Once active, the Fleets card becomes a live spectator view: one board per team,
 its ships plus incoming shots, with sunk/hit counts, updating over Realtime.

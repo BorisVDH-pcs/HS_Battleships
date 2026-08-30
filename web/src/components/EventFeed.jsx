@@ -26,6 +26,10 @@ export default function EventFeed({ events, teams, myTeamId }) {
         return `${who} sank a ${e.payload?.size}-tile ship!`;
       case 'game_won':
         return `${who} wins — the enemy fleet is gone.`;
+      case 'game_reset':
+        return e.payload?.fleets_cleared
+          ? 'The game has been reset — fleets need placing again.'
+          : 'The game has been reset. Fleets are unchanged.';
       case 'score_adjusted': {
         // The delta only. The admin's reason is deliberately not in the payload:
         // it is free text and could name a tile on the shared grid.

@@ -138,5 +138,8 @@ which is how the originals leaked.
 ## Open questions
 
 - Do claimed-but-unfired tiles survive a game reset?
-- Should there be an admin override to end or roll back a game mid-flight?
+- ~~Should there be an admin override to end or roll back a game mid-flight?~~
+  Yes — `admin_reset_game` (0013). Rolls back to `placement`, keeping the tiles
+  and roster and optionally the fleets. Status is reset *before* the ships are
+  deleted, because the freeze triggers reject ship writes outside `placement`.
 - Per-player scoring: derive purely from `tile_claims`, or keep manual adjustments?
