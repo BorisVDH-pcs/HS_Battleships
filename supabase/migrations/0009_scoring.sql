@@ -35,6 +35,7 @@ alter table games
 -- totals reach everyone through the aggregate view below instead.
 
 drop policy if exists scores_read on score_events;
+drop policy if exists scores_own_team_or_admin on score_events;
 
 create policy scores_own_team_or_admin on score_events
   for select using (team_id in (select my_team_ids()) or is_admin());
