@@ -197,8 +197,24 @@ Then hard-refresh (Ctrl+F5) — the browser caches the previous bundle.
 
 Roughly in priority order:
 
-1. **Real tile content.** The 100 tiles from the Middleman sheet's `Tile Data`
-   have never been imported. The admin paste box takes them directly.
+1. ~~**Real tile content.**~~ **Done.** The 100 V4 tiles are loaded into Demo
+   Match. Names only, no `rules` — the source list did not have any.
+
+   **The tile list is not in this repo, and must not be.** This repo is
+   public, and tile contents are secret #2 (see architecture.md, "The two
+   secrets"): committing the list would publish exactly what `tiles_for_me`
+   exists to hide. It lives in the Middleman sheet and in the database. If
+   you need to re-import, paste the sheet's `Tile Data` into the admin box.
+
+   Import notes for next time:
+   - The sheet labels squares `A1`..`J10`, where the **letter is the column
+     and the number is the row** — matching `coordLabel()` in `board.js`.
+     Listed reading order (A1, B1, ... J1, A2, ...) is already
+     `position = (row-1)*10 + col`, so no re-sorting is needed.
+   - Verify the import by checksum rather than by eye:
+     `select md5(string_agg(name, '|' order by position)) from tiles where
+     game_id = ...` and compare against the same hash computed on the source.
+     That catches a transcription slip that spot-checking will not.
 2. **Discord relay.** The Apps Script posted picks and completions to Discord.
    `game_events` was designed to drive this — it has a `relayed_at` column for
    exactly this — but nothing consumes it. An Edge Function or small worker
@@ -217,8 +233,10 @@ Roughly in priority order:
    fleet" card on their own page during placement, and can reposition until the
    admin starts the game. Members get a waiting message. `place_fleet` always
    allowed this — only the UI was missing.
-6. **Delete the demo data** before a real event: the "Demo Match" game and the
-   `demo`, `Lil Sod`, `Soft Papi` accounts.
+6. **Delete the demo data** before a real event: the `demo`, `Lil Sod` and
+   `Soft Papi` accounts. **Note the game itself now holds the real tiles** —
+   "Demo Match" is only a name at this point. Rename it rather than deleting
+   it, or re-import the tiles into whatever replaces it.
 7. **Mobile.** Partly addressed. Measured at 375x812: no horizontal page
    scroll, all three grids fit, the page is about 2.7 screens tall. Three
    things were fixed after that measurement:
