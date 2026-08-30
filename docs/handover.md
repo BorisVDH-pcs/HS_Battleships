@@ -51,7 +51,7 @@ Security, not by the UI. Clients have no INSERT/UPDATE/DELETE rights anywhere;
 every mutation goes through a `security definer` RPC that validates server-side.
 The `tiles` table denies all direct reads — the app reads the `tiles_for_me`
 view, which nulls out unclaimed tiles. The `game_events` feed is world-readable
-and therefore **must never carry a tile's name or rules**: the grid is shared, so
+and therefore **must never carry a tile's name or icon**: the grid is shared, so
 naming a tile would reveal it on the reader's own board. (The original Apps
 Script author had the same rule — the public webhook omitted tile names.)
 
@@ -132,10 +132,14 @@ event — see gaps below.
 All in the app, signed in as the admin:
 
 1. **New game** — name it and both teams
-2. **Tiles** — paste 100 lines in board order, `name | rules` optional
+2. **Tiles** — paste 100 lines in board order, `name | icon` (icon optional).
+   Strip the `A1.` prefixes: the box numbers lines by position, it does not
+   parse coordinates
 3. **Open placement**
 4. **Roster** — add players, set captains (players must have signed up first)
-5. **Fleets** — click a hull, click its top-left cell, `R` rotates
+5. **Fleets** — click a hull, click its top-left cell, `R` rotates. On a touch
+   screen the first tap aims and a second tap on the same cell drops the hull,
+   and rotating uses the button rather than the key
 6. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
 7. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
    and award or dock points by hand with a reason. Every adjustment can be undone
@@ -156,11 +160,11 @@ Two views, both fed by `admin_list_*` definer functions that raise
 `Admins only` server-side, so neither is reachable by faking a client flag.
 
 - **Tiles card -> Show board / Show as list** — all 100 squares with their real
-  names and icons. The list prints the icon *slug* rather than the picture,
-  because its job is checking each tile got the icon it was meant to get. The grid answers "what is on G7"; the list is for
-  proofreading a fresh import against the sheet. Both stay available once the
-  game is `active`, when *editing* tiles is refused. Either view flags squares
-  that have no tile rather than rendering a silent gap.
+  names and icons. The grid answers "what is on G7"; the list is for proofreading
+  a fresh import against the sheet, and prints the icon *slug* rather than the
+  picture so you can see which tile got which. Both stay available once the game
+  is `active`, when *editing* tiles is refused. Either view flags squares with no
+  tile rather than rendering a silent gap.
 - **Both fleets at once** (`AdminBoards`) — one board per team showing that
   team's ships plus the shots the opponent has taken at them.
 
@@ -179,6 +183,14 @@ is separate from every player account and `is_admin` is grantable only by SQL.
   the organiser remains the fallback if a captain does not show up.
 - **On a team, once `active`:** enemy waters (claimable), their own fleet with
   incoming shots, their active tile slots, the scoreboard, and the event feed.
+
+Every board labels its squares `A1`..`J10` — the coordinate, not the 1..100
+position, because that is what people say out loud and type into Discord. A
+shot marker outranks the label: a hit shows a cross, a claimed-but-unfired tile
+shows a dot, and a claimed tile shows its **icon** if it has one.
+
+Claiming asks for confirmation, as firing already did. A cell is a small target
+on a phone and a claim costs one of the team's active slots until it is fired.
 
 ---
 
@@ -207,7 +219,26 @@ debugging:
 curl -s https://borisvdh-pcs.github.io/HS_Battleships/ | grep -o 'index-[^"]*\.js'
 ```
 
-Then hard-refresh (Ctrl+F5) — the browser caches the previous bundle.
+Then hard-refresh (Ctrl+F5) — the browser caches the previous bundle. This bites
+often enough to be the first thing to rule out: twice more since that was
+written, a change looked missing and was simply a cached stylesheet.
+
+**Tile icons need no build step.** `web/public/icons/*.png` is copied verbatim by
+Vite, so an icon is live as soon as it is committed. To add one, drop the source
+art in `tools/icon-src/` (gitignored) and run:
+
+```bash
+python tools/make_icons.py
+```
+
+It writes a square 64px PNG per source file and prints the slug to use after the
+pipe in the admin paste box. 64px because a cell is 30-50px and phones are 2x;
+the raw wiki renders are 100-1280px and average 92 KB against roughly 4 KB here.
+
+> Note that `web/public/icons/` is **public**, like the rest of the repo. The
+> filenames — and the pictures themselves — reveal the pool of tasks, though not
+> which square each sits on. Renaming them to something opaque does not help,
+> since anyone can open the folder and look. Accepted deliberately.
 
 ---
 
@@ -236,13 +267,23 @@ Roughly in priority order:
      `select md5(string_agg(name, '|' order by position)) from tiles where
      game_id = ...` and compare against the same hash computed on the source.
      That catches a transcription slip that spot-checking will not.
-2. **Discord relay.** The Apps Script posted picks and completions to Discord.
+2. **Tile icons — 10 of ~90 done.** The plumbing is finished (0014, `TileIcon`,
+   `tools/make_icons.py`); what is left is artwork. Ten tiles have an icon; the
+   rest fall back to their coordinate, which is the pre-icon board, so this is
+   cosmetic and safe to leave half-done through an event.
+
+   Only ~21 of the 90 distinct tile names matched anything in the set at
+   `iftachShoham/HighSociety-Bingo` — that bingo had different tasks — so most
+   still need sourcing. Decided against category icons (`slayer`, `raids`, ...)
+   in favour of per-item art, and against opaque filenames, since anyone can
+   open the public folder and look at the pictures regardless.
+3. **Discord relay.** The Apps Script posted picks and completions to Discord.
    `game_events` was designed to drive this — it has a `relayed_at` column for
    exactly this — but nothing consumes it. An Edge Function or small worker
    reading unrelayed events is the intended shape.
-3. **Rotate the Discord webhook URLs** hardcoded in the old Apps Script files on
+4. **Rotate the Discord webhook URLs** hardcoded in the old Apps Script files on
    Boris's Desktop. Advised repeatedly, never confirmed done.
-4. ~~**Scoring.**~~ **Done** — see 0009. Totals are derived by `team_scores`
+5. ~~**Scoring.**~~ **Done** — see 0009. Totals are derived by `team_scores`
    (tiles × `points_per_tile` + hits × `points_per_hit` + sinks ×
    `points_per_sink` + manual adjustments), the weights are per-game and
    editable in the admin console, and `score_events` is now written and read
@@ -250,15 +291,15 @@ Roughly in priority order:
    `admin_delete_score_event`. Defaults are 1 point per completed tile and
    nothing else, which is what the spreadsheet did. Confirmed working in the
    browser by Boris, who set it to 1 per hit and watched the totals re-derive.
-5. ~~**Captain-facing placement.**~~ **Done.** A captain now sees a "Place your
+6. ~~**Captain-facing placement.**~~ **Done.** A captain now sees a "Place your
    fleet" card on their own page during placement, and can reposition until the
    admin starts the game. Members get a waiting message. `place_fleet` always
    allowed this — only the UI was missing.
-6. **Delete the demo data** before a real event: the `demo`, `Lil Sod` and
+7. **Delete the demo data** before a real event: the `demo`, `Lil Sod` and
    `Soft Papi` accounts. **Note the game itself now holds the real tiles** —
    "Demo Match" is only a name at this point. Rename it rather than deleting
    it, or re-import the tiles into whatever replaces it.
-7. **Mobile.** Partly addressed. Measured at 375x812: no horizontal page
+8. **Mobile.** Partly addressed. Measured at 375x812: no horizontal page
    scroll, all three grids fit, the page is about 2.7 screens tall. Three
    things were fixed after that measurement:
    - cells were ~24px, about half the ~44px a thumb wants. Small screens now
@@ -276,16 +317,32 @@ Roughly in priority order:
    Node on the machine and checked by balance-checking the sources and
    grepping the deployed bundle. Someone should open the live site on an
    actual handset before the event.
-8. **Tests.** There are none, of any kind. This is the single biggest
+9. **Tests.** There are none, of any kind. This is the single biggest
    difference between this repo and iftachShoham/HighSociety-Monopoly, and it
    is largely a consequence of the architecture: the rules live in PL/pgSQL
    `security definer` functions, which are awkward to test without a local
    Postgres. pgTAP is the route if it matters.
-9. **Admin audit log.** `admin_reset_game` destroys a match's claims, feed and
+10. **Admin audit log.** `admin_reset_game` destroys a match's claims, feed and
    score adjustments and leaves no record of who pressed the button. Offered,
    not yet built.
-10. **Roster changes are polled, not pushed** (10s). Fine for a waiting room. If
+11. **Roster changes are polled, not pushed** (10s). Fine for a waiting room. If
    it matters on the night, emit a `game_event` on roster change.
+12. **A second version, on a different architecture.** Decided 2026-08-30: after
+   the event, build the game again the way `iftachShoham/HighSociety-Monopoly`
+   is built — Hono on Cloudflare Workers, D1, TypeScript services layered
+   `routes -> services -> repositories -> domain`, shared Zod schemas, Vitest —
+   and compare the two honestly.
+
+   The trade is real in both directions. RLS fails *closed*: a query that
+   forgets its filter returns nothing, which is exactly what happened to
+   `ship_cells` in `useGame` and turned a fleet leak into a cosmetic bug. A
+   service over D1 fails *open* — the same mistake returns every row. Against
+   that, logic in TypeScript is far easier to test, read and run locally than
+   the PL/pgSQL this app keeps its rules in, which is why that repo has tests
+   and this one has none (gap 9).
+
+   **This version is frozen architecturally until the event is over.** Build v2
+   as a separate repo, not a branch, so the comparison stays honest.
 
 ---
 
@@ -308,10 +365,11 @@ Roughly in priority order:
   ignore; the only way to clear a lint is for the object to stop matching it.
   That is why `tiles_for_me` and `team_scores` are functions and not views
   (0010/0011) — `security_definer_view` is CRITICAL and fires on views only.
-  Nothing about the security changed. The remaining ~19 `authenticated ... can
-  execute SECURITY DEFINER function` warnings are inherent to the design — every
-  write and every gated read in this app is a definer RPC on purpose — and are
-  expected to stay.
+  Nothing about the security changed. The remaining `authenticated ... can
+  execute SECURITY DEFINER function` warnings — one per RPC — are inherent to the
+  design, since every write and every gated read in this app is a definer RPC on
+  purpose, and are expected to stay. What matters is that the error count is
+  **zero**; do not chase the warning count, it grows with each new RPC.
 - **`select f(), (subquery)` in one statement** evaluates the subquery against
   the pre-call snapshot, so it looks like the function did nothing. Check in a
   separate statement.
@@ -322,8 +380,20 @@ Roughly in priority order:
   poll it in a loop; check the deployed bundle instead.
 - **`/repos/…/pages` returns 404 without auth** even when Pages is enabled. It is
   not evidence of anything — fetch the site itself.
-- **`python` is not on PATH** in the Bash tool on this machine, and fails
-  silently inside a pipeline.
+- **Bash heredocs collapse backslashes** on this machine. A `<<'PY'` heredoc is
+  supposed to pass its body through untouched, but a doubled backslash arrives
+  as a single one. That silently breaks regexes and any string match against a
+  JS escape sequence, and the failure looks like the pattern is wrong rather
+  than the plumbing. Build such strings with `chr(92)`, or use the Write tool
+  and run the file. This cost time three times, including once while writing
+  this very bullet.
+- **Dropping a function drops its grants.** `create or replace` cannot change a
+  `RETURNS TABLE` list, so changing one means `drop` + `create` — and the new
+  function comes back with no grants and PUBLIC's implicit EXECUTE. Re-apply the
+  revoke/grant pair in the same migration (0014 does) or every player silently
+  loses the board.
+- **Windows Python cannot see the Bash tool's `/tmp`.** Git Bash maps it
+  elsewhere; write to the scratchpad with a `C:\...` path instead.
 - **Boris's work laptop has no Node, npm or `gh`** — only git and Python. There
   is no local dev server and no local build there, so frontend changes go to
   `main` and are compiled for the first time by GitHub Actions. Check the
@@ -361,15 +431,36 @@ Roughly in priority order:
   the fleet". The throwaway game was deleted afterwards.
 - The admin Score card, in the browser, by Boris — changing the weighting to
   1-per-hit re-derived both totals correctly.
+- The admin tile board (**Show board** / **Show as list**), in the browser, by
+  Boris.
+- **The 100 V4 tiles**, by checksum rather than by eye:
+  `md5(string_agg(name, '|' order by position))` matched the same hash computed
+  on the source paste, so all 100 names round-tripped byte-identical and in
+  board order. Seven coordinates spot-checked against the sheet's labels.
+- **Redaction, re-tested after 0014** — as a real (non-admin) player,
+  `tiles_for_me` returns 100 rows with **0 names and 0 icons** while 10 tiles
+  have icons set, and a direct read of `tiles` returns **0 rows**. The loaded
+  page made **0 requests** to `/icons/`, so nothing leaks through the network
+  log either.
+- **Mobile layout, measured** on the live site at 375x812: 30x30 cells, all of
+  A-J visible, zero overflow on both board and page, 44px yard buttons,
+  `pointer: coarse` matched and the touch instructions rendered.
+- All ten committed icons serve HTTP 200 at
+  `/HS_Battleships/icons/<slug>.png` with the expected byte sizes.
 
 **Not verified:**
 
-- **The captain's placement card in a browser.** The RPC path under it is
-  tested end to end, but the card itself has never been rendered — written on a
-  machine with no Node (see Traps) and compiled only by CI. Needs a captain
-  account on a game in `placement`.
+- **Placing a fleet by touch, end to end.** The aim-then-confirm path was
+  written blind and only the rendered card has been seen, never a hull actually
+  dropped with a thumb. This is the first thing every captain does, so it is
+  worth two minutes on a real handset.
+- **An icon rendering on a claimed tile.** The redaction direction is proven
+  (above); the *showing* direction needs a live claim on a tile that has an
+  icon — try G1.
 - A full game played through the player UI by two real people since the V4 rule
   changes. Every game-logic test has been driven from SQL or the admin console.
-- Anything at mobile width.
+- **Anything on a real phone.** The measurements above were taken in an emulated
+  375x812 viewport, which gets layout and `pointer: coarse` right but is not a
+  handset.
 - Behaviour with a realistic team size — everything so far has been 1–2 players
   per side.

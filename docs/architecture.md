@@ -18,7 +18,7 @@ games ────────────────────────�
 | `games` | A single match: status, grid size, fleet composition, active-tile limit, winner |
 | `teams` | Exactly two per game (enforced by trigger), plus the Discord role to ping |
 | `team_members` | Who plays for whom, and who is captain (captains place the fleet) |
-| `tiles` | The 100 tasks — coordinate, name, rules |
+| `tiles` | The 100 tasks — coordinate, name, and an optional icon slug |
 | `ships` / `ship_cells` | Each team's placement. **Secret from the opponent** |
 | `tile_claims` | Claim → fire. A completed claim *is* a shot |
 | `game_events` | Append-only feed: powers Realtime and the Discord relay |
@@ -82,10 +82,15 @@ Everything else about this design follows from these:
 1. **Enemy ship placement.** `ships` and `ship_cells` are readable only by members of
    the owning team. The opponent learns a cell's contents only as the result of
    their own shot.
-2. **Unclaimed tile contents.** Teams pick tiles blind — a number, not a task. So
-   `tiles` has an RLS policy of `using (false)`: no client reads it directly. The app
-   reads the `tiles_for_me` function, which returns `name` and `rules` only for tiles the
-   viewer's own team has already claimed, and nulls for the rest.
+2. **Unclaimed tile contents.** Teams pick tiles blind — a coordinate, not a task.
+   So `tiles` has an RLS policy of `using (false)`: no client reads it directly. The
+   app reads the `tiles_for_me` function, which returns `name` and `icon` only for
+   tiles the viewer's own team has already claimed, and nulls for the rest.
+
+   The icon is redacted for the same reason the name is: a Dragon warhammer on an
+   unclaimed square gives it away. That redaction is also what keeps the image
+   files out of reach — with no slug there is no filename, so an unclaimed tile
+   generates no request and appears nowhere in the network log.
 
 Because both are enforced in the database rather than the UI, there is no request a
 determined player can craft to get around them — unlike the spreadsheet, where the
@@ -93,7 +98,7 @@ tile data sat in a reachable tab and placement was one `IMPORTRANGE` away.
 
 ### The event feed is the back door to secret #2
 `game_events.payload` is world-readable, so it must never carry a tile's `name` or
-`rules`. If it did, a team could read the opponent's claimed tiles out of the feed
+`icon`. If it did, a team could read the opponent's claimed tiles out of the feed
 and so learn what those same tiles are on its own board — the grid is shared.
 Events therefore store `tile_id` and `position` only, and each client resolves the
 name through `tiles_for_me`. The spreadsheet had the identical rule: its private
