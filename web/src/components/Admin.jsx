@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
-  adminOpenPlacement, adminListTiles, adminListShipCells, adminDeleteGame, adminResetGame,
+  adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminAdjustScore, adminListScoreEvents, adminDeleteScoreEvent, adminSetScoring,
 } from '../lib/supabase.js';
-import FleetPlacer from './FleetPlacer.jsx';
 import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
 import TileBoard from './TileBoard.jsx';
@@ -23,7 +22,6 @@ export default function Admin() {
   const [profiles, setProfiles] = useState([]);
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
-  const [shipCells, setShipCells] = useState([]);
   const [scores, setScores] = useState([]);
   const [scoreEvents, setScoreEvents] = useState([]);
   const [gameId, setGameId] = useState(null);
@@ -48,16 +46,14 @@ export default function Admin() {
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
-    if (!id) { setTiles([]); setShipCells([]); setScores([]); setScoreEvents([]); return; }
+    if (!id) { setTiles([]); setScores([]); setScoreEvents([]); return; }
     try {
-      const [t, ships, adjustments, { data: sc }] = await Promise.all([
+      const [t, adjustments, { data: sc }] = await Promise.all([
         adminListTiles(id),
-        adminListShipCells(id),
         adminListScoreEvents(id),
         supabase.rpc('team_scores', { p_game_id: id }),
       ]);
       setTiles(t ?? []);
-      setShipCells(ships ?? []);
       setScoreEvents(adjustments ?? []);
       setScores(sc ?? []);
     } catch (err) {
@@ -67,21 +63,6 @@ export default function Admin() {
 
   useEffect(() => { loadGames(); }, [loadGames]);
   useEffect(() => { loadGameDetail(gameId); }, [gameId, loadGameDetail]);
-
-  // A captain can save from another device. Fleet placement emits an event, so
-  // keep the admin's editable boards in step with the read-only overview below.
-  useEffect(() => {
-    if (!gameId) return;
-    const ch = supabase
-      .channel(`admin-detail-${gameId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
-        () => loadGameDetail(gameId)
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [gameId, loadGameDetail]);
 
   async function run(fn, okMessage) {
     setBusy(true); setError(null); setNotice(null);
@@ -236,32 +217,10 @@ export default function Admin() {
 
           <section className="card">
             <h2>Fleets</h2>
-            {game.status === 'placement' ? (
-              <div className="columns">
-                {gameTeams.map((t) => (
-                  <div key={t.id}>
-                    <FleetPlacer
-                      teamId={t.id}
-                      teamName={t.name}
-                      fleet={game.fleet}
-                      initialPlacement={placementForTeam(shipCells, t.id)}
-                      onPlaced={() => run(async () => {}, `${t.name} fleet saved.`)}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">
-                {game.status === 'setup'
-                  ? 'Open placement before positioning fleets.'
-                  : 'Fleets are frozen once the game starts.'}
-              </p>
-            )}
-
-            {/* Always on, placement included. This used to hide during
-                placement, which is exactly when the organiser most needs it:
-                a captain saves a fleet and the admin has no way to confirm it
-                landed. The placer above is a blank canvas, not a read-out. */}
+            <p className="muted">
+              Live overview of each team’s placed ships and incoming shots.
+              Captains place their own fleets from the player page.
+            </p>
             <AdminBoards gameId={game.id} teams={gameTeams} />
           </section>
 
@@ -288,27 +247,6 @@ export default function Admin() {
       )}
     </div>
   );
-}
-
-function placementForTeam(shipCells, teamId) {
-  const ships = new Map();
-
-  for (const cell of shipCells) {
-    if (cell.team_id !== teamId) continue;
-    if (!ships.has(cell.ship_id)) {
-      ships.set(cell.ship_id, { size: cell.size, cells: [] });
-    }
-    ships.get(cell.ship_id).cells.push({ row: cell.row, col: cell.col });
-  }
-
-  return [...ships.values()]
-    .map((ship) => ({
-      ...ship,
-      cells: ship.cells.sort((a, b) => a.row - b.row || a.col - b.col),
-    }))
-    .sort((a, b) => a.size - b.size
-      || a.cells[0].row - b.cells[0].row
-      || a.cells[0].col - b.cells[0].col);
 }
 
 function NewGame({ busy, onCreate }) {

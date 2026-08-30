@@ -34,8 +34,8 @@ server-side, so the tab is a convenience, not the permission:
 3. **Open placement** — moves the game from `setup` to `placement`.
 4. **Roster** — add players to teams and pick captains. Players appear here
    once they have signed up on the login screen.
-5. **Fleets** — click a hull, click its top-left cell, `R` to rotate. Illegal
-   placements are refused as you go.
+5. **Fleets** — captains place their own fleets from the player page. The admin
+   page shows both boards as a read-only live overview.
 6. **Start game** — refuses unless there are two teams, 100 tiles and both
    fleets complete. Fleets freeze at this moment.
 

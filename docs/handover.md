@@ -142,9 +142,8 @@ All in the app, signed in as the admin:
    parse coordinates
 3. **Open placement**
 4. **Roster** — add players, set captains (players must have signed up first)
-5. **Fleets** — click a hull, click its top-left cell, `R` rotates. On a touch
-   screen the first tap aims and a second tap on the same cell drops the hull,
-   and rotating uses the button rather than the key
+5. **Fleets** — captains place their own fleet from the player page. The admin
+   Fleets card is a read-only live overview of both boards
 6. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
 7. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
    and award or dock points by hand with a reason. Every adjustment can be undone
@@ -156,12 +155,10 @@ replay immediately. Both clear every claim, the feed, the manual adjustments and
 the winner, and both emit a `game_reset` event, so open player pages notice by
 themselves instead of sitting on a board that no longer exists.
 
-The Fleets card carries a live spectator view underneath the placer, in every
-status: one board per team, its ships plus incoming shots, with sunk/hit counts,
-updating over Realtime. During `placement`, the editable boards above now load
-the saved fleets as well, so they no longer falsely look unfinished while the
-spectator boards show the ships. A captain's `fleet_placed` event refreshes both
-the editable boards and the overview.
+The Fleets card is a live spectator view in every status: one board per team,
+its ships plus incoming shots, with sunk/hit counts, updating over Realtime.
+There are deliberately no placement controls in the admin page; captains place
+from their player page and the `fleet_placed` event refreshes the overview.
 
 ### What the admin can see that players cannot
 
@@ -191,8 +188,8 @@ is separate from every player account and `is_admin` is grantable only by SQL.
   carry this.
 - **On a team, during `placement`:** a captain gets a **Place your fleet** card
   and can reposition freely until the game starts; a member gets a line saying
-  their captain is doing it. The admin console can still place either fleet, so
-  the organiser remains the fallback if a captain does not show up.
+  their captain is doing it. The admin console only watches both fleet boards;
+  it does not expose placement controls.
 - **On a team, once `active`:** enemy waters (claimable), their own fleet with
   incoming shots, their active tile slots, the scoreboard, and the event feed.
 
@@ -374,6 +371,7 @@ Roughly in priority order:
   status ternary, so during `placement` it was simply absent, and no refresh or
   event could have helped. The symptom — "the admin does not see the fleet" —
   is identical to a missed event, which is what made it easy to misdiagnose.
+  The card now renders only `AdminBoards`, in every status.
 - **Realtime needs the publication, not just the subscription.** A channel can
   report `SUBSCRIBED` and still deliver nothing if its table is not in
   `supabase_realtime`. There is no error anywhere. This is what 0007 fixes, and
@@ -491,13 +489,10 @@ Roughly in priority order:
   production transaction: admin placement succeeded with 5 ships / 17 cells,
   off-board and touching fleets were rejected, and the event payload contained
   only `{"ships":5}`.
-- The admin fleet placers now load the persisted fleet returned by
-  `admin_list_ship_cells`, explain that the saved fleet is loaded, and refresh
-  when a captain saves from another page. Deployed from commit `b9f42f7` and
-  verified in the signed-in live admin panel: Kriegsmarine's editor drew all 17
-  saved cells, showed "All hulls placed" and offered "Save changes";
-  Flikkerlikkers correctly remained an empty five-hull placement because that
-  team has no saved fleet. The deployed bundle was `index-Dh3Cpf9g.js`.
+- The admin fleet placers briefly loaded the persisted fleets in commit
+  `b9f42f7`, but were removed on Boris's instruction: placement belongs on the
+  captain page. The admin Fleets card now contains only the two live overview
+  boards with coordinates, ships, hits, misses and active claims.
 
 **Not verified:**
 
