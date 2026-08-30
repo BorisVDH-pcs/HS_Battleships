@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase.js';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rsn, setRsn] = useState('');
   const [mode, setMode] = useState('signin');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
@@ -14,10 +15,24 @@ export default function Login() {
     setBusy(true);
     setMessage(null);
     try {
-      const fn = mode === 'signin' ? 'signInWithPassword' : 'signUp';
-      const { error } = await supabase.auth[fn]({ email, password });
-      if (error) throw error;
-      if (mode === 'signup') setMessage('Account created — check your email to confirm.');
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        // rsn lands in raw_user_meta_data, which the on_auth_user_created
+        // trigger copies into the profiles row.
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { rsn: rsn.trim(), display_name: rsn.trim() } },
+        });
+        if (error) throw error;
+        setMessage(
+          data.session
+            ? 'Account created.'
+            : 'Account created — check your email to confirm, then sign in.'
+        );
+      }
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -39,6 +54,14 @@ export default function Login() {
           <input type="password" value={password} required minLength={8}
                  onChange={(e) => setPassword(e.target.value)} />
         </label>
+        {mode === 'signup' && (
+          <label>
+            RuneScape name
+            <input type="text" value={rsn} required
+                   placeholder="Your in-game name"
+                   onChange={(e) => setRsn(e.target.value)} />
+          </label>
+        )}
         <button type="submit" disabled={busy}>
           {busy ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
