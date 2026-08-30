@@ -50,6 +50,24 @@ jobs:
           if [ -n "$SECRET_SUPABASE_ANON_KEY" ]; then
             export VITE_SUPABASE_ANON_KEY="$SECRET_SUPABASE_ANON_KEY"
           fi
+
+          # Refuse to ship a service_role / secret key. Vite inlines this value
+          # into a bundle served to every player, and a secret key bypasses RLS
+          # completely — it would hand out both fleets and all 100 tile answers.
+          # This has happened once already: a secret key pasted into the repo
+          # secret overrode the correct anon key and was published.
+          case "$VITE_SUPABASE_ANON_KEY" in
+            sb_secret_*)
+              echo "::error::VITE_SUPABASE_ANON_KEY is a SECRET key (sb_secret_...). It bypasses RLS and must never reach the browser. Use the publishable/anon key, and rotate the leaked secret key in Supabase."
+              exit 1
+              ;;
+          esac
+          if printf '%s' "$VITE_SUPABASE_ANON_KEY" | cut -d. -f2 \
+             | tr '_-' '/+' | base64 -d 2>/dev/null | grep -q 'service_role'; then
+            echo "::error::VITE_SUPABASE_ANON_KEY is a service_role JWT. It bypasses RLS and must never reach the browser."
+            exit 1
+          fi
+
           npm run build --prefix web
 
       - uses: actions/configure-pages@v5
