@@ -16,6 +16,9 @@ export default function EventFeed({ events, teams, myTeamId }) {
       : null;
 
     switch (e.type) {
+      case 'fleet_placed':
+        // Hull count only — the payload deliberately carries no cells.
+        return `${who}'s fleet is set.`;
       case 'game_started':
         return 'The game has begun — fleets are locked.';
       case 'tile_claimed':

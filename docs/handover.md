@@ -73,6 +73,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0012_game_reset_event_type.sql` | Adds the `game_reset` event type (split from 0013 for the same reason as 0008) |
 | `0013_reset_game.sql` | `admin_reset_game` — roll a started game back to placement without losing tiles or roster |
 | `0014_tile_icons.sql` | Adds `tiles.icon`, drops the unused `tiles.rules`, rebuilds `tiles_for_me` and `admin_list_tiles` around them (drop + recreate, so grants are re-applied) |
+| `0015_fleet_placed_event_type.sql` | Adds the `fleet_placed` event type (separate file for the same reason as 0008 and 0012) |
+| `0016_place_fleet_emits_event.sql` | `place_fleet` now emits `fleet_placed`, so the admin console sees a captain's placement without a manual refresh |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -348,6 +350,14 @@ Roughly in priority order:
 
 ## Traps — things that cost time here
 
+- **No event means no refresh, forever.** The admin console and every player
+  page refetch when a `game_events` row appears for the game, and nothing else
+  triggers them. An RPC that changes state without emitting an event leaves
+  every other screen stale indefinitely — not a cache that ages out, no signal
+  at all. `place_fleet` had exactly this bug until 0016: a captain placed a full
+  fleet and the organiser's screen kept saying "No fleet placed yet". Roster
+  changes still have it, which is why the waiting room polls (gap 11). If you
+  add a state-changing RPC, emit an event from it.
 - **Realtime needs the publication, not just the subscription.** A channel can
   report `SUBSCRIBED` and still deliver nothing if its table is not in
   `supabase_realtime`. There is no error anywhere. This is what 0007 fixes, and
