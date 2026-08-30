@@ -1,10 +1,17 @@
 import { Fragment } from 'react';
-import { GRID, colLetter } from '../lib/board.js';
+import { GRID, colLetter, coordLabel } from '../lib/board.js';
 
 /**
- * The enemy board: 100 numbered tiles. A tile shows only its number until this
- * team claims it — the task itself stays hidden server-side (see `tiles_for_me`).
- * Fired tiles show the hit/miss they produced.
+ * The enemy board: 100 tiles labelled A1..J10. A tile shows only its coordinate
+ * until this team claims it — the task itself stays hidden server-side (see
+ * `tiles_for_me`). Fired tiles show the hit/miss they produced.
+ *
+ * The coordinate rather than the 1..100 position, because that is what people
+ * say out loud and type into Discord, and it matches the axes and the feed.
+ *
+ * When tile icons arrive they replace this label on *claimed* tiles only, and
+ * `tiles_for_me` has to null the icon exactly as it nulls `name` and `rules` —
+ * an icon on an unclaimed tile is a hint about its contents.
  */
 export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
@@ -22,6 +29,7 @@ export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
             <div className="axis">{r + 1}</div>
             {Array.from({ length: GRID }, (_, c) => {
               const position = r * GRID + c + 1;
+              const label = coordLabel(r + 1, c + 1);
               const tile = byPosition.get(position);
               if (!tile) return <div key={position} className="cell empty" />;
 
@@ -39,10 +47,10 @@ export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
                   key={position}
                   className={cls}
                   disabled={tile.revealed || !canClaim || busyTileId === tile.id}
-                  title={tile.revealed ? tile.name : `Tile ${position} — not yet claimed`}
+                  title={tile.revealed ? `${label} — ${tile.name}` : `${label} — not yet claimed`}
                   onClick={() => onClaim(tile)}
                 >
-                  {fired ? (tile.claim_result === 'hit' ? '✕' : '·') : position}
+                  {fired ? (tile.claim_result === 'hit' ? '✕' : '·') : label}
                 </button>
               );
             })}
