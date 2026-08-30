@@ -66,6 +66,14 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0005_lock_down_trigger_function.sql` | Revokes EXECUTE on that trigger function — it was callable as an RPC |
 | `0006_admin_and_ship_spacing.sql` | Admin role + admin RPCs, ship-spacing rule, `start_game` made admin-only |
 | `0007_enable_realtime.sql` | Publishes `game_events` — **Realtime did nothing before this** |
+| `0008_score_event_type.sql` | Adds the `score_adjusted` event type (separate file so it commits before 0009 uses it) |
+| `0009_scoring.sql` | Scoring weights on `games`, the `team_scores` view, the four score RPCs, and `score_events` taken off world-read |
+
+The Supabase migration ledger lists one fewer than there are files:
+`0005_lock_down_trigger_function` was applied as a plain statement rather than
+through `apply_migration`, so it does not appear in `list_migrations`. The revoke
+itself **is** live — `handle_new_user` has no `anon`/`authenticated` EXECUTE.
+Bookkeeping only, but it makes the ledger a bad way to check what is applied.
 
 ---
 
@@ -124,6 +132,8 @@ All in the app, signed in as the admin:
 4. **Roster** — add players, set captains (players must have signed up first)
 5. **Fleets** — click a hull, click its top-left cell, `R` rotates
 6. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
+7. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
+   and award or dock points by hand with a reason. Every adjustment can be undone
 
 Once active, the Fleets card becomes a live spectator view: one board per team,
 its ships plus incoming shots, with sunk/hit counts, updating over Realtime.
@@ -180,8 +190,14 @@ Roughly in priority order:
    reading unrelayed events is the intended shape.
 3. **Rotate the Discord webhook URLs** hardcoded in the old Apps Script files on
    Boris's Desktop. Advised repeatedly, never confirmed done.
-4. **Scoring.** `score_events` exists for manual adjustments (the sheet's "+1"
-   button) but nothing reads or writes it, and there is no scoreboard.
+4. ~~**Scoring.**~~ **Done** — see 0009. Totals are derived by `team_scores`
+   (tiles × `points_per_tile` + hits × `points_per_hit` + sinks ×
+   `points_per_sink` + manual adjustments), the weights are per-game and
+   editable in the admin console, and `score_events` is now written and read
+   through `admin_adjust_score` / `admin_list_score_events` /
+   `admin_delete_score_event`. Defaults are 1 point per completed tile and
+   nothing else, which is what the spreadsheet did. **Not yet seen in a
+   browser** — see below.
 5. **Captain-facing placement.** `place_fleet` allows a captain, but only the
    admin console calls it — a captain has no UI to place their own fleet.
 6. **Delete the demo data** before a real event: the "Demo Match" game and the
@@ -220,6 +236,11 @@ Roughly in priority order:
   not evidence of anything — fetch the site itself.
 - **`python` is not on PATH** in the Bash tool on this machine, and fails
   silently inside a pipeline.
+- **Boris's work laptop has no Node, npm or `gh`** — only git and Python. There
+  is no local dev server and no local build there, so frontend changes go to
+  `main` and are compiled for the first time by GitHub Actions. Check the
+  workflow result before assuming a change is live. (`winget install
+  OpenJS.NodeJS.LTS` fixes it if that trade stops being worth it.)
 
 ---
 
@@ -239,9 +260,18 @@ Roughly in priority order:
   automatically once assigned — tested with the real `Soft Papi` account
 - Signup works end-to-end on the live site
 - Deployed bundle carries the right key and the current code
+- Scoring, server-side, against the live database: `team_scores` totals
+  cross-check against `ship_status` and the raw claim counts; `admin_adjust_score`
+  refuses a caller with no admin profile; an adjustment moves the total and
+  `admin_delete_score_event` puts it back; the `score_adjusted` payload carries
+  the delta and no `reason`; and an impersonated Flikkerlikkers player sees both
+  teams' totals but **zero** `score_events` rows. Test rows were deleted after.
 
 **Not verified:**
 
+- **The scoring UI in a browser.** The SQL underneath it is tested, but the
+  Scoreboard and the admin Score card have never been rendered — they were
+  written on a machine with no Node (see Traps) and compiled only by CI.
 - A full game played through the player UI by two real people since the V4 rule
   changes. Every game-logic test has been driven from SQL or the admin console.
 - Anything at mobile width.

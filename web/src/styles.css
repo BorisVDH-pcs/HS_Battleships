@@ -192,6 +192,37 @@ button.cell:disabled { cursor: default; }
 .feed li.mine span { color: var(--text); }
 .feed li.theirs span { color: var(--muted); }
 
+/* ---- scoreboard ---- */
+
+.scoreboard { margin: 1.5rem 0; }
+.scoreboard ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.scoreboard li {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: .6rem .9rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.scoreboard li.leading { border-color: var(--gold-deep); box-shadow: var(--glow-sm); }
+.scoreboard li.mine .who strong { color: var(--gold-lit); }
+.scoreboard .who strong { font-family: var(--display); letter-spacing: .04em; }
+.scoreboard .tag {
+  margin-left: .5rem; font-size: .65rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.scoreboard .meta { color: var(--muted); font-size: .78rem; margin-top: .15rem; }
+.scoreboard .points {
+  font-family: var(--display); font-size: 1.7rem; line-height: 1;
+  color: var(--gold); font-variant-numeric: tabular-nums; flex: none;
+}
+.scoreboard li.leading .points { color: var(--gold-lit); text-shadow: var(--glow-sm); }
+.scoreboard > .muted { margin: .5rem 0 0; }
+
+/* The admin console nests the scoreboard inside a card that already has a
+   heading, so it must not add a second block of top margin. */
+.card .scoreboard { margin: 0; }
+.card .scoreboard h2 { display: none; }
+
 /* ---- controls ---- */
 
 button {
@@ -298,6 +329,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   border-bottom: 1px solid var(--line);
 }
 .roster .captain { color: var(--gold); }
+.roster .meta { color: var(--muted); font-size: .78rem; margin-top: .1rem; }
 
 /* ---- waiting room ---- */
 

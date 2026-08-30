@@ -41,6 +41,21 @@ hit and compares that to the ship's size. The Sheets version diffed a snapshot
 kept in `PropertiesService`, which drifted on reset and could miss concurrent
 sinks — this cannot.
 
+### Score is derived too
+`team_scores` totals each team from what the board already records — tiles fired,
+hits, enemy ships finished off — times per-game weights on `games`
+(`points_per_tile`, `points_per_hit`, `points_per_sink`), plus the sum of manual
+adjustments. Nothing stores a running total, so nothing can drift, and changing a
+weight simply re-totals both teams.
+
+`score_events` keeps its original job: the sheet's "+1" button, as an audit trail.
+Its `reason` is free text an admin types, which makes it the one place in the
+schema that *could* name a tile — so unlike every other public channel here it is
+**not** world-readable. Rows are visible to the team they concern and to admins;
+everyone sees the totals through `team_scores`, which exposes counts only. The
+`score_adjusted` event carries the delta and never the reason, for the same
+reason the shot events carry no tile name.
+
 ## Game rules, and where each is enforced
 
 | Rule | Enforced by |

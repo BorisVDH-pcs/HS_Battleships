@@ -6,6 +6,7 @@ import EnemyGrid from './components/EnemyGrid.jsx';
 import MyFleet from './components/MyFleet.jsx';
 import ActiveTiles from './components/ActiveTiles.jsx';
 import EventFeed from './components/EventFeed.jsx';
+import Scoreboard from './components/Scoreboard.jsx';
 import Admin from './components/Admin.jsx';
 
 export default function App() {
@@ -102,7 +103,7 @@ export default function App() {
     }
   }
 
-  const { loading, error, teams, myTeamId, tiles, myShipCells, myFleet, enemyShots, events } = game;
+  const { loading, error, teams, myTeamId, tiles, myShipCells, myFleet, enemyShots, events, scores } = game;
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
@@ -155,6 +156,8 @@ export default function App() {
               {teams.find((t) => t.id === game.game.winner_team_id)?.name} wins.
             </p>
           )}
+
+          <Scoreboard scores={scores} myTeamId={myTeamId} game={game.game} />
 
           <div className="columns">
             <section>

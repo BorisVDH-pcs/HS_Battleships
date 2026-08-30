@@ -20,6 +20,7 @@ export function useGame(gameId, session) {
     myFleet: [],      // ship_status for my fleet only
     enemyShots: [],   // fired claims by the other team, onto my board
     events: [],
+    scores: [],       // team_scores: derived totals for BOTH teams, no free text
   });
 
   const load = useCallback(async () => {
@@ -37,18 +38,21 @@ export function useGame(gameId, session) {
         teams?.find((t) => memberships?.some((m) => m.team_id === t.id))?.id ?? null;
       const enemyTeamId = teams?.find((t) => t.id !== myTeamId)?.id ?? null;
 
-      const [{ data: tiles }, { data: myShipCells }, { data: myFleet }, { data: events }] =
-        await Promise.all([
-          supabase.from('tiles_for_me').select('*').eq('game_id', gameId).order('position'),
-          supabase.from('ship_cells').select('*'),
-          supabase.from('ship_status').select('*'),
-          supabase
-            .from('game_events')
-            .select('*')
-            .eq('game_id', gameId)
-            .order('created_at', { ascending: false })
-            .limit(50),
-        ]);
+      const [
+        { data: tiles }, { data: myShipCells }, { data: myFleet },
+        { data: events }, { data: scores },
+      ] = await Promise.all([
+        supabase.from('tiles_for_me').select('*').eq('game_id', gameId).order('position'),
+        supabase.from('ship_cells').select('*'),
+        supabase.from('ship_status').select('*'),
+        supabase
+          .from('game_events')
+          .select('*')
+          .eq('game_id', gameId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase.from('team_scores').select('*').eq('game_id', gameId),
+      ]);
 
       // Enemy shots land on my board: their fired claims, resolved to coordinates.
       let enemyShots = [];
@@ -72,6 +76,7 @@ export function useGame(gameId, session) {
         myFleet: myFleet ?? [],
         enemyShots,
         events: events ?? [],
+        scores: scores ?? [],
       });
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }));

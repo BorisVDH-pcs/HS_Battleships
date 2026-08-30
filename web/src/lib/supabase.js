@@ -89,3 +89,24 @@ export const adminListShipCells = (gameId) =>
 
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
+
+// ---- Scoring -------------------------------------------------------------
+// Totals are derived (see the `team_scores` view); these only touch the manual
+// adjustments layered on top, which is the sheet's "+1" button.
+
+/** `reason` is required and is visible to this team and admins, never to the enemy. */
+export const adminAdjustScore = (teamId, delta, reason, profileId = null) =>
+  rpc('admin_adjust_score', {
+    p_team_id: teamId, p_delta: delta, p_reason: reason, p_profile_id: profileId,
+  });
+
+export const adminListScoreEvents = (gameId) =>
+  rpc('admin_list_score_events', { p_game_id: gameId });
+
+export const adminDeleteScoreEvent = (id) =>
+  rpc('admin_delete_score_event', { p_id: id });
+
+export const adminSetScoring = (gameId, perTile, perHit, perSink) =>
+  rpc('admin_set_scoring', {
+    p_game_id: gameId, p_per_tile: perTile, p_per_hit: perHit, p_per_sink: perSink,
+  });
