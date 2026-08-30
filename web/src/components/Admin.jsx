@@ -232,15 +232,18 @@ export default function Admin() {
                 ))}
               </div>
             ) : (
-              <>
-                <p className="muted">
-                  {game.status === 'setup'
-                    ? 'Open placement before positioning fleets.'
-                    : 'Fleets are frozen once the game starts.'}
-                </p>
-                <AdminBoards gameId={game.id} teams={gameTeams} />
-              </>
+              <p className="muted">
+                {game.status === 'setup'
+                  ? 'Open placement before positioning fleets.'
+                  : 'Fleets are frozen once the game starts.'}
+              </p>
             )}
+
+            {/* Always on, placement included. This used to hide during
+                placement, which is exactly when the organiser most needs it:
+                a captain saves a fleet and the admin has no way to confirm it
+                landed. The placer above is a blank canvas, not a read-out. */}
+            <AdminBoards gameId={game.id} teams={gameTeams} />
           </section>
 
           <Scoring
