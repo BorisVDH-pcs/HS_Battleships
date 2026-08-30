@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, adminListTiles, adminListShipCells } from '../lib/supabase.js';
-import { GRID, colLetter, cellKey } from '../lib/board.js';
+import { GRID, colLetter, coordLabel, cellKey } from '../lib/board.js';
 
 /**
  * The organiser's view: both boards at once, with nothing hidden.
@@ -122,10 +122,18 @@ export default function AdminBoards({ gameId, teams }) {
                       else if (isShip) cls += ' ship';
                       if (shot?.status === 'active') cls += ' active';
 
+                      // Same labelling as the player board: a bare cell names
+                      // itself, so a square can be read off without counting
+                      // along the axes. A shot marker outranks the label.
+                      const label = coordLabel(row, col);
+                      const mark =
+                        shot?.status === 'fired' && shot.result === 'hit' ? '✕'
+                          : shot?.status === 'active' ? '•'
+                            : label;
+
                       return (
-                        <div key={key} className={cls} title={`${colLetter(col)}${row}`}>
-                          {shot?.status === 'fired' && shot.result === 'hit' ? '✕' : ''}
-                          {shot?.status === 'active' ? '•' : ''}
+                        <div key={key} className={cls} title={label}>
+                          {mark}
                         </div>
                       );
                     }),
