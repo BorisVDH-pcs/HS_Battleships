@@ -16,7 +16,7 @@ team hiding a fleet of `2,3,3,4,5` on its own 10x10 board.
 | Repo | https://github.com/BorisVDH-pcs/HS_Battleships |
 | Live | https://borisvdh-pcs.github.io/HS_Battleships/ |
 | Supabase | project `Battleships` — `fjgcijmdxeebgkdokini`, eu-west-2 |
-| Local | `Documents/Claude/Project 1/HS_Battleships` |
+| Local | No canonical path — clone it where you need it. On Boris's work laptop: `Desktop/BorisHS/HS_Battleships` |
 | Dev server | port **5174** (`npm run dev --prefix web`) |
 
 The Supabase project is deliberately **separate** from HighSocietyScape's
