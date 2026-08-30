@@ -365,3 +365,29 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .cell.preview     { background: #2b3f33; border-color: var(--ship-lit); }
 .cell.preview-bad { background: #3a1a16; border-color: var(--hit); }
 .cell.no-go       { box-shadow: inset 0 0 0 1px rgba(184, 50, 31, .25); }
+
+/* ---- phones ---- */
+/*
+ * Captains place their fleet from a phone, so the boards have to survive a
+ * thumb. At 375px the ten columns were collapsing to ~24px cells, well under
+ * the ~44px a touch target wants. Claw back the page padding and hold the
+ * cells to a 32px floor; if they still will not fit, the board scrolls
+ * sideways rather than shrinking further.
+ *
+ * Scoped to `.board` on purpose: AdminBoards renders a bare `.board-grid`
+ * with no scrolling parent, and a floor there would push the whole page
+ * sideways instead.
+ */
+@media (max-width: 620px) {
+  .app { padding: 1rem .75rem; }
+
+  .board { overflow-x: auto; overflow-y: hidden; padding-bottom: .3rem; }
+  .board .board-grid {
+    grid-template-columns: 1.4rem repeat(10, minmax(32px, 1fr));
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .placer .yard button { min-height: 44px; }
+  .slot button { min-height: 44px; }
+}

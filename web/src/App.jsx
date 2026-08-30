@@ -92,6 +92,11 @@ export default function App() {
   if (!session) return <main className="app"><Login /></main>;
 
   async function onClaim(tile) {
+    // A grid cell is a small target, especially on a phone, and a claim is not
+    // free: it takes one of the team's active slots until the tile is fired.
+    // Firing already confirms in ActiveTiles; claiming should too.
+    if (!window.confirm(`Claim tile ${tile.position}? It takes one of your active slots.`)) return;
+
     setBusyTileId(tile.id);
     setNotice(null);
     try {
