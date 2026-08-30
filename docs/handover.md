@@ -493,8 +493,11 @@ Roughly in priority order:
   only `{"ships":5}`.
 - The admin fleet placers now load the persisted fleet returned by
   `admin_list_ship_cells`, explain that the saved fleet is loaded, and refresh
-  when a captain saves from another page. The production frontend build passes
-  locally; deployment status is recorded below.
+  when a captain saves from another page. Deployed from commit `b9f42f7` and
+  verified in the signed-in live admin panel: Kriegsmarine's editor drew all 17
+  saved cells, showed "All hulls placed" and offered "Save changes";
+  Flikkerlikkers correctly remained an empty five-hull placement because that
+  team has no saved fleet. The deployed bundle was `index-Dh3Cpf9g.js`.
 
 **Not verified:**
 
