@@ -6,6 +6,7 @@ import EnemyGrid from './components/EnemyGrid.jsx';
 import MyFleet from './components/MyFleet.jsx';
 import ActiveTiles from './components/ActiveTiles.jsx';
 import EventFeed from './components/EventFeed.jsx';
+import Admin from './components/Admin.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -13,6 +14,8 @@ export default function App() {
   const [gameId, setGameId] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [tab, setTab] = useState('game');
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -38,6 +41,18 @@ export default function App() {
       .order('created_at', { ascending: false })
       .limit(1)
       .then(({ data }) => setGameId(data?.[0]?.id ?? null));
+  }, [session]);
+
+  // Whether to offer the admin tab. Cosmetic only — every admin RPC re-checks
+  // is_admin() server-side, so faking this flag buys nothing.
+  useEffect(() => {
+    if (!supabase || !session) { setIsAdmin(false); return; }
+    supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
   }, [session]);
 
   const game = useGame(gameId, session);
@@ -81,11 +96,21 @@ export default function App() {
       <header className="top">
         <h1>HS Battleships</h1>
         <div className="who">
-          <span>{displayName || 'Signed in'}</span>
+          <span className="name">{displayName || 'Signed in'}</span>
           <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>
 
+      {isAdmin && (
+        <nav className="tabs">
+          <button className={tab === 'game' ? 'on' : ''} onClick={() => setTab('game')}>Game</button>
+          <button className={tab === 'admin' ? 'on' : ''} onClick={() => setTab('admin')}>Admin</button>
+        </nav>
+      )}
+
+      {isAdmin && tab === 'admin' && <Admin />}
+
+      {tab === 'game' && <>
       {loading && <p>Loading game…</p>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="error">{notice}</p>}
@@ -143,6 +168,7 @@ export default function App() {
           <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
         </>
       )}
+      </>}
     </main>
   );
 }

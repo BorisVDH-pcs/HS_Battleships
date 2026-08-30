@@ -20,7 +20,26 @@ There is **no turn order**. A team plays whenever it has a free slot.
 4. **Sink** — when every cell of a ship has been hit, it sinks. All five ships sunk ends the game.
 
 Fleets are placed before the game starts and **frozen the moment it does** — for
-players, captains and admins alike.
+players, captains and admins alike. **Ships may not touch, not even at the
+corners**, so every ship is surrounded by at least one clear cell.
+
+## Running an event (admin)
+
+Admins get an **Admin** tab in the app. Everything below is also enforced
+server-side, so the tab is a convenience, not the permission:
+
+1. **New game** — name it and name both teams.
+2. **Tiles** — paste 100 lines, one per tile in board order, optionally
+   `name | rules`. This replaces the Middleman sheet's `Tile Data`.
+3. **Open placement** — moves the game from `setup` to `placement`.
+4. **Roster** — add players to teams and pick captains. Players appear here
+   once they have signed up on the login screen.
+5. **Fleets** — click a hull, click its top-left cell, `R` to rotate. Illegal
+   placements are refused as you go.
+6. **Start game** — refuses unless there are two teams, 100 tiles and both
+   fleets complete. Fleets freeze at this moment.
+
+Grant admin with `update profiles set is_admin = true where display_name = '…';`
 
 ## Stack
 

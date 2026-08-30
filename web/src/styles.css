@@ -1,14 +1,39 @@
+/* High Society theme — molten gold on black, after the clan logo.
+ *
+ * The palette is deliberately narrow: the page is near-black, and gold carries
+ * every meaning that isn't hit/miss. Glow is the accent, not another hue, so the
+ * two colours that DO carry game meaning (hit red, ship green) stay unmistakable
+ * against it.
+ */
+
 :root {
-  --bg: #0e1620;
-  --panel: #16212e;
-  --line: #27384a;
-  --text: #dbe6f0;
-  --muted: #7d93a8;
-  --accent: #4aa3df;
-  --hit: #c0392b;
-  --miss: #34495e;
-  --ship: #2d6a4f;
-  --active: #b7791f;
+  --bg:        #07060a;
+  --bg-lift:   #0f0d13;
+  --panel:     #14110c;
+  --panel-2:   #1b1610;
+  --line:      #3a2d15;
+  --line-lit:  #6b5320;
+
+  --gold:      #e8b83c;
+  --gold-lit:  #ffe9a3;
+  --gold-deep: #8a6516;
+  --gold-dim:  #a08a52;
+
+  --text:      #efe3c8;
+  --muted:     #8d7c56;
+
+  --hit:       #b8321f;
+  --hit-lit:   #ff7a5c;
+  --miss:      #1e222a;
+  --ship:      #2c5f43;
+  --ship-lit:  #4f9d74;
+
+  --glow-sm: 0 0 6px rgba(232, 184, 60, .35);
+  --glow-md: 0 0 14px rgba(232, 184, 60, .30);
+  --glow-lg: 0 0 34px rgba(232, 184, 60, .22);
+
+  --display: "Cinzel", Georgia, "Times New Roman", serif;
+  --body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -16,30 +41,78 @@
 body {
   margin: 0;
   background: var(--bg);
+  /* Two soft embers behind the page, echoing the logo's glow. Fixed so they do
+     not slide around while the board scrolls. */
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% -10%, rgba(232, 184, 60, .13), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 110%, rgba(232, 184, 60, .06), transparent 70%);
+  background-attachment: fixed;
   color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.5 var(--body);
+  min-height: 100vh;
 }
 
 .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
 
-.top { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-.top h1 { font-size: 1.4rem; margin: 0; }
-.who { display: flex; gap: .75rem; align-items: baseline; color: var(--muted); font-size: .85rem; }
+/* ---- headings ---- */
 
-h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; }
+
+.top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem; flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.top h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--gold-lit) 0%, var(--gold) 45%, var(--gold-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The gradient replaces the glyph colour, so the glow has to come from a
+     drop-shadow filter rather than text-shadow (which would paint behind the
+     transparent fill and show through). */
+  filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
+}
+.who {
+  display: flex; gap: .75rem; align-items: baseline;
+  color: var(--muted); font-size: .85rem;
+}
+.who .name { color: var(--gold-dim); }
+
+h2 {
+  font-size: .8rem; text-transform: uppercase; letter-spacing: .18em;
+  color: var(--gold-dim); margin: 0 0 .7rem;
+}
+h3 { font-size: .95rem; letter-spacing: .06em; color: var(--gold-dim); margin: 0 0 .5rem; }
+
+/* ---- chrome ---- */
 
 .status { color: var(--muted); }
+.status strong { color: var(--gold); font-family: var(--display); letter-spacing: .04em; }
+
 .banner {
-  background: var(--accent); color: #04121d; padding: .6rem .9rem;
-  border-radius: 6px; font-weight: 600;
+  background: linear-gradient(180deg, var(--gold-lit), var(--gold) 60%, var(--gold-deep));
+  color: #1a1204; padding: .7rem 1rem; border-radius: 4px;
+  font-family: var(--display); font-weight: 700; letter-spacing: .06em;
+  box-shadow: var(--glow-md);
 }
-.error { color: #ff8b7a; }
+.error {
+  color: #ffb0a0;
+  border-left: 2px solid var(--hit);
+  padding-left: .7rem;
+}
 .muted { color: var(--muted); font-size: .85rem; }
 
 .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 860px) { .columns { grid-template-columns: 1fr; } }
 
 /* ---- boards ---- */
+
 .board-grid {
   display: grid;
   grid-template-columns: 1.4rem repeat(10, 1fr);
@@ -47,53 +120,71 @@ h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; color:
 }
 .axis, .corner {
   display: grid; place-items: center;
-  color: var(--muted); font-size: .7rem;
+  color: var(--gold-dim); font-size: .7rem;
+  font-family: var(--display); letter-spacing: .05em;
 }
 .cell {
   aspect-ratio: 1;
   display: grid; place-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: 2px;
   color: var(--muted);
   font-size: .7rem;
   font-family: inherit;
   padding: 0;
+  transition: background .12s, border-color .12s, box-shadow .12s;
 }
 button.cell { cursor: default; }
-button.cell.claimable { cursor: pointer; color: var(--text); }
-button.cell.claimable:hover { border-color: var(--accent); background: #1d2b3a; }
+button.cell.claimable { cursor: pointer; color: var(--gold-dim); }
+button.cell.claimable:hover {
+  border-color: var(--gold);
+  background: var(--panel-2);
+  color: var(--gold-lit);
+  box-shadow: var(--glow-sm);
+}
 button.cell:disabled { cursor: default; }
 
-.cell.ship   { background: var(--ship); border-color: #3d8b6a; }
-.cell.hit    { background: var(--hit); color: #fff; border-color: #e05a4a; }
-.cell.miss   { background: var(--miss); color: var(--muted); }
-.cell.active { border-color: var(--active); color: var(--active); }
+.cell.ship   { background: var(--ship); border-color: var(--ship-lit); color: #cfe9db; }
+.cell.hit    {
+  background: var(--hit); color: #fff; border-color: var(--hit-lit);
+  box-shadow: 0 0 10px rgba(255, 122, 92, .45);
+}
+.cell.miss   { background: var(--miss); color: #5b646f; }
+.cell.active {
+  border-color: var(--gold); color: var(--gold-lit);
+  box-shadow: var(--glow-sm);
+}
 .cell.empty  { background: transparent; border-color: transparent; }
 
 .fleet-status { color: var(--muted); font-size: .85rem; margin: 0 0 .5rem; }
 
 /* ---- active tiles ---- */
+
 .active-tiles { margin-top: 1.5rem; }
 .slot {
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: .8rem 1rem;
   margin-bottom: .6rem;
 }
-.slot.empty { color: var(--muted); border-style: dashed; }
+.slot.empty { color: var(--muted); border-style: dashed; background: none; }
 .slot.empty p { margin: 0; font-size: .85rem; }
-.slot header { display: flex; justify-content: space-between; gap: 1rem; }
-.slot .coord { color: var(--accent); font-variant-numeric: tabular-nums; }
+.slot header { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.slot .coord {
+  color: var(--gold); font-family: var(--display);
+  font-variant-numeric: tabular-nums; letter-spacing: .05em;
+}
 .slot .rules { color: var(--muted); font-size: .85rem; }
 
 /* ---- feed ---- */
+
 .feed { margin-top: 1.5rem; }
 .feed ul { list-style: none; padding: 0; margin: 0; }
 .feed li {
   display: flex; gap: .75rem;
-  padding: .35rem 0;
+  padding: .4rem 0;
   border-bottom: 1px solid var(--line);
   font-size: .88rem;
 }
@@ -101,24 +192,119 @@ button.cell:disabled { cursor: default; }
 .feed li.mine span { color: var(--text); }
 .feed li.theirs span { color: var(--muted); }
 
-/* ---- forms ---- */
-button {
-  background: var(--accent); color: #04121d; border: none;
-  padding: .5rem .9rem; border-radius: 5px; font: inherit; font-weight: 600;
-  cursor: pointer;
-}
-button:disabled { opacity: .5; cursor: default; }
-button.link {
-  background: none; color: var(--accent); padding: 0;
-  font-weight: 400; text-decoration: underline;
-}
+/* ---- controls ---- */
 
-.login { max-width: 320px; margin: 4rem auto; }
-.login form { display: grid; gap: .8rem; margin: 1.2rem 0; }
-.login label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
-.login input {
-  background: var(--panel); border: 1px solid var(--line);
-  color: var(--text); padding: .5rem; border-radius: 5px; font: inherit;
+button {
+  background: linear-gradient(180deg, var(--gold-lit), var(--gold) 55%, var(--gold-deep));
+  color: #1a1204;
+  border: 1px solid var(--gold-deep);
+  padding: .5rem .95rem; border-radius: 4px;
+  font: inherit; font-weight: 700;
+  letter-spacing: .03em;
+  cursor: pointer;
+  transition: box-shadow .15s, filter .15s;
 }
+button:hover:not(:disabled) { box-shadow: var(--glow-md); filter: brightness(1.06); }
+button:disabled { opacity: .35; cursor: default; }
+
+button.ghost {
+  background: none; color: var(--gold-dim);
+  border: 1px solid var(--line-lit); font-weight: 600;
+}
+button.ghost:hover:not(:disabled) { color: var(--gold-lit); border-color: var(--gold); }
+
+button.danger {
+  background: none; color: #e8907f;
+  border: 1px solid #5c2a20; font-weight: 600;
+}
+button.danger:hover:not(:disabled) { background: #2a1310; border-color: var(--hit); box-shadow: none; }
+
+button.link {
+  background: none; color: var(--gold); padding: 0; border: none;
+  font-weight: 400; text-decoration: underline; letter-spacing: 0;
+}
+button.link:hover:not(:disabled) { box-shadow: none; color: var(--gold-lit); }
+
+input, select, textarea {
+  background: #0b0906;
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: .5rem .6rem; border-radius: 4px; font: inherit;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--gold-deep); box-shadow: var(--glow-sm);
+}
+textarea { resize: vertical; min-height: 7rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; }
+label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); letter-spacing: .04em; }
+
+/* ---- login ---- */
+
+.login { max-width: 340px; margin: 4rem auto; }
+.login h1 { text-align: center; font-size: 1.7rem; }
+.login form { display: grid; gap: .8rem; margin: 1.4rem 0; }
 .message { color: var(--muted); font-size: .85rem; }
 .login .forgot { margin-top: 1.5rem; line-height: 1.4; }
+
+/* ---- admin ---- */
+
+.tabs {
+  display: flex; gap: .4rem; margin: 1.2rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.tabs button {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font-family: var(--display); font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; font-size: .78rem;
+  padding: .5rem .8rem; border-radius: 0;
+}
+.tabs button:hover:not(:disabled) { color: var(--gold-lit); box-shadow: none; filter: none; }
+.tabs button.on { color: var(--gold); border-bottom-color: var(--gold); }
+
+.admin { display: grid; gap: 1.5rem; }
+.card {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1.1rem 1.2rem;
+}
+.card > h2 { margin-top: 0; }
+.row { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
+.row > label { flex: 1 1 10rem; }
+.row > button { flex: none; }
+
+.game-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.game-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: .6rem .8rem;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: #0b0906;
+}
+.game-list li.on { border-color: var(--gold-deep); box-shadow: var(--glow-sm); }
+.game-list .meta { color: var(--muted); font-size: .8rem; }
+
+.pill {
+  display: inline-block; padding: .1rem .55rem; border-radius: 999px;
+  font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+  border: 1px solid var(--line-lit); color: var(--gold-dim);
+}
+.pill.active   { color: #7fe0a8; border-color: #2c5f43; }
+.pill.finished { color: var(--muted); }
+
+.roster { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .35rem; }
+.roster li {
+  display: flex; justify-content: space-between; align-items: center; gap: .6rem;
+  font-size: .87rem; padding: .3rem .2rem;
+  border-bottom: 1px solid var(--line);
+}
+.roster .captain { color: var(--gold); }
+
+/* ---- fleet placer ---- */
+
+.placer { display: grid; gap: 1rem; }
+.placer .yard { display: flex; gap: .5rem; flex-wrap: wrap; }
+.placer .yard button { font-family: var(--display); letter-spacing: .05em; }
+.placer .yard button.placed { opacity: .4; }
+.cell.preview     { background: #2b3f33; border-color: var(--ship-lit); }
+.cell.preview-bad { background: #3a1a16; border-color: var(--hit); }
+.cell.no-go       { box-shadow: inset 0 0 0 1px rgba(184, 50, 31, .25); }
