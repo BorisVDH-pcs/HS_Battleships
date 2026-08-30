@@ -370,9 +370,15 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /*
  * Captains place their fleet from a phone, so the boards have to survive a
  * thumb. At 375px the ten columns were collapsing to ~24px cells, well under
- * the ~44px a touch target wants. Claw back the page padding and hold the
- * cells to a 32px floor; if they still will not fit, the board scrolls
- * sideways rather than shrinking further.
+ * the ~44px a touch target wants.
+ *
+ * The whole 10x10 has to stay visible — you cannot plan a fleet through a
+ * viewport that shows eight columns — so instead of scrolling the board we
+ * claw back every pixel of surrounding chrome (page padding, card padding,
+ * the row-number gutter, the cell gap) and spend it all on the cells. That
+ * buys 30px, measured: 327px of card, minus a 16px gutter and 11px of gaps,
+ * over ten columns. `overflow-x` stays as a safety net for anything narrower
+ * than an iPhone SE.
  *
  * Scoped to `.board` on purpose: AdminBoards renders a bare `.board-grid`
  * with no scrolling parent, and a floor there would push the whole page
@@ -380,10 +386,12 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
  */
 @media (max-width: 620px) {
   .app { padding: 1rem .75rem; }
+  .card { padding: .7rem; }
 
-  .board { overflow-x: auto; overflow-y: hidden; padding-bottom: .3rem; }
+  .board { overflow-x: auto; overflow-y: hidden; }
   .board .board-grid {
-    grid-template-columns: 1.4rem repeat(10, minmax(32px, 1fr));
+    grid-template-columns: 1rem repeat(10, minmax(30px, 1fr));
+    gap: 1px;
     width: max-content;
     min-width: 100%;
   }

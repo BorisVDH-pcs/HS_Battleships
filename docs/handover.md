@@ -219,9 +219,33 @@ Roughly in priority order:
    allowed this — only the UI was missing.
 6. **Delete the demo data** before a real event: the "Demo Match" game and the
    `demo`, `Lil Sod`, `Soft Papi` accounts.
-7. **Mobile.** Never tested at phone width, and players will be on phones during
-   a raid. The two-board layouts are the risk.
-8. **Roster changes are polled, not pushed** (10s). Fine for a waiting room. If
+7. **Mobile.** Partly addressed. Measured at 375x812: no horizontal page
+   scroll, all three grids fit, the page is about 2.7 screens tall. Three
+   things were fixed after that measurement:
+   - cells were ~24px, about half the ~44px a thumb wants. Small screens now
+     trim the page padding, card padding, row-number gutter and cell gap and
+     spend all of it on the cells, which reaches 30px at 375px with the whole
+     10x10 still on screen (measured, not guessed). `overflow-x` on `.board`
+     is a safety net for anything narrower;
+   - `FleetPlacer` took its placement preview from hover, which a phone does
+     not have, so a tap dropped a hull blind. Coarse pointers now aim on the
+     first tap and commit on a second tap of the same cell. Rotation always
+     had a button as well as the `R` key.
+   - claiming a tile now asks for confirmation, as firing already did.
+
+   **Still unverified on a real phone.** All of the above was written without
+   Node on the machine and checked by balance-checking the sources and
+   grepping the deployed bundle. Someone should open the live site on an
+   actual handset before the event.
+8. **Tests.** There are none, of any kind. This is the single biggest
+   difference between this repo and iftachShoham/HighSociety-Monopoly, and it
+   is largely a consequence of the architecture: the rules live in PL/pgSQL
+   `security definer` functions, which are awkward to test without a local
+   Postgres. pgTAP is the route if it matters.
+9. **Admin audit log.** `admin_reset_game` destroys a match's claims, feed and
+   score adjustments and leaves no record of who pressed the button. Offered,
+   not yet built.
+10. **Roster changes are polled, not pushed** (10s). Fine for a waiting room. If
    it matters on the night, emit a `game_event` on roster change.
 
 ---
