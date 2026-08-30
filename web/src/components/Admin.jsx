@@ -8,6 +8,7 @@ import {
 import FleetPlacer from './FleetPlacer.jsx';
 import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
+import TileBoard from './TileBoard.jsx';
 
 const STEP_HINT = {
   setup:     'Add the 100 tiles, then open placement.',
@@ -322,6 +323,10 @@ function Tiles({ game, tiles, busy, onSave }) {
         {tiles.length} of {need} saved.
         {tiles.length > 0 && ` First: ${tiles[0].name}. Last: ${tiles[tiles.length - 1].name}.`}
       </p>
+
+      {/* Outside the `locked` branch on purpose: checking what is on the board
+          is most useful mid-game, which is exactly when editing is forbidden. */}
+      {tiles.length > 0 && <TileBoard tiles={tiles} />}
 
       {locked ? (
         <p className="muted">Tiles are locked once the game is {game.status}.</p>
