@@ -68,7 +68,7 @@ export const adminCreateGame = (name, teamA, teamB, gridSize = 10, maxActive = 2
     p_grid_size: gridSize, p_max_active: maxActive,
   });
 
-/** tiles: [{ row, col, name, rules }] — must be exactly gridSize^2 of them. */
+/** tiles: [{ row, col, name, icon }] — must be exactly gridSize^2 of them. */
 export const adminSetTiles = (gameId, tiles) =>
   rpc('admin_set_tiles', { p_game_id: gameId, p_tiles: tiles });
 

@@ -176,7 +176,6 @@ button.cell:disabled { cursor: default; }
   color: var(--gold); font-family: var(--display);
   font-variant-numeric: tabular-nums; letter-spacing: .05em;
 }
-.slot .rules { color: var(--muted); font-size: .85rem; }
 
 /* ---- feed ---- */
 
@@ -365,6 +364,25 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .cell.preview     { background: #2b3f33; border-color: var(--ship-lit); }
 .cell.preview-bad { background: #3a1a16; border-color: var(--hit); }
 .cell.no-go       { box-shadow: inset 0 0 0 1px rgba(184, 50, 31, .25); }
+
+/* ---- tile icons ---- */
+/*
+ * Only ever rendered on a claimed tile — an unclaimed one has no slug, so
+ * there is no filename to request. Sized in percentages so the same asset
+ * works at the 30px a phone gives a cell and the ~50px a desktop does.
+ * pointer-events: none keeps the tap on the button underneath.
+ */
+.cell .tile-icon {
+  width: 84%; height: 84%;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.tile-cell .tile-icon {
+  width: 22px; height: 22px;
+  object-fit: contain;
+  align-self: flex-start;
+}
 
 /* ---- admin tile board ---- */
 /*

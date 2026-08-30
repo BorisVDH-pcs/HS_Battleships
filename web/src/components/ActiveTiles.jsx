@@ -43,7 +43,6 @@ export default function ActiveTiles({ tiles, maxActive, onFired }) {
                 {coordLabel(fromPosition(tile.position).row, fromPosition(tile.position).col)}
               </span>
             </header>
-            {tile.rules && <p className="rules">{tile.rules}</p>}
             <button onClick={() => fire(tile)} disabled={busyId === tile.claim_id}>
               {busyId === tile.claim_id ? 'Firing…' : 'Mark complete & fire'}
             </button>

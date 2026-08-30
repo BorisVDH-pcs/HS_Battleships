@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GRID, colLetter, coordLabel } from '../lib/board.js';
+import TileIcon from './TileIcon.jsx';
 
 /**
  * The organiser's view of the tile content: all 100 squares with their real
@@ -8,7 +9,7 @@ import { GRID, colLetter, coordLabel } from '../lib/board.js';
  * This is the counterpart to AdminBoards, which shows the fleets. Between them
  * an admin can see both secrets; neither is reachable without `is_admin()`,
  * because both are fed by `admin_list_*` definer functions. Players get
- * `tiles_for_me()` instead, which nulls `name` and `rules` until a tile is
+ * `tiles_for_me()` instead, which nulls `name` and `icon` until a tile is
  * claimed — so nothing here may ever be rendered on a player's page.
  *
  * Two layouts, because they answer different questions. The grid answers
@@ -24,7 +25,7 @@ export default function TileBoard({ tiles }) {
     if (!byPosition.has(p)) missing.push(p);
   }
 
-  const full = (t) => (t.rules ? `${t.name} — ${t.rules}` : t.name);
+  const full = (t) => (t.icon ? `${t.name}  [${t.icon}]` : t.name);
 
   return (
     <>
@@ -84,8 +85,8 @@ export default function TileBoard({ tiles }) {
                     // name does not fit in a tenth of the page.
                     <div key={t.id} className="tile-cell" title={full(t)}>
                       <b>{coordLabel(row, col)}</b>
+                      {t.icon && <TileIcon slug={t.icon} fallback={null} />}
                       <span>{t.name}</span>
-                      {t.rules && <em>{t.rules}</em>}
                     </div>
                   );
                 }),
@@ -109,7 +110,9 @@ export default function TileBoard({ tiles }) {
                 {t ? (
                   <>
                     <span>{t.name}</span>
-                    {t.rules && <em>{t.rules}</em>}
+                    {/* The slug, not the picture: this view exists to check
+                        that every tile got the icon it was meant to get. */}
+                    <em>{t.icon || 'no icon'}</em>
                   </>
                 ) : (
                   <span className="muted">— empty —</span>

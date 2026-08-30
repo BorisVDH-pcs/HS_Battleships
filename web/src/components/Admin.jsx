@@ -296,7 +296,7 @@ function NewGame({ busy, onCreate }) {
 /**
  * Tiles are pasted rather than typed one by one: 100 of them came out of the
  * Middleman sheet as rows, and retyping them into a form would be its own event.
- * One line per tile, in board order, `name | rules`.
+ * One line per tile, in board order, `name | icon`.
  */
 function Tiles({ game, tiles, busy, onSave }) {
   const need = game.grid_size * game.grid_size;
@@ -310,7 +310,8 @@ function Tiles({ game, tiles, busy, onSave }) {
       row: Math.floor(i / game.grid_size) + 1,
       col: (i % game.grid_size) + 1,
       name: name.trim(),
-      rules: rest.join('|').trim(),
+      // Slug only; admin_set_tiles strips anything else server-side.
+      icon: rest.join('|').trim(),
     };
   });
 
@@ -339,12 +340,14 @@ function Tiles({ game, tiles, busy, onSave }) {
             <>
               <p className="muted" style={{ marginTop: '.8rem' }}>
                 One line per tile, in board order (A1, B1 … J1, then A2 …).
-                Optionally <code>name | rules</code>. Needs exactly {need} lines.
+                Optionally <code>name | icon</code>, where the icon names a file
+                in <code>web/public/icons</code> without the <code>.png</code>.
+                Needs exactly {need} lines.
               </p>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={'Slayer task | Any boss task counts\nBarrows chest | Solo only\n…'}
+                placeholder={'Slayer tile | slayer_helmet\nDragon warhammer | dragon_warhammer\n…'}
               />
               <div className="row" style={{ marginTop: '.6rem' }}>
                 <button

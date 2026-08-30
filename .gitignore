@@ -6,3 +6,8 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Source artwork for tools/make_icons.py. Full-resolution wiki renders,
+# ~100 KB each; only the 4 KB downscaled results in web/public/icons/
+# belong in the repo.
+tools/icon-src/

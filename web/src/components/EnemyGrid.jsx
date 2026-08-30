@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { GRID, colLetter, coordLabel } from '../lib/board.js';
+import TileIcon from './TileIcon.jsx';
 
 /**
  * The enemy board: 100 tiles labelled A1..J10. A tile shows only its coordinate
@@ -9,9 +10,9 @@ import { GRID, colLetter, coordLabel } from '../lib/board.js';
  * The coordinate rather than the 1..100 position, because that is what people
  * say out loud and type into Discord, and it matches the axes and the feed.
  *
- * When tile icons arrive they replace this label on *claimed* tiles only, and
- * `tiles_for_me` has to null the icon exactly as it nulls `name` and `rules` —
- * an icon on an unclaimed tile is a hint about its contents.
+ * A claimed tile shows its icon instead of the coordinate. `tiles_for_me`
+ * nulls the icon exactly as it nulls the name, so an unclaimed tile has no
+ * filename to render and none to request.
  */
 export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
@@ -50,7 +51,9 @@ export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
                   title={tile.revealed ? `${label} — ${tile.name}` : `${label} — not yet claimed`}
                   onClick={() => onClaim(tile)}
                 >
-                  {fired ? (tile.claim_result === 'hit' ? '✕' : '·') : label}
+                  {fired
+                    ? (tile.claim_result === 'hit' ? '✕' : '·')
+                    : <TileIcon slug={tile.icon} fallback={label} />}
                 </button>
               );
             })}
