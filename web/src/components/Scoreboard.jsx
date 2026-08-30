@@ -1,10 +1,10 @@
 /**
- * The scoreboard. Everything here is derived by the `team_scores` view, so there
+ * The scoreboard. Everything here is derived by the `team_scores` function, so there
  * is no running total anywhere that could drift out of step with the board.
  *
  * It shows both teams, deliberately. Tiles fired, hits and sinkings are already
  * public — `game_events` broadcasts every shot and its result — so a total built
- * from them reveals nothing new. What the view does NOT expose is the `reason`
+ * from them reveals nothing new. What it does NOT expose is the `reason`
  * on a manual adjustment, which is free text an admin types and could name a
  * tile. Those stay behind RLS, readable only by the team they concern.
  */

@@ -42,7 +42,9 @@ export function useGame(gameId, session) {
         { data: tiles }, { data: myShipCells }, { data: myFleet },
         { data: events }, { data: scores },
       ] = await Promise.all([
-        supabase.from('tiles_for_me').select('*').eq('game_id', gameId).order('position'),
+        // tiles_for_me and team_scores are `security definer` FUNCTIONS, not
+        // views — see 0010. They already order their own rows.
+        supabase.rpc('tiles_for_me', { p_game_id: gameId }),
         supabase.from('ship_cells').select('*'),
         supabase.from('ship_status').select('*'),
         supabase
@@ -51,7 +53,7 @@ export function useGame(gameId, session) {
           .eq('game_id', gameId)
           .order('created_at', { ascending: false })
           .limit(50),
-        supabase.from('team_scores').select('*').eq('game_id', gameId),
+        supabase.rpc('team_scores', { p_game_id: gameId }),
       ]);
 
       // Enemy shots land on my board: their fired claims, resolved to coordinates.

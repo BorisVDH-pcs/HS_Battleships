@@ -84,7 +84,7 @@ Everything else about this design follows from these:
    their own shot.
 2. **Unclaimed tile contents.** Teams pick tiles blind — a number, not a task. So
    `tiles` has an RLS policy of `using (false)`: no client reads it directly. The app
-   reads the `tiles_for_me` view, which returns `name` and `rules` only for tiles the
+   reads the `tiles_for_me` function, which returns `name` and `rules` only for tiles the
    viewer's own team has already claimed, and nulls for the rest.
 
 Because both are enforced in the database rather than the UI, there is no request a

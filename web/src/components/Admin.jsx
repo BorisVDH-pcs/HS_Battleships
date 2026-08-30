@@ -53,7 +53,7 @@ export default function Admin() {
         adminListTiles(id),
         adminListShipCells(id),
         adminListScoreEvents(id),
-        supabase.from('team_scores').select('*').eq('game_id', id),
+        supabase.rpc('team_scores', { p_game_id: id }),
       ]);
       setTiles(t ?? []);
       setShipCells(s ?? []);
@@ -397,7 +397,7 @@ function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
 
 /**
  * Scoring. The totals themselves cannot be edited: they are derived by the
- * `team_scores` view from tiles fired, hits and sinkings. What an organiser
+ * `team_scores` function from tiles fired, hits and sinkings. What an organiser
  * controls is the weighting, and the manual adjustments on top — which is all
  * the spreadsheet's "+1" button ever was.
  *

@@ -91,7 +91,7 @@ export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 
 // ---- Scoring -------------------------------------------------------------
-// Totals are derived (see the `team_scores` view); these only touch the manual
+// Totals are derived (see the `team_scores` function); these only touch the manual
 // adjustments layered on top, which is the sheet's "+1" button.
 
 /** `reason` is required and is visible to this team and admins, never to the enemy. */

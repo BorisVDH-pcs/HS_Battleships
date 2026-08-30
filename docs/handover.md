@@ -68,6 +68,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0007_enable_realtime.sql` | Publishes `game_events` — **Realtime did nothing before this** |
 | `0008_score_event_type.sql` | Adds the `score_adjusted` event type (separate file so it commits before 0009 uses it) |
 | `0009_scoring.sql` | Scoring weights on `games`, the `team_scores` view, the four score RPCs, and `score_events` taken off world-read |
+| `0010_views_to_functions.sql` | `tiles_for_me` and `team_scores` become `security definer` **functions** |
+| `0011_drop_definer_views.sql` | Drops the two views, once the frontend calling the functions is live |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -224,6 +226,14 @@ Roughly in priority order:
 - **`row` and `position` are reserved** in a `RETURNS TABLE` column list. Quote
   them.
 - **`RAISE NOTICE` is invisible** through the Supabase MCP tool — return a value.
+- **The security advisor cannot be silenced per-object.** There is no dismiss or
+  ignore; the only way to clear a lint is for the object to stop matching it.
+  That is why `tiles_for_me` and `team_scores` are functions and not views
+  (0010/0011) — `security_definer_view` is CRITICAL and fires on views only.
+  Nothing about the security changed. The remaining ~19 `authenticated ... can
+  execute SECURITY DEFINER function` warnings are inherent to the design — every
+  write and every gated read in this app is a definer RPC on purpose — and are
+  expected to stay.
 - **`select f(), (subquery)` in one statement** evaluates the subquery against
   the pre-call snapshot, so it looks like the function did nothing. Check in a
   separate statement.
