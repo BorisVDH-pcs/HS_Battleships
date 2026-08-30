@@ -50,11 +50,37 @@ supabase/migrations/0001_init.sql    tables, views, RLS
 supabase/migrations/0002_rpc.sql     place_fleet / start_game / claim_tile / fire_tile
 ```
 
-## Setup
+## Layout (frontend)
 
-```bash
-npm install
+```
+web/src/lib/supabase.js       client + the four game RPCs
+web/src/lib/board.js          coordinate helpers (A1..J10 <-> row/col <-> 1..100)
+web/src/hooks/useGame.js      loads game state, refetches on Realtime events
+web/src/components/           EnemyGrid, MyFleet, ActiveTiles, EventFeed, Login
 ```
 
-Copy `.env.example` to `.env` and fill in your Supabase project URL and anon key,
-then run the two migrations in the Supabase SQL Editor in order.
+## Setup
+
+The migrations in `supabase/migrations/` are already applied to the **Battleships**
+Supabase project. For a fresh project, run them in order in the SQL Editor.
+
+```bash
+npm install --prefix web
+```
+
+Copy `.env.example` to `web/.env` and set `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY`, then:
+
+```bash
+npm run dev --prefix web
+```
+
+The dev server runs on **port 5174**, so it can sit alongside HighSocietyScape on 5173.
+
+### Demo data
+
+A "Demo Match" game exists in the Battleships project with both fleets placed,
+100 placeholder tiles, and a throwaway `demo@hsbattleships.local` account for
+clicking around. Delete both before running a real event.
+
+Credentials are deliberately not recorded here — keep them out of the repo.
