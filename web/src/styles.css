@@ -301,8 +301,11 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 
 /* ---- waiting room ---- */
 
-.waiting { max-width: 34rem; margin: 2rem auto; text-align: center; }
-.waiting h2 { font-size: 1rem; letter-spacing: .1em; color: var(--gold); }
+.waiting { max-width: 34rem; margin: 3rem auto; text-align: center; }
+.waiting .lead {
+  font-family: var(--display); font-size: 1.05rem; line-height: 1.7;
+  color: var(--gold); margin: .3rem 0 1rem;
+}
 .waiting strong { color: var(--gold-lit); }
 
 /* ---- admin board overview ---- */

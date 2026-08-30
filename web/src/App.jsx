@@ -132,18 +132,13 @@ export default function App() {
 
       {waitingForTeam && (
         <section className="card waiting">
-          <h2>You’re in — waiting for a team</h2>
-          <p>
-            Your account <strong>{displayName}</strong> is registered for{' '}
-            <strong>{game.game.name}</strong>, but you haven’t been put on a team yet.
+          <p className="lead">
+            You are not assigned to a team yet.<br />
+            Come back once teams have been made.
           </p>
           <p className="muted">
-            An admin assigns players to{' '}
-            {teams.length === 2
-              ? `${teams[0].name} or ${teams[1].name}`
-              : 'a team'}
-            . Give them your username exactly as it appears above. This page will
-            let you in on its own once you’ve been added — no need to refresh.
+            Signed in as <strong>{displayName}</strong> — this page will let you
+            in on its own once an admin adds you.
           </p>
         </section>
       )}
