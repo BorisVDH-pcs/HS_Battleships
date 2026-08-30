@@ -1,0 +1,100 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase.js';
+
+/**
+ * Loads everything the board needs for one game and keeps it live.
+ *
+ * Realtime on `game_events` is the trigger to refetch: every meaningful change
+ * (claim, shot, sinking, win) writes an event, so one subscription covers the
+ * whole game. That replaces the Apps Script's 120-second polling loop.
+ */
+export function useGame(gameId, session) {
+  const [state, setState] = useState({
+    loading: true,
+    error: null,
+    game: null,
+    teams: [],
+    myTeamId: null,
+    tiles: [],        // tiles_for_me: name is null until my team claims it
+    myShipCells: [],  // my own placement (RLS hides the enemy's)
+    myFleet: [],      // ship_status for my fleet only
+    enemyShots: [],   // fired claims by the other team, onto my board
+    events: [],
+  });
+
+  const load = useCallback(async () => {
+    if (!supabase || !gameId || !session) return;
+    try {
+      const uid = session.user.id;
+
+      const [{ data: game }, { data: teams }, { data: memberships }] = await Promise.all([
+        supabase.from('games').select('*').eq('id', gameId).single(),
+        supabase.from('teams').select('*').eq('game_id', gameId).order('name'),
+        supabase.from('team_members').select('team_id, role').eq('profile_id', uid),
+      ]);
+
+      const myTeamId =
+        teams?.find((t) => memberships?.some((m) => m.team_id === t.id))?.id ?? null;
+      const enemyTeamId = teams?.find((t) => t.id !== myTeamId)?.id ?? null;
+
+      const [{ data: tiles }, { data: myShipCells }, { data: myFleet }, { data: events }] =
+        await Promise.all([
+          supabase.from('tiles_for_me').select('*').eq('game_id', gameId).order('position'),
+          supabase.from('ship_cells').select('*'),
+          supabase.from('ship_status').select('*'),
+          supabase
+            .from('game_events')
+            .select('*')
+            .eq('game_id', gameId)
+            .order('created_at', { ascending: false })
+            .limit(50),
+        ]);
+
+      // Enemy shots land on my board: their fired claims, resolved to coordinates.
+      let enemyShots = [];
+      if (enemyTeamId) {
+        const { data } = await supabase
+          .from('tile_claims')
+          .select('tile_id, result, status')
+          .eq('team_id', enemyTeamId)
+          .eq('status', 'fired');
+        enemyShots = data ?? [];
+      }
+
+      setState({
+        loading: false,
+        error: null,
+        game: game ?? null,
+        teams: teams ?? [],
+        myTeamId,
+        tiles: tiles ?? [],
+        myShipCells: myShipCells ?? [],
+        myFleet: myFleet ?? [],
+        enemyShots,
+        events: events ?? [],
+      });
+    } catch (err) {
+      setState((s) => ({ ...s, loading: false, error: err.message }));
+    }
+  }, [gameId, session]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // One subscription for the whole game.
+  useEffect(() => {
+    if (!supabase || !gameId) return;
+    const channel = supabase
+      .channel(`game:${gameId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
+        () => load()
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [gameId, load]);
+
+  return { ...state, refresh: load };
+}

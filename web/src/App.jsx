@@ -1,0 +1,143 @@
+import { useEffect, useState } from 'react';
+import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
+import { useGame } from './hooks/useGame.js';
+import Login from './components/Login.jsx';
+import EnemyGrid from './components/EnemyGrid.jsx';
+import MyFleet from './components/MyFleet.jsx';
+import ActiveTiles from './components/ActiveTiles.jsx';
+import EventFeed from './components/EventFeed.jsx';
+
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [ready, setReady] = useState(false);
+  const [gameId, setGameId] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [busyTileId, setBusyTileId] = useState(null);
+
+  useEffect(() => {
+    if (!supabase) { setReady(true); return; }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Pick the most recent game the player can see.
+  useEffect(() => {
+    if (!supabase || !session) return;
+    supabase
+      .from('games')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => setGameId(data?.[0]?.id ?? null));
+  }, [session]);
+
+  const game = useGame(gameId, session);
+
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="app">
+        <h1>HS Battleships</h1>
+        <p className="error">
+          Supabase is not configured. Copy <code>.env.example</code> to{' '}
+          <code>web/.env</code> and fill in the project URL and anon key.
+        </p>
+      </main>
+    );
+  }
+
+  if (!ready) return <main className="app"><p>Loading…</p></main>;
+  if (!session) return <main className="app"><Login /></main>;
+
+  async function onClaim(tile) {
+    setBusyTileId(tile.id);
+    setNotice(null);
+    try {
+      await claimTile(tile.id);
+      await game.refresh();
+    } catch (err) {
+      setNotice(err.message);
+    } finally {
+      setBusyTileId(null);
+    }
+  }
+
+  const { loading, error, teams, myTeamId, tiles, myShipCells, myFleet, enemyShots, events } = game;
+  const maxActive = game.game?.max_active_tiles ?? 2;
+  const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
+  const isActive = game.game?.status === 'active';
+  const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
+
+  return (
+    <main className="app">
+      <header className="top">
+        <h1>HS Battleships</h1>
+        <div className="who">
+          <span>{session.user.email}</span>
+          <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
+        </div>
+      </header>
+
+      {loading && <p>Loading game…</p>}
+      {error && <p className="error">{error}</p>}
+      {notice && <p className="error">{notice}</p>}
+
+      {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
+
+      {game.game && (
+        <>
+          <p className="status">
+            <strong>{game.game.name}</strong> — {game.game.status}
+            {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
+            {!myTeamId && ' · you are not on a team in this game'}
+          </p>
+
+          {game.game.status === 'finished' && (
+            <p className="banner">
+              {teams.find((t) => t.id === game.game.winner_team_id)?.name} wins.
+            </p>
+          )}
+
+          <div className="columns">
+            <section>
+              <h2>Enemy waters</h2>
+              <EnemyGrid
+                tiles={tiles}
+                onClaim={onClaim}
+                canClaim={canClaim}
+                busyTileId={busyTileId}
+              />
+              {isActive && !canClaim && myTeamId && (
+                <p className="muted">Both slots are full — fire one before claiming another.</p>
+              )}
+            </section>
+
+            <section>
+              <h2>Your fleet</h2>
+              <MyFleet
+                myShipCells={myShipCells}
+                enemyShots={enemyShots}
+                tiles={tiles}
+                fleet={myFleet}
+              />
+            </section>
+          </div>
+
+          <ActiveTiles
+            tiles={tiles}
+            maxActive={maxActive}
+            onFired={(tile, result) => {
+              setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+              game.refresh();
+            }}
+          />
+
+          <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
+        </>
+      )}
+    </main>
+  );
+}
