@@ -488,6 +488,16 @@ Roughly in priority order:
 
 **Implemented after this handover was first written:**
 
+- Team-name editing is live from commit `c518812`. Admins get both names in a
+  **Team names** card; captains get only their own in **Your team**, in every
+  game status. The `rename_team` RPC was production-tested in rolled-back
+  transactions: admin-own/either-team and captain-own succeeded, a cross-team
+  captain rename was refused, the Realtime event was created, and no test name
+  or event remained. The deployed admin UI was verified with both inputs.
+- The Tiles card's **Show board**, **Show as list** and **Replace tiles** buttons
+  now share one non-wrapping row. Verified in the deployed bundle
+  `index-Cu1Bg-Iw.js` at the normal viewport and at 375x812: identical top edges,
+  all three within the card, and no horizontal page overflow.
 - `0017_restore_place_fleet_guards.sql` fixes a regression in 0016. That
   migration had been based on the pre-0006 `place_fleet` body and therefore
   removed the admin exception, the grid-boundary check and the server-side
