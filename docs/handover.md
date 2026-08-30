@@ -492,7 +492,9 @@ Roughly in priority order:
 - The admin fleet placers briefly loaded the persisted fleets in commit
   `b9f42f7`, but were removed on Boris's instruction: placement belongs on the
   captain page. The admin Fleets card now contains only the two live overview
-  boards with coordinates, ships, hits, misses and active claims.
+  boards with coordinates, ships, hits, misses and active claims. Deployed from
+  commit `530c82b` as bundle `index-9cmobK4X.js` and verified in the signed-in
+  live admin panel: zero `.placer` components and exactly two overview grids.
 
 **Not verified:**
 
