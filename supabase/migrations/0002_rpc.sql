@@ -1,8 +1,10 @@
 -- HS_Battleships — game logic RPCs
 --
 -- Every mutation lives here as a `security definer` function. Clients have no
--- direct INSERT/UPDATE rights, so the two secrets (tile answers, enemy ship
--- placement) are never exposed and cannot be bypassed by a crafted request.
+-- direct INSERT/UPDATE rights, so the enemy's placement and the contents of
+-- unclaimed tiles are never exposed and cannot be reached by a crafted request.
+--
+-- There is no turn order: a team may claim and fire whenever it has a free slot.
 
 -- ============================================================
 -- Fleet placement
@@ -11,6 +13,9 @@
 -- version — we do not need a flood-fill to *discover* ships. We only need to
 -- VALIDATE what was submitted: right sizes, straight, contiguous, in bounds.
 -- (Cell overlap is caught by the unique(team_id,row,col) constraint.)
+--
+-- Only callable during 'placement'; the freeze triggers in 0001 enforce the same
+-- rule one level deeper, so nothing can move a fleet once the game starts.
 --
 -- p_ships: [{"size":3,"cells":[{"row":1,"col":2},...]}, ...]
 
@@ -95,19 +100,59 @@ end;
 $$;
 
 -- ============================================================
--- Unlock a tile (the trivia gate)
+-- Start the game — the point of no return for fleets
 -- ============================================================
--- Fuzzy match ported from the Apps Script: Levenshtein distance, tolerance 1 for
--- short answers and 2 for longer ones. The answer never leaves the server.
 
-create or replace function unlock_tile(p_tile_id uuid, p_answer text)
+create or replace function start_game(p_game_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_game    games%rowtype;
+  v_teams   int;
+  v_unready int;
+begin
+  select * into v_game from games where id = p_game_id;
+
+  if v_game.status <> 'placement' then
+    raise exception 'Game is % — it can only be started from placement', v_game.status;
+  end if;
+
+  select count(*) into v_teams from teams where game_id = p_game_id;
+  if v_teams <> 2 then
+    raise exception 'Game needs two teams before it can start (has %)', v_teams;
+  end if;
+
+  -- Every team must have a complete fleet on the board.
+  select count(*) into v_unready
+    from teams t
+   where t.game_id = p_game_id
+     and (select count(*) from ships s where s.team_id = t.id)
+         <> array_length(v_game.fleet, 1);
+
+  if v_unready > 0 then
+    raise exception '% team(s) have not finished placing their fleet', v_unready;
+  end if;
+
+  update games set status = 'active', started_at = now() where id = p_game_id;
+
+  insert into game_events (game_id, type, payload)
+  values (p_game_id, 'game_started', jsonb_build_object('by', auth.uid()));
+end;
+$$;
+
+-- ============================================================
+-- Claim a tile
+-- ============================================================
+-- No question to answer — picking the tile IS the move. The tile's task is
+-- revealed to the claiming team only (see the `tiles_for_me` view), and the
+-- two-active-tile limit is enforced by trigger.
+
+create or replace function claim_tile(p_tile_id uuid)
 returns tile_claims
 language plpgsql security definer set search_path = public as $$
 declare
   v_team_id uuid;
   v_tile    tiles%rowtype;
-  v_variant text;
-  v_ok      boolean := false;
   v_claim   tile_claims;
 begin
   select t.id into v_team_id
@@ -126,25 +171,14 @@ begin
 
   select * into v_tile from tiles where id = p_tile_id;
 
-  foreach v_variant in array v_tile.answer_variants loop
-    if levenshtein(lower(trim(p_answer)), lower(trim(v_variant)))
-       <= (case when length(v_variant) <= 5 then 1 else 2 end) then
-      v_ok := true;
-      exit;
-    end if;
-  end loop;
-
-  if not v_ok then
-    raise exception 'Wrong answer';
-  end if;
-
-  insert into tile_claims (team_id, tile_id, unlocked_by)
+  insert into tile_claims (team_id, tile_id, claimed_by)
   values (v_team_id, p_tile_id, auth.uid())
   returning * into v_claim;
 
+  -- No tile_name here: the feed is world-readable. See 0001_init.sql.
   insert into game_events (game_id, team_id, type, payload)
-  values (v_tile.game_id, v_team_id, 'tile_unlocked',
-          jsonb_build_object('tile_id', v_tile.id, 'tile_name', v_tile.name,
+  values (v_tile.game_id, v_team_id, 'tile_claimed',
+          jsonb_build_object('tile_id', v_tile.id,
                              'position', v_tile.position, 'by', auth.uid()));
 
   return v_claim;
@@ -155,7 +189,8 @@ $$;
 -- Fire (complete the tile task)
 -- ============================================================
 -- Resolves HIT/MISS synchronously and returns it. This is what replaces the
--- 120-second polling loop in the Apps Script.
+-- 120-second polling loop in the Apps Script. Firing frees the slot, so the team
+-- may immediately claim another tile — there is no turn to wait for.
 
 create or replace function fire_tile(p_claim_id uuid)
 returns shot_result
@@ -198,9 +233,10 @@ begin
      set status = 'fired', result = v_result, fired_by = auth.uid(), fired_at = now()
    where id = p_claim_id;
 
+  -- No tile_name here: the feed is world-readable. See 0001_init.sql.
   insert into game_events (game_id, team_id, type, payload)
   values (v_game_id, v_claim.team_id, 'shot_fired',
-          jsonb_build_object('tile_id', v_tile.id, 'tile_name', v_tile.name,
+          jsonb_build_object('tile_id', v_tile.id,
                              'position', v_tile.position, 'result', v_result,
                              'by', auth.uid()));
 
@@ -227,6 +263,7 @@ begin
 end;
 $$;
 
-grant execute on function place_fleet(uuid, jsonb)  to authenticated;
-grant execute on function unlock_tile(uuid, text)   to authenticated;
-grant execute on function fire_tile(uuid)           to authenticated;
+grant execute on function place_fleet(uuid, jsonb) to authenticated;
+grant execute on function start_game(uuid)         to authenticated;
+grant execute on function claim_tile(uuid)         to authenticated;
+grant execute on function fire_tile(uuid)          to authenticated;

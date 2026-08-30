@@ -61,7 +61,7 @@ taunt message pinging the opposing team's Discord role.
 |---|---|---|
 | 120 s polling loop for HIT/MISS | Slow, times out, blocks the UI | Resolve synchronously in the database; push via Realtime |
 | Ship-sunk via snapshot diff in script properties | Drifts, breaks on reset, misses concurrent sinks | Derive from data — a ship is sunk when every cell has a hit |
-| Tile answers live in a sheet teams can reach | Cheatable | Answers never leave the server; validated in a `security definer` function |
+| Tile data lives in a sheet teams can reach | Cheatable — the whole board is readable up front | Tile contents readable only once *your* team claims that tile (V4 drops the questions entirely) |
 | Enemy ship placement is one `IMPORTRANGE` away | Cheatable | Row Level Security — placement is unreadable by the opponent |
 | Discord webhooks hardcoded in script source | Secret leakage | Server-side env vars only |
 | Two-slot arming enforced by checking `L6`/`N6` | Race conditions, fragile | Database constraint / trigger |
