@@ -4,8 +4,8 @@ import {
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminListShipCells, adminDeleteGame,
 } from '../lib/supabase.js';
-import { GRID, coordLabel } from '../lib/board.js';
 import FleetPlacer from './FleetPlacer.jsx';
+import AdminBoards from './AdminBoards.jsx';
 
 const STEP_HINT = {
   setup:     'Add the 100 tiles, then open placement.',
@@ -168,39 +168,29 @@ export default function Admin() {
 
           <section className="card">
             <h2>Fleets</h2>
-            {game.status !== 'placement' && (
-              <p className="muted">
-                {game.status === 'setup'
-                  ? 'Open placement before positioning fleets.'
-                  : 'Fleets are frozen once the game starts.'}
-              </p>
-            )}
-            <div className="columns">
-              {gameTeams.map((t) => {
-                const cells = shipCells.filter((c) => c.team_id === t.id);
-                const ships = new Set(cells.map((c) => c.ship_id)).size;
-                return (
+            {game.status === 'placement' ? (
+              <div className="columns">
+                {gameTeams.map((t) => (
                   <div key={t.id}>
-                    {game.status === 'placement' ? (
-                      <FleetPlacer
-                        teamId={t.id}
-                        teamName={t.name}
-                        fleet={game.fleet}
-                        onPlaced={() => run(async () => {}, `${t.name} fleet saved.`)}
-                      />
-                    ) : (
-                      <>
-                        <h3>{t.name}</h3>
-                        <p className="muted">
-                          {ships} of {game.fleet.length} ships placed
-                          {cells.length > 0 && ` · ${cells.map((c) => coordLabel(c.row, c.col)).sort().join(' ')}`}
-                        </p>
-                      </>
-                    )}
+                    <FleetPlacer
+                      teamId={t.id}
+                      teamName={t.name}
+                      fleet={game.fleet}
+                      onPlaced={() => run(async () => {}, `${t.name} fleet saved.`)}
+                    />
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <p className="muted">
+                  {game.status === 'setup'
+                    ? 'Open placement before positioning fleets.'
+                    : 'Fleets are frozen once the game starts.'}
+                </p>
+                <AdminBoards gameId={game.id} teams={gameTeams} />
+              </>
+            )}
           </section>
         </>
       )}

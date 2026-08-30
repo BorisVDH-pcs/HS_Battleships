@@ -15,7 +15,6 @@ export default function App() {
   const [notice, setNotice] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState('game');
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -52,13 +51,7 @@ export default function App() {
       .select('is_admin')
       .eq('id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        const admin = Boolean(data?.is_admin);
-        setIsAdmin(admin);
-        // A dedicated admin account plays for nobody, so the board is not what
-        // they came for. Players are unaffected — they never see the tabs.
-        if (admin) setTab('admin');
-      });
+      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
   }, [session]);
 
   const game = useGame(gameId, session);
@@ -107,16 +100,12 @@ export default function App() {
         </div>
       </header>
 
-      {isAdmin && (
-        <nav className="tabs">
-          <button className={tab === 'game' ? 'on' : ''} onClick={() => setTab('game')}>Game</button>
-          <button className={tab === 'admin' ? 'on' : ''} onClick={() => setTab('admin')}>Admin</button>
-        </nav>
-      )}
+      {/* An admin has no team, so the player view would show them an empty
+          board and a claim button that cannot work. They get the organiser's
+          console instead, which carries its own both-boards overview. */}
+      {isAdmin && <Admin />}
 
-      {isAdmin && tab === 'admin' && <Admin />}
-
-      {tab === 'game' && <>
+      {!isAdmin && <>
       {loading && <p>Loading game…</p>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="error">{notice}</p>}

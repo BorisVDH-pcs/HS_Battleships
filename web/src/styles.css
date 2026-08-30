@@ -299,6 +299,22 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 }
 .roster .captain { color: var(--gold); }
 
+/* ---- admin board overview ---- */
+
+.legend {
+  display: flex; align-items: center; gap: .4rem 1rem; flex-wrap: wrap;
+  margin-top: 1rem; color: var(--muted); font-size: .8rem;
+}
+.legend .key {
+  width: .85rem; height: .85rem; border-radius: 2px;
+  display: inline-block; vertical-align: -2px; margin-right: .3rem;
+  border: 1px solid var(--line);
+}
+.legend .key.ship   { background: var(--ship);  border-color: var(--ship-lit); }
+.legend .key.hit    { background: var(--hit);   border-color: var(--hit-lit); }
+.legend .key.miss   { background: var(--miss); }
+.legend .key.active { background: var(--panel); border-color: var(--gold); }
+
 /* ---- fleet placer ---- */
 
 .placer { display: grid; gap: 1rem; }
