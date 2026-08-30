@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
-  adminOpenPlacement, adminListTiles, adminListShipCells, adminDeleteGame, adminResetGame,
+  adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminAdjustScore, adminListScoreEvents, adminDeleteScoreEvent, adminSetScoring,
 } from '../lib/supabase.js';
 import FleetPlacer from './FleetPlacer.jsx';
@@ -23,7 +23,6 @@ export default function Admin() {
   const [profiles, setProfiles] = useState([]);
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
-  const [shipCells, setShipCells] = useState([]);
   const [scores, setScores] = useState([]);
   const [scoreEvents, setScoreEvents] = useState([]);
   const [gameId, setGameId] = useState(null);
@@ -48,16 +47,14 @@ export default function Admin() {
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
-    if (!id) { setTiles([]); setShipCells([]); setScores([]); setScoreEvents([]); return; }
+    if (!id) { setTiles([]); setScores([]); setScoreEvents([]); return; }
     try {
-      const [t, s, adjustments, { data: sc }] = await Promise.all([
+      const [t, adjustments, { data: sc }] = await Promise.all([
         adminListTiles(id),
-        adminListShipCells(id),
         adminListScoreEvents(id),
         supabase.rpc('team_scores', { p_game_id: id }),
       ]);
       setTiles(t ?? []);
-      setShipCells(s ?? []);
       setScoreEvents(adjustments ?? []);
       setScores(sc ?? []);
     } catch (err) {
