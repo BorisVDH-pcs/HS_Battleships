@@ -57,32 +57,47 @@ values (
 -- is_admin flag. Do not add this account to a team; the roster picker hides
 -- admin accounts for exactly that reason.
 
-insert into auth.users (
-  id, instance_id, aud, role, email, encrypted_password,
-  email_confirmed_at, created_at, updated_at,
-  raw_app_meta_data, raw_user_meta_data,
-  confirmation_token, recovery_token, email_change,
-  email_change_token_new, email_change_token_current,
-  phone_change, phone_change_token, reauthentication_token
-)
-values (
-  gen_random_uuid(),
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated',
-  -- vvv choose the admin username and a STRONG password vvv
-  'hs_admin' || '@players.hs-battleships.invalid',
-  crypt('choose-a-strong-password', gen_salt('bf')),
-  now(), now(), now(),
-  '{"provider":"email","providers":["email"]}',
-  jsonb_build_object('display_name', 'HS Admin'),
-  '', '', '', '', '', '', '', ''
-);
+-- Paste the whole block into the Supabase SQL Editor and edit only the three
+-- variables at the top. The address and the profiles lookup are derived from
+-- them, so the username cannot drift out of sync with what the grant targets.
 
--- Then grant it. The flag is deliberately NOT settable from the app: the
--- profiles_self policy blocks a user changing their own is_admin.
-update profiles set is_admin = true where display_name = 'HS Admin';
+do $$
+declare
+  -- vvv EDIT THESE THREE LINES ONLY vvv
+  v_password     text := 'CHANGE-THIS-TO-A-STRONG-PASSWORD';  -- must change
+  v_username     text := 'hs_admin';                          -- typed at login
+  v_display_name text := 'HS Admin';                          -- shown in the app
+  -- ^^^ nothing below needs editing ^^^
+begin
+  insert into auth.users (
+    id, instance_id, aud, role, email, encrypted_password,
+    email_confirmed_at, created_at, updated_at,
+    raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, recovery_token, email_change,
+    email_change_token_new, email_change_token_current,
+    phone_change, phone_change_token, reauthentication_token
+  )
+  values (
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    -- Must match how the app derives the address from a username
+    -- (see web/src/lib/auth.js): lowercased, spaces to underscores.
+    lower(replace(v_username, ' ', '_')) || '@players.hs-battleships.invalid',
+    crypt(v_password, gen_salt('bf')),
+    now(), now(), now(),
+    '{"provider":"email","providers":["email"]}',
+    jsonb_build_object('display_name', v_display_name),
+    '', '', '', '', '', '', '', ''
+  );
 
--- Who currently has admin?
+  -- The on_auth_user_created trigger has already made the profiles row by here,
+  -- inside this same transaction. The flag is deliberately NOT settable from the
+  -- app: the profiles_self policy blocks a user changing their own is_admin.
+  update profiles set is_admin = true where display_name = v_display_name;
+end $$;
+
+-- Should return exactly one row. Zero rows means the display name did not match.
 select display_name, is_admin from profiles where is_admin;
 
 -- Revoke:
