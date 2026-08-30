@@ -10,6 +10,7 @@ import EventFeed from './components/EventFeed.jsx';
 import Scoreboard from './components/Scoreboard.jsx';
 import CaptainPlacement from './components/CaptainPlacement.jsx';
 import Admin from './components/Admin.jsx';
+import TeamNameEditor from './components/TeamNameEditor.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -118,6 +119,7 @@ export default function App() {
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
+  const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
 
   return (
     <main className="app">
@@ -167,11 +169,18 @@ export default function App() {
             </p>
           )}
 
+          {myRole === 'captain' && myTeam && (
+            <section className="card">
+              <h2>Your team</h2>
+              <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
+            </section>
+          )}
+
           {game.game.status === 'placement' && myTeamId && (
             <CaptainPlacement
               isCaptain={myRole === 'captain'}
               teamId={myTeamId}
-              teamName={teams.find((t) => t.id === myTeamId)?.name ?? 'your'}
+              teamName={myTeam?.name ?? 'your'}
               fleet={game.game.fleet}
               shipsPlaced={myFleet.length}
               onPlaced={() => game.refresh()}

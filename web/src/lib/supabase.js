@@ -62,6 +62,10 @@ async function rpc(name, args) {
   return data;
 }
 
+/** Admins may rename either team; captains may rename only their own team. */
+export const renameTeam = (teamId, name) =>
+  rpc('rename_team', { p_team_id: teamId, p_name: name });
+
 export const adminCreateGame = (name, teamA, teamB, gridSize = 10, maxActive = 2) =>
   rpc('admin_create_game', {
     p_name: name, p_team_a: teamA, p_team_b: teamB,

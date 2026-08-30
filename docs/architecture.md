@@ -106,8 +106,8 @@ webhook named the tile, its general webhook deliberately did not.
 
 ## Game logic as RPCs
 
-Clients hold **no** insert/update/delete rights. Four `security definer` functions
-are the entire write surface:
+Clients hold **no** insert/update/delete rights. Narrow `security definer`
+functions are the entire write surface for game actions:
 
 | Function | Does |
 |---|---|
@@ -115,6 +115,7 @@ are the entire write surface:
 | `start_game(game_id)` | Checks two teams with complete fleets, then flips to `active` — the point after which fleets are frozen |
 | `claim_tile(tile_id)` | Reveals the tile to the claiming team and takes one of its two slots. No question — the pick *is* the move |
 | `fire_tile(claim_id)` | Resolves HIT/MISS **synchronously**, frees the slot, and emits `shot_fired`, `ship_sunk`, `game_won` events as warranted |
+| `rename_team(team_id, name)` | Lets an admin rename either team or a captain rename only their own; validates the name and emits `team_renamed` for live refresh |
 
 ## No more polling
 

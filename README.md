@@ -31,13 +31,17 @@ server-side, so the tab is a convenience, not the permission:
 1. **New game** — name it and name both teams.
 2. **Tiles** — paste 100 lines, one per tile in board order, optionally
    `name | rules`. This replaces the Middleman sheet's `Tile Data`.
-3. **Open placement** — moves the game from `setup` to `placement`.
-4. **Roster** — add players to teams and pick captains. Players appear here
+3. **Team names** — rename either team whenever needed.
+4. **Open placement** — moves the game from `setup` to `placement`.
+5. **Roster** — add players to teams and pick captains. Players appear here
    once they have signed up on the login screen.
-5. **Fleets** — captains place their own fleets from the player page. The admin
+6. **Fleets** — captains place their own fleets from the player page. The admin
    page shows both boards as a read-only live overview.
-6. **Start game** — refuses unless there are two teams, 100 tiles and both
+7. **Start game** — refuses unless there are two teams, 100 tiles and both
    fleets complete. Fleets freeze at this moment.
+
+Captains also get a **Your team** card on their player page where they can
+rename their own team. The database refuses cross-team renames.
 
 Grant admin with `update profiles set is_admin = true where display_name = '…';`
 

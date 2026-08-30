@@ -303,6 +303,23 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .row > label { flex: 1 1 10rem; }
 .row > button { flex: none; }
 
+.team-name-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .6rem;
+  align-items: end;
+}
+.team-name-editor .error,
+.team-name-editor .muted { grid-column: 1 / -1; margin: 0; }
+
+.tile-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: .6rem;
+  margin-top: .6rem;
+}
+.tile-actions button { flex: 1 1 0; white-space: nowrap; }
+
 .game-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
 .game-list li {
   display: flex; justify-content: space-between; align-items: center; gap: 1rem;
@@ -453,6 +470,8 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 @media (max-width: 620px) {
   .app { padding: 1rem .75rem; }
   .card { padding: .7rem; }
+  .tile-actions { gap: .35rem; }
+  .tile-actions button { padding-inline: .45rem; font-size: .82rem; }
 
   .board { overflow-x: auto; overflow-y: hidden; }
   .board .board-grid {

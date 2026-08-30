@@ -16,7 +16,7 @@ import TileIcon from './TileIcon.jsx';
  * "what is at G7"; the list answers "did all 100 import correctly", which is
  * a proofreading job and wants one tile per line in board order.
  */
-export default function TileBoard({ tiles }) {
+export default function TileBoard({ tiles, canEdit = false, editOpen = false, onToggleEdit }) {
   const [view, setView] = useState(null);   // null | 'grid' | 'list'
 
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
@@ -29,7 +29,7 @@ export default function TileBoard({ tiles }) {
 
   return (
     <>
-      <div className="row" style={{ marginTop: '.6rem' }}>
+      <div className="tile-actions">
         <button
           className="ghost"
           onClick={() => setView(view === 'grid' ? null : 'grid')}
@@ -42,12 +42,18 @@ export default function TileBoard({ tiles }) {
         >
           {view === 'list' ? 'Hide list' : 'Show as list'}
         </button>
-        {view && (
-          <span className="muted">
-            Admin only — these names are hidden from players until claimed.
-          </span>
+        {canEdit && (
+          <button className="ghost" onClick={onToggleEdit}>
+            {editOpen ? 'Cancel' : 'Replace tiles'}
+          </button>
         )}
       </div>
+
+      {view && (
+        <p className="muted" style={{ marginTop: '.6rem' }}>
+          Admin only — these names are hidden from players until claimed.
+        </p>
+      )}
 
       {view && missing.length > 0 && (
         <p className="error" style={{ marginTop: '.6rem' }}>

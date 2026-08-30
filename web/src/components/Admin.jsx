@@ -7,6 +7,7 @@ import {
 } from '../lib/supabase.js';
 import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
+import TeamNameEditor from './TeamNameEditor.jsx';
 import TileBoard from './TileBoard.jsx';
 
 const STEP_HINT = {
@@ -63,6 +64,21 @@ export default function Admin() {
 
   useEffect(() => { loadGames(); }, [loadGames]);
   useEffect(() => { loadGameDetail(gameId); }, [gameId, loadGameDetail]);
+
+  // Team renames can originate from a captain's screen. They emit an event so
+  // the organiser's labels update without a manual refresh.
+  useEffect(() => {
+    if (!gameId) return;
+    const channel = supabase
+      .channel(`admin-game:${gameId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
+        () => { loadGames(); loadGameDetail(gameId); }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [gameId, loadGames, loadGameDetail]);
 
   async function run(fn, okMessage) {
     setBusy(true); setError(null); setNotice(null);
@@ -202,6 +218,18 @@ export default function Admin() {
             }
           />
 
+          <section className="card">
+            <h2>Team names</h2>
+            <div className="columns">
+              {gameTeams.map((team) => (
+                <div key={team.id}>
+                  <h3>{team.name}</h3>
+                  <TeamNameEditor team={team} onRenamed={() => loadGames()} />
+                </div>
+              ))}
+            </div>
+          </section>
+
           <Roster
             gameTeams={gameTeams}
             profiles={profiles}
@@ -305,15 +333,24 @@ function Tiles({ game, tiles, busy, onSave }) {
 
       {/* Outside the `locked` branch on purpose: checking what is on the board
           is most useful mid-game, which is exactly when editing is forbidden. */}
-      {tiles.length > 0 && <TileBoard tiles={tiles} />}
+      {tiles.length > 0 && (
+        <TileBoard
+          tiles={tiles}
+          canEdit={!locked}
+          editOpen={open}
+          onToggleEdit={() => setOpen(!open)}
+        />
+      )}
 
       {locked ? (
         <p className="muted">Tiles are locked once the game is {game.status}.</p>
       ) : (
         <>
-          <button className="ghost" onClick={() => setOpen(!open)}>
-            {open ? 'Cancel' : tiles.length ? 'Replace tiles' : 'Add tiles'}
-          </button>
+          {tiles.length === 0 && (
+            <button className="ghost" onClick={() => setOpen(!open)}>
+              {open ? 'Cancel' : 'Add tiles'}
+            </button>
+          )}
           {open && (
             <>
               <p className="muted" style={{ marginTop: '.8rem' }}>

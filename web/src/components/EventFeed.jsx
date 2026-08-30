@@ -19,6 +19,8 @@ export default function EventFeed({ events, teams, myTeamId }) {
       case 'fleet_placed':
         // Hull count only — the payload deliberately carries no cells.
         return `${who}'s fleet is set.`;
+      case 'team_renamed':
+        return `${e.payload?.old_name ?? 'A team'} is now ${e.payload?.new_name ?? who}.`;
       case 'game_started':
         return 'The game has begun — fleets are locked.';
       case 'tile_claimed':

@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0017` are applied to the live project.
+`0001` through `0019` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -78,6 +78,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0015_fleet_placed_event_type.sql` | Adds the `fleet_placed` event type (separate file for the same reason as 0008 and 0012) |
 | `0016_place_fleet_emits_event.sql` | `place_fleet` now emits `fleet_placed`, so the admin console sees a captain's placement without a manual refresh |
 | `0017_restore_place_fleet_guards.sql` | Restores admin placement, grid-boundary validation and no-touch validation accidentally dropped by 0016, while retaining `fleet_placed` |
+| `0018_team_renamed_event_type.sql` | Adds the `team_renamed` event type in its own committed migration |
+| `0019_rename_team.sql` | Adds the guarded team-name RPC: admins may rename either team, captains only their own; emits `team_renamed` so open screens refresh |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -139,13 +141,15 @@ All in the app, signed in as the admin:
 1. **New game** — name it and both teams
 2. **Tiles** — paste 100 lines in board order, `name | icon` (icon optional).
    Strip the `A1.` prefixes: the box numbers lines by position, it does not
-   parse coordinates
-3. **Open placement**
-4. **Roster** — add players, set captains (players must have signed up first)
-5. **Fleets** — captains place their own fleet from the player page. The admin
+   parse coordinates. With tiles loaded, **Show board**, **Show as list** and
+   **Replace tiles** sit together in one action row
+3. **Team names** — the admin can rename either team
+4. **Open placement**
+5. **Roster** — add players, set captains (players must have signed up first)
+6. **Fleets** — captains place their own fleet from the player page. The admin
    Fleets card is a read-only live overview of both boards
-6. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
-7. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
+7. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
+8. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
    and award or dock points by hand with a reason. Every adjustment can be undone
 
 If it goes wrong mid-match, **Reset to placement** rolls the game back without
@@ -190,6 +194,9 @@ is separate from every player account and `is_admin` is grantable only by SQL.
   and can reposition freely until the game starts; a member gets a line saying
   their captain is doing it. The admin console only watches both fleet boards;
   it does not expose placement controls.
+- **Captain, in every game status:** gets a **Your team** card and may rename
+  their own team. `rename_team` refuses members and cross-team captain changes;
+  its event updates open player and admin screens.
 - **On a team, once `active`:** enemy waters (claimable), their own fleet with
   incoming shots, their active tile slots, the scoreboard, and the event feed.
 
