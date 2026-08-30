@@ -299,6 +299,12 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 }
 .roster .captain { color: var(--gold); }
 
+/* ---- waiting room ---- */
+
+.waiting { max-width: 34rem; margin: 2rem auto; text-align: center; }
+.waiting h2 { font-size: 1rem; letter-spacing: .1em; color: var(--gold); }
+.waiting strong { color: var(--gold-lit); }
+
 /* ---- admin board overview ---- */
 
 .legend {

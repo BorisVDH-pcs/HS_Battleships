@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
 import Login from './components/Login.jsx';
@@ -56,6 +56,24 @@ export default function App() {
 
   const game = useGame(gameId, session);
 
+  // Signed up, but no captain has picked them yet. Showing the board here would
+  // be a game they cannot touch, with the reason buried in a grey clause — so
+  // they get a waiting room instead.
+  const waitingForTeam =
+    !isAdmin && !game.loading && Boolean(game.game) && !game.myTeamId;
+
+  // Being added to a team writes no game_event, so the Realtime subscription
+  // never fires for it. Poll while waiting so the page lets them in by itself
+  // rather than needing to be told to refresh. Must sit above the early returns
+  // below — a hook after a conditional return is a hook that sometimes vanishes.
+  const refreshRef = useRef(game.refresh);
+  refreshRef.current = game.refresh;
+  useEffect(() => {
+    if (!waitingForTeam) return;
+    const id = setInterval(() => refreshRef.current?.(), 10000);
+    return () => clearInterval(id);
+  }, [waitingForTeam]);
+
   if (!isSupabaseConfigured) {
     return (
       <main className="app">
@@ -112,12 +130,29 @@ export default function App() {
 
       {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
 
-      {game.game && (
+      {waitingForTeam && (
+        <section className="card waiting">
+          <h2>You’re in — waiting for a team</h2>
+          <p>
+            Your account <strong>{displayName}</strong> is registered for{' '}
+            <strong>{game.game.name}</strong>, but you haven’t been put on a team yet.
+          </p>
+          <p className="muted">
+            An admin assigns players to{' '}
+            {teams.length === 2
+              ? `${teams[0].name} or ${teams[1].name}`
+              : 'a team'}
+            . Give them your username exactly as it appears above. This page will
+            let you in on its own once you’ve been added — no need to refresh.
+          </p>
+        </section>
+      )}
+
+      {game.game && !waitingForTeam && (
         <>
           <p className="status">
             <strong>{game.game.name}</strong> — {game.game.status}
             {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
-            {!myTeamId && ' · you are not on a team in this game'}
           </p>
 
           {game.game.status === 'finished' && (
