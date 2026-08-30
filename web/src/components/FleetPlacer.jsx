@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { placeFleet } from '../lib/supabase.js';
 import {
   GRID, colLetter, cellKey, shipFootprint, placementError, blockedCells,
@@ -15,13 +15,29 @@ const SHIP_NAMES = { 2: 'Cutter', 3: 'Frigate', 4: 'Galleon', 5: 'Man o’ War' 
  * is submitted, but place_fleet() re-checks the whole fleet server-side — this
  * is for feedback, not enforcement.
  */
-export default function FleetPlacer({ teamId, teamName, fleet, onPlaced }) {
+export default function FleetPlacer({
+  teamId, teamName, fleet, initialPlacement = [], onPlaced,
+}) {
   const [placed, setPlaced] = useState([]);   // [{ size, cells }]
   const [dir, setDir] = useState('h');
   const [selected, setSelected] = useState(null);   // index into remaining
   const [hover, setHover] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  // Admin placement is also an editor: load the saved fleet so the upper board
+  // cannot falsely look empty while the read-only board below shows ships. The
+  // primitive key prevents unrelated live events from wiping unsaved edits.
+  const initialKey = JSON.stringify(initialPlacement);
+  useEffect(() => {
+    setPlaced(initialPlacement.map((ship) => ({
+      size: ship.size,
+      cells: ship.cells.map((cell) => ({ row: cell.row, col: cell.col })),
+    })));
+    setSelected(null);
+    setHover(null);
+    setError(null);
+  }, [teamId, initialKey]);
 
   // A phone has no hover, so the preview never appears and a tap would drop a
   // hull blind. On coarse pointers the first tap previews and a second tap on
@@ -116,6 +132,11 @@ export default function FleetPlacer({ teamId, teamName, fleet, onPlaced }) {
     >
       <div>
         <h3>{teamName}</h3>
+        {initialPlacement.length > 0 && (
+          <p className="muted">
+            The saved fleet is loaded. Click a ship to move it, then save your changes.
+          </p>
+        )}
         <p className="muted">
           {coarse ? (
             <>
@@ -193,9 +214,17 @@ export default function FleetPlacer({ teamId, teamName, fleet, onPlaced }) {
 
       <div className="row">
         <button onClick={submit} disabled={busy || remaining.length > 0}>
-          {busy ? 'Saving…' : `Save fleet for ${teamName}`}
+          {busy
+            ? 'Saving…'
+            : initialPlacement.length > 0
+              ? `Save changes for ${teamName}`
+              : `Save fleet for ${teamName}`}
         </button>
-        <button className="ghost" onClick={() => { setPlaced([]); setSelected(null); setHover(null); setError(null); }}>
+        <button
+          className="ghost"
+          title="Clear this editor. The saved fleet is unchanged until you save a replacement."
+          onClick={() => { setPlaced([]); setSelected(null); setHover(null); setError(null); }}
+        >
           Clear
         </button>
         {remaining.length > 0 && (

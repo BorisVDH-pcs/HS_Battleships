@@ -55,7 +55,9 @@ and therefore **must never carry a tile's name or icon**: the grid is shared, so
 naming a tile would reveal it on the reader's own board. (The original Apps
 Script author had the same rule — the public webhook omitted tile names.)
 
-### Migrations — all applied to the live project
+### Migrations
+
+`0001` through `0017` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -75,6 +77,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0014_tile_icons.sql` | Adds `tiles.icon`, drops the unused `tiles.rules`, rebuilds `tiles_for_me` and `admin_list_tiles` around them (drop + recreate, so grants are re-applied) |
 | `0015_fleet_placed_event_type.sql` | Adds the `fleet_placed` event type (separate file for the same reason as 0008 and 0012) |
 | `0016_place_fleet_emits_event.sql` | `place_fleet` now emits `fleet_placed`, so the admin console sees a captain's placement without a manual refresh |
+| `0017_restore_place_fleet_guards.sql` | Restores admin placement, grid-boundary validation and no-touch validation accidentally dropped by 0016, while retaining `fleet_placed` |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -155,9 +158,10 @@ themselves instead of sitting on a board that no longer exists.
 
 The Fleets card carries a live spectator view underneath the placer, in every
 status: one board per team, its ships plus incoming shots, with sunk/hit counts,
-updating over Realtime. During `placement` it is how you confirm a captain's
-fleet actually saved — the placer above it is an input, not a read-out, and
-shows a blank grid whether or not a fleet exists.
+updating over Realtime. During `placement`, the editable boards above now load
+the saved fleets as well, so they no longer falsely look unfinished while the
+spectator boards show the ships. A captain's `fleet_placed` event refreshes both
+the editable boards and the overview.
 
 ### What the admin can see that players cannot
 
@@ -476,6 +480,21 @@ Roughly in priority order:
 - **The overview renders during placement**, in the deployed bundle: the
   `AdminBoards` call sits as a sibling of the status ternary rather than inside
   its `else`.
+
+**Implemented after this handover was first written:**
+
+- `0017_restore_place_fleet_guards.sql` fixes a regression in 0016. That
+  migration had been based on the pre-0006 `place_fleet` body and therefore
+  removed the admin exception, the grid-boundary check and the server-side
+  no-touch check. 0017 restores all three and keeps the redacted
+  `fleet_placed` event. Applied to the live project and verified in a rolled-back
+  production transaction: admin placement succeeded with 5 ships / 17 cells,
+  off-board and touching fleets were rejected, and the event payload contained
+  only `{"ships":5}`.
+- The admin fleet placers now load the persisted fleet returned by
+  `admin_list_ship_cells`, explain that the saved fleet is loaded, and refresh
+  when a captain saves from another page. The production frontend build passes
+  locally; deployment status is recorded below.
 
 **Not verified:**
 
