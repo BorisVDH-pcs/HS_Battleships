@@ -153,8 +153,11 @@ replay immediately. Both clear every claim, the feed, the manual adjustments and
 the winner, and both emit a `game_reset` event, so open player pages notice by
 themselves instead of sitting on a board that no longer exists.
 
-Once active, the Fleets card becomes a live spectator view: one board per team,
-its ships plus incoming shots, with sunk/hit counts, updating over Realtime.
+The Fleets card carries a live spectator view underneath the placer, in every
+status: one board per team, its ships plus incoming shots, with sunk/hit counts,
+updating over Realtime. During `placement` it is how you confirm a captain's
+fleet actually saved — the placer above it is an input, not a read-out, and
+shows a blank grid whether or not a fleet exists.
 
 ### What the admin can see that players cannot
 
@@ -168,7 +171,10 @@ Two views, both fed by `admin_list_*` definer functions that raise
   is `active`, when *editing* tiles is refused. Either view flags squares with no
   tile rather than rendering a silent gap.
 - **Both fleets at once** (`AdminBoards`) — one board per team showing that
-  team's ships plus the shots the opponent has taken at them.
+  team's ships plus the shots the opponent has taken at them. Rendered in every
+  game status. It used to appear only after the game left `placement`, which
+  hid it during the one phase where "did that fleet save?" is the question
+  being asked.
 
 Between them these are the game's two secrets, which is why the admin account
 is separate from every player account and `is_admin` is grantable only by SQL.
@@ -358,6 +364,12 @@ Roughly in priority order:
   fleet and the organiser's screen kept saying "No fleet placed yet". Roster
   changes still have it, which is why the waiting room polls (gap 11). If you
   add a state-changing RPC, emit an event from it.
+- **A component that is not mounted cannot be stale.** Before blaming Realtime
+  for a screen that will not update, check that the thing you expect to see is
+  rendered at all. `AdminBoards` sat in the `else` branch of the Fleets card's
+  status ternary, so during `placement` it was simply absent, and no refresh or
+  event could have helped. The symptom — "the admin does not see the fleet" —
+  is identical to a missed event, which is what made it easy to misdiagnose.
 - **Realtime needs the publication, not just the subscription.** A channel can
   report `SUBSCRIBED` and still deliver nothing if its table is not in
   `supabase_realtime`. There is no error anywhere. This is what 0007 fixes, and
@@ -457,6 +469,13 @@ Roughly in priority order:
   `pointer: coarse` matched and the touch instructions rendered.
 - All ten committed icons serve HTTP 200 at
   `/HS_Battleships/icons/<slug>.png` with the expected byte sizes.
+- **`place_fleet` emits `fleet_placed`** — replayed a captain's real fleet
+  through the RPC inside a transaction: one event, payload `{"ships": 5}`, no
+  `row`/`col` anywhere in it. Rolled back, and the fleet was intact afterwards
+  (5 ships, 17 cells, sizes 2,3,3,4,5) with zero leftover events.
+- **The overview renders during placement**, in the deployed bundle: the
+  `AdminBoards` call sits as a sibling of the status ternary rather than inside
+  its `else`.
 
 **Not verified:**
 
@@ -464,6 +483,9 @@ Roughly in priority order:
   written blind and only the rendered card has been seen, never a hull actually
   dropped with a thumb. This is the first thing every captain does, so it is
   worth two minutes on a real handset.
+- **The overview showing a fleet in Boris's own browser.** The markup is
+  confirmed deployed and the data is confirmed present (Kriegsmarine: 5 ships,
+  17 cells), but nobody has yet seen the two meet on screen.
 - **An icon rendering on a claimed tile.** The redaction direction is proven
   (above); the *showing* direction needs a live claim on a tile that has an
   icon — try G1.
