@@ -7,6 +7,7 @@ import MyFleet from './components/MyFleet.jsx';
 import ActiveTiles from './components/ActiveTiles.jsx';
 import EventFeed from './components/EventFeed.jsx';
 import Scoreboard from './components/Scoreboard.jsx';
+import CaptainPlacement from './components/CaptainPlacement.jsx';
 import Admin from './components/Admin.jsx';
 
 export default function App() {
@@ -103,7 +104,7 @@ export default function App() {
     }
   }
 
-  const { loading, error, teams, myTeamId, tiles, myShipCells, myFleet, enemyShots, events, scores } = game;
+  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, scores } = game;
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
@@ -155,6 +156,17 @@ export default function App() {
             <p className="banner">
               {teams.find((t) => t.id === game.game.winner_team_id)?.name} wins.
             </p>
+          )}
+
+          {game.game.status === 'placement' && myTeamId && (
+            <CaptainPlacement
+              isCaptain={myRole === 'captain'}
+              teamId={myTeamId}
+              teamName={teams.find((t) => t.id === myTeamId)?.name ?? 'your'}
+              fleet={game.game.fleet}
+              shipsPlaced={myFleet.length}
+              onPlaced={() => game.refresh()}
+            />
           )}
 
           <Scoreboard scores={scores} myTeamId={myTeamId} game={game.game} />

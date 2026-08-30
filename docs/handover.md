@@ -146,8 +146,12 @@ its ships plus incoming shots, with sunk/hit counts, updating over Realtime.
   teams have been made." No board. The page polls every 10s and admits them by
   itself once assigned — roster changes emit no `game_event`, so Realtime cannot
   carry this.
-- **On a team:** enemy waters (claimable), their own fleet with incoming shots,
-  their active tile slots, and the event feed.
+- **On a team, during `placement`:** a captain gets a **Place your fleet** card
+  and can reposition freely until the game starts; a member gets a line saying
+  their captain is doing it. The admin console can still place either fleet, so
+  the organiser remains the fallback if a captain does not show up.
+- **On a team, once `active`:** enemy waters (claimable), their own fleet with
+  incoming shots, their active tile slots, the scoreboard, and the event feed.
 
 ---
 
@@ -198,10 +202,12 @@ Roughly in priority order:
    editable in the admin console, and `score_events` is now written and read
    through `admin_adjust_score` / `admin_list_score_events` /
    `admin_delete_score_event`. Defaults are 1 point per completed tile and
-   nothing else, which is what the spreadsheet did. **Not yet seen in a
-   browser** — see below.
-5. **Captain-facing placement.** `place_fleet` allows a captain, but only the
-   admin console calls it — a captain has no UI to place their own fleet.
+   nothing else, which is what the spreadsheet did. Confirmed working in the
+   browser by Boris, who set it to 1 per hit and watched the totals re-derive.
+5. ~~**Captain-facing placement.**~~ **Done.** A captain now sees a "Place your
+   fleet" card on their own page during placement, and can reposition until the
+   admin starts the game. Members get a waiting message. `place_fleet` always
+   allowed this — only the UI was missing.
 6. **Delete the demo data** before a real event: the "Demo Match" game and the
    `demo`, `Lil Sod`, `Soft Papi` accounts.
 7. **Mobile.** Never tested at phone width, and players will be on phones during
@@ -277,11 +283,19 @@ Roughly in priority order:
   the delta and no `reason`; and an impersonated Flikkerlikkers player sees both
   teams' totals but **zero** `score_events` rows. Test rows were deleted after.
 
+- Captain placement, server-side: a captain who is **not** an admin placed a full
+  fleet through `place_fleet` on a throwaway game in `placement`; a plain member
+  of the same team was refused with "Only a team captain or an admin may place
+  the fleet". The throwaway game was deleted afterwards.
+- The admin Score card, in the browser, by Boris — changing the weighting to
+  1-per-hit re-derived both totals correctly.
+
 **Not verified:**
 
-- **The scoring UI in a browser.** The SQL underneath it is tested, but the
-  Scoreboard and the admin Score card have never been rendered — they were
-  written on a machine with no Node (see Traps) and compiled only by CI.
+- **The captain's placement card in a browser.** The RPC path under it is
+  tested end to end, but the card itself has never been rendered — written on a
+  machine with no Node (see Traps) and compiled only by CI. Needs a captain
+  account on a game in `placement`.
 - A full game played through the player UI by two real people since the V4 rule
   changes. Every game-logic test has been driven from SQL or the admin console.
 - Anything at mobile width.

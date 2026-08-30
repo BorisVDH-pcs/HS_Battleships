@@ -15,6 +15,7 @@ export function useGame(gameId, session) {
     game: null,
     teams: [],
     myTeamId: null,
+    myRole: null,     // 'captain' lets this player place the team's fleet
     tiles: [],        // tiles_for_me: name is null until my team claims it
     myShipCells: [],  // my own placement (RLS hides the enemy's)
     myFleet: [],      // ship_status for my fleet only
@@ -36,6 +37,8 @@ export function useGame(gameId, session) {
 
       const myTeamId =
         teams?.find((t) => memberships?.some((m) => m.team_id === t.id))?.id ?? null;
+      // Captains may place their own fleet — place_fleet() has always allowed it.
+      const myRole = memberships?.find((m) => m.team_id === myTeamId)?.role ?? null;
       const enemyTeamId = teams?.find((t) => t.id !== myTeamId)?.id ?? null;
 
       const [
@@ -45,8 +48,13 @@ export function useGame(gameId, session) {
         // tiles_for_me and team_scores are `security definer` FUNCTIONS, not
         // views — see 0010. They already order their own rows.
         supabase.rpc('tiles_for_me', { p_game_id: gameId }),
-        supabase.from('ship_cells').select('*'),
-        supabase.from('ship_status').select('*'),
+        // RLS already limits both to my own teams, but "my teams" spans every
+        // game I have ever been in. Without the filter a second game would draw
+        // the other game's ships onto this board, and miscount shipsPlaced.
+        myTeamId
+          ? supabase.from('ship_cells').select('*').eq('team_id', myTeamId)
+          : supabase.from('ship_cells').select('*'),
+        supabase.from('ship_status').select('*').eq('game_id', gameId),
         supabase
           .from('game_events')
           .select('*')
@@ -73,6 +81,7 @@ export function useGame(gameId, session) {
         game: game ?? null,
         teams: teams ?? [],
         myTeamId,
+        myRole,
         tiles: tiles ?? [],
         myShipCells: myShipCells ?? [],
         myFleet: myFleet ?? [],
