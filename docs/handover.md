@@ -72,6 +72,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0011_drop_definer_views.sql` | Drops the two views, once the frontend calling the functions is live |
 | `0012_game_reset_event_type.sql` | Adds the `game_reset` event type (split from 0013 for the same reason as 0008) |
 | `0013_reset_game.sql` | `admin_reset_game` — roll a started game back to placement without losing tiles or roster |
+| `0014_tile_icons.sql` | Adds `tiles.icon`, drops the unused `tiles.rules`, rebuilds `tiles_for_me` and `admin_list_tiles` around them (drop + recreate, so grants are re-applied) |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -155,7 +156,8 @@ Two views, both fed by `admin_list_*` definer functions that raise
 `Admins only` server-side, so neither is reachable by faking a client flag.
 
 - **Tiles card -> Show board / Show as list** — all 100 squares with their real
-  names and rules. The grid answers "what is on G7"; the list is for
+  names and icons. The list prints the icon *slug* rather than the picture,
+  because its job is checking each tile got the icon it was meant to get. The grid answers "what is on G7"; the list is for
   proofreading a fresh import against the sheet. Both stay available once the
   game is `active`, when *editing* tiles is refused. Either view flags squares
   that have no tile rather than rendering a silent gap.
@@ -221,6 +223,9 @@ Roughly in priority order:
    secrets"): committing the list would publish exactly what `tiles_for_me`
    exists to hide. It lives in the Middleman sheet and in the database. If
    you need to re-import, paste the sheet's `Tile Data` into the admin box.
+
+   Tiles carry a `name` and an optional `icon`. There is no `rules` column —
+   it was dropped in 0014, empty, because the V4 board has none.
 
    Import notes for next time:
    - The sheet labels squares `A1`..`J10`, where the **letter is the column
