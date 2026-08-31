@@ -211,19 +211,17 @@ button.cell:disabled { cursor: default; }
 .cell.active .coord-label { opacity: 1; color: var(--gold-lit); }
 @media (pointer: coarse) { .coord-label { opacity: .8; } }
 
-/* Both columns get the same single-line heading row, so the two 10x10 grids
-   start at the same y and stay readable as a pair. */
-.section-head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  gap: 1rem;
-  /* Fixed, not min-height: the status text is .85rem against the h2's .8rem,
-     so letting content decide would leave this row a pixel taller than the
-     enemy side's and put the grids back out of step. */
-  height: 1.4rem;
-  margin-bottom: .7rem;
-}
-.section-head h2, .section-head .fleet-status { margin: 0; }
-.fleet-status { color: var(--muted); font-size: .85rem; }
+/* The two boards are tabs now, so there is no second column to line this one
+   up with — the heading row that did that job is gone with it. */
+.boards { margin: 1.5rem 0; }
+.board-tabs { align-items: baseline; margin-top: 0; }
+.board-tabs .fleet-status { margin-left: auto; }
+.fleet-status { color: var(--muted); font-size: .85rem; margin: 0; }
+
+/* Capped rather than full-bleed. Across 1100px the cells reach ~105px and the
+   64px tile art is being upscaled; at this width they land near 72px, which is
+   about the size the icons were drawn for. */
+.board { max-width: 780px; margin-inline: auto; }
 
 /* ---- active tiles ---- */
 

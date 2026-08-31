@@ -20,6 +20,10 @@ export default function App() {
   const [notice, setNotice] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Which board is on screen. The two used to sit side by side, which cost
+  // each of them half the page and left the cells too small to read the tile
+  // art in. One at a time, full width.
+  const [boardTab, setBoardTab] = useState('enemy');
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -216,39 +220,49 @@ export default function App() {
             />
           )}
 
-          <div className="columns">
-            <section>
-              <div className="section-head">
-                <h2>Enemy waters</h2>
-              </div>
-              <EnemyGrid
-                tiles={tiles}
-                onClaim={onClaim}
-                canClaim={canClaim}
-                busyTileId={busyTileId}
-              />
-              {isActive && !canClaim && myTeamId && (
-                <p className="muted">Both slots are full — fire one before claiming another.</p>
-              )}
-            </section>
-
-            <section>
-              {/* The count rides the heading rather than sitting above the
-                  grid: a line there pushed this board below the enemy one,
-                  and the two are meant to be read side by side. */}
-              <div className="section-head">
-                <h2>Your fleet</h2>
+          <section className="boards">
+            {/* The same tab strip the admin console uses, so this reads as part
+                of the app rather than a second idea about tabs. */}
+            <div className="tabs board-tabs">
+              <button
+                className={boardTab === 'enemy' ? 'on' : ''}
+                onClick={() => setBoardTab('enemy')}
+              >
+                Enemy waters
+              </button>
+              <button
+                className={boardTab === 'fleet' ? 'on' : ''}
+                onClick={() => setBoardTab('fleet')}
+              >
+                Your fleet
+              </button>
+              {boardTab === 'fleet' && (
                 <span className="fleet-status">
                   {myFleet.length - sunkCount} afloat, {sunkCount} sunk
                 </span>
-              </div>
+              )}
+            </div>
+
+            {boardTab === 'enemy' ? (
+              <>
+                <EnemyGrid
+                  tiles={tiles}
+                  onClaim={onClaim}
+                  canClaim={canClaim}
+                  busyTileId={busyTileId}
+                />
+                {isActive && !canClaim && myTeamId && (
+                  <p className="muted">Both slots are full — fire one before claiming another.</p>
+                )}
+              </>
+            ) : (
               <MyFleet
                 myShipCells={myShipCells}
                 enemyShots={enemyShots}
                 tiles={tiles}
               />
-            </section>
-          </div>
+            )}
+          </section>
 
           <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
         </>
