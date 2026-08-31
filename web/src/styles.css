@@ -591,6 +591,41 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   align-self: flex-start;
 }
 
+/* ---- admin task boards ---- */
+/* The organiser's read of both task grids. Reuses .board-grid and .cell, so a
+   square means the same thing here as it does on a player's board. */
+
+.cell .tile-progress {
+  font-family: var(--display); font-size: .68rem;
+  color: var(--gold-dim); letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+/* Claimed and part-done reads as gold; claimed and fully evidenced but not yet
+   fired reads brighter, because that is the one an organiser may be waiting on. */
+.cell.active.ready { border-color: var(--gold); box-shadow: var(--glow-md); }
+.cell.active.ready .tile-progress { color: var(--gold-lit); }
+button.cell.clickable { cursor: pointer; }
+button.cell.clickable:hover { border-color: var(--gold); background: var(--panel-2); }
+button.cell.picked {
+  border-color: var(--gold-lit);
+  box-shadow: var(--glow-md);
+  background: var(--panel-2);
+}
+
+.tile-evidence-panel {
+  margin-top: 1rem;
+  padding: .8rem;
+  border: 1px solid var(--gold-deep);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.tile-evidence-panel .panel-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+}
+.tile-evidence-panel h3 { margin: 0; }
+.tile-evidence-panel .coord { color: var(--gold); font-family: var(--display); }
+.tile-evidence-panel > .muted { margin: .3rem 0 .7rem; font-size: .8rem; }
+
 /* ---- admin tile board ---- */
 /*
  * Not `.board-grid`: that grid is square cells holding a number, this one is

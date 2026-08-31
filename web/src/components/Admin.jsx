@@ -8,6 +8,7 @@ import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
+import AdminTileBoards from './AdminTileBoards.jsx';
 import TileBoard from './TileBoard.jsx';
 
 const STEP_HINT = {
@@ -252,6 +253,16 @@ export default function Admin() {
           <section className="card">
             <h2>Score</h2>
             <Scoreboard scores={scores} myTeamId={null} />
+          </section>
+
+          <section className="card">
+            <h2>Task boards</h2>
+            <p className="muted">
+              The shared grid as each team has worked it. A claimed square shows
+              its evidence count — 1/3 is a team mid-task — and clicking one
+              opens what they have submitted for it.
+            </p>
+            <AdminTileBoards gameId={game.id} />
           </section>
 
           <section className="card">
