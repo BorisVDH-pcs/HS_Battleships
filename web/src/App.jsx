@@ -193,22 +193,6 @@ export default function App() {
               underneath them off the screen entirely. */}
           <Scoreboard scores={scores} myTeamId={myTeamId} />
 
-          {/* Directly under the score, and never conditional: the team should
-              be able to glance at the top of the page and see what it is
-              holding. Through placement both slots read as empty, which is
-              accurate — nothing can be claimed yet. */}
-          <ActiveTiles
-            tiles={tiles}
-            maxActive={maxActive}
-            emptyHint={isPlacement
-              ? 'Nothing to claim until the game starts.'
-              : undefined}
-            onFired={(tile, result) => {
-              setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-              game.refresh();
-            }}
-          />
-
           {isPlacement && myTeamId && (
             <CaptainPlacement
               isCaptain={myRole === 'captain'}
@@ -242,6 +226,21 @@ export default function App() {
                 </span>
               )}
             </div>
+
+            {/* Sits with the board rather than up by the score: what the team
+                is holding and where it can shoot belong together, and this
+                keeps it below the placement card during prep. */}
+            <ActiveTiles
+              tiles={tiles}
+              maxActive={maxActive}
+              emptyHint={isPlacement
+                ? 'Nothing to claim until the game starts.'
+                : undefined}
+              onFired={(tile, result) => {
+                setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                game.refresh();
+              }}
+            />
 
             {boardTab === 'enemy' ? (
               <>

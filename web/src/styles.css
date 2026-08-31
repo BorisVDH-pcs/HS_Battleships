@@ -225,7 +225,7 @@ button.cell:disabled { cursor: default; }
 
 /* ---- active tiles ---- */
 
-.active-tiles { margin-top: 1.5rem; }
+.active-tiles { margin: 1.25rem 0; }
 
 /* Capped, not full-bleed: stretched across 1100px these two cards read as
    banners rather than tiles, and the pair is easier to take in when it sits
