@@ -482,6 +482,14 @@ Roughly in priority order:
 
 **Implemented after this handover was first written:**
 
+- Fixed hit-only scoring is live from commit `12dfb52` and migration 0020.
+  Production verification showed every game at weights `0,1,0`, every returned
+  total equal to its hit count, zero returned adjustments, the fixed-rule check
+  constraint validated, and all four scoring-admin RPCs absent. The deployed
+  bundle `index-DPFEbTcC.js` was verified in the signed-in admin panel: the Score
+  card has two team rows, zero controls, and none of the removed section labels.
+  The database advisors report no errors; the remaining warnings are the known
+  intentional definer-RPC/auth notices documented below.
 - Team-name editing is live from commit `c518812`. Admins get both names in a
   **Team names** card; captains get only their own in **Your team**, in every
   game status. The `rename_team` RPC was production-tested in rolled-back
