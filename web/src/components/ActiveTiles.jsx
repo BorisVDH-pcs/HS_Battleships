@@ -74,11 +74,13 @@ export default function ActiveTiles({
 
           return (
             <article key={tile.id} className="slot filled">
-              {/* A claimed tile always has its name; the icon is optional, so
-                  the coordinate stands in as it does on the board itself. */}
+              {/* A claimed tile always has its name; the artwork is optional,
+                  so an undrawn tile borrows the stand-in, exactly as it does on
+                  the board itself. */}
               <div className="slot-art">
                 <TileIcon
                   slug={tile.icon}
+                  standIn
                   fallback={<span className="slot-art-coord">{label}</span>}
                 />
               </div>

@@ -68,7 +68,11 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                     ? (tile.claim_result === 'hit'
                         ? <span className="mark">✸</span>
                         : <span className="mark">○</span>)
-                    : <TileIcon slug={tile.icon} fallback={<span className="coord-label">{label}</span>} />}
+                    : <TileIcon
+                        slug={tile.icon}
+                        standIn={tile.revealed}
+                        fallback={<span className="coord-label">{label}</span>}
+                      />}
                 </button>
               );
             })}

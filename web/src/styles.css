@@ -210,7 +210,7 @@ button.cell:disabled { cursor: default; }
 }
 /* The burst wants to fill its square; the ring wants room around it, so it
    reads as a splash in open water rather than another filled cell. */
-.cell.hit .mark  { font-size: 1.15em; line-height: 1; }
+.cell.hit .mark  { font-size: 1.7em; line-height: 1; }
 .cell.miss .mark { font-size: .8em; line-height: 1; }
 
 /* The class arrives on an element that is already mounted — the realtime

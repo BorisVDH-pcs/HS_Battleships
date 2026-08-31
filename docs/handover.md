@@ -1,6 +1,6 @@
 # Handover — HS_Battleships
 
-Current as of **2026-08-31**, end of session. Written to be picked up cold, by
+Current as of **2026-08-31**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
 Boris or by another session with no memory of this one.
 
 ---
@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0020` are applied to the live project.
+`0001` through `0023` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -81,6 +81,9 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0018_team_renamed_event_type.sql` | Adds the `team_renamed` event type in its own committed migration |
 | `0019_rename_team.sql` | Adds the guarded team-name RPC: admins may rename either team, captains only their own; emits `team_renamed` so open screens refresh |
 | `0020_fixed_hit_only_scoring.sql` | Fixes scoring at one point per hit, ignores legacy adjustments, constrains the old weight columns to `0,1,0`, and removes all four scoring-admin RPCs |
+| `0021_evidence.sql` | `tiles.required_evidence`, the `tile_evidence` table (select policy and nothing else, so submitted proof cannot be edited or deleted by anyone using the app), the private `evidence` storage bucket and its policies, `add_evidence`, `list_my_evidence`, `admin_list_evidence`, and the `claims_need_evidence` trigger |
+| `0022_admin_tile_progress.sql` | `admin_tile_progress` — every claim in a game with its evidence count, for the organiser's board |
+| `0023_evidence_fires.sql` | `add_evidence` now fires the shot itself in the same transaction once the requirement is met, so "fully evidenced but still active" cannot exist |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -175,11 +178,22 @@ Two views, both fed by `admin_list_*` definer functions that raise
   picture so you can see which tile got which. Both stay available once the game
   is `active`, when *editing* tiles is refused. Either view flags squares with no
   tile rather than rendering a silent gap.
-- **Both fleets at once** (`AdminBoards`) — one board per team showing that
-  team's ships plus the shots the opponent has taken at them. Rendered in every
-  game status. It used to appear only after the game left `placement`, which
-  hid it during the one phase where "did that fleet save?" is the question
-  being asked.
+- **Boards** (`AdminOverview`) — one board per team, drawn from that team's
+  side of the game: the **opponent's** hulls they are hunting, with their own
+  claims and shots painted on top. Alpha's board therefore carries Bravo's
+  ships and Alpha's hits, so reading it is reading Alpha's game. There is
+  deliberately no second copy of each fleet; the earlier `AdminBoards` and
+  `AdminTileBoards` drew the same fleets twice and are deleted. Rendered in
+  every game status, including `placement`, which is the one phase where "did
+  that fleet save?" is the question being asked.
+
+  A claimed square shows its evidence count (`1/3`), and clicking any claimed
+  square opens `EvidencePanel` — the screenshots for that tile, each with the
+  name of the member who submitted it. Signed URLs are minted only for the tile
+  actually open. The card refreshes on `game_events` Realtime plus a 20s poll,
+  because an upload emits no event.
+- **Evidence review** (`EvidenceReview`) — the same submissions as a flat list
+  across the whole game, for reading through in order rather than by square.
 
 Between them these are the game's two secrets, which is why the admin account
 is separate from every player account and `is_admin` is grantable only by SQL.
@@ -202,8 +216,37 @@ is separate from every player account and `is_admin` is grantable only by SQL.
 
 Every board labels its squares `A1`..`J10` — the coordinate, not the 1..100
 position, because that is what people say out loud and type into Discord. A
-shot marker outranks the label: a hit shows a cross, a claimed-but-unfired tile
-shows a dot, and a claimed tile shows its **icon** if it has one.
+shot marker outranks the label, and a claimed tile shows its **icon**.
+
+**The colour language** (`styles.css`, top of file) — a hit is one event with
+two meanings, so it has two colours:
+
+| | Looks like | Means |
+|---|---|---|
+| `.cell.hit.dealt` | ember fill, solid burst `✸` | a hull *you* struck — enemy waters, and every admin board |
+| `.cell.hit` | red fill, solid burst `✸` | damage *you took* — your own fleet only |
+| `.cell.miss` | water blue, hollow ring `○` | a square already spent |
+| `.cell.ship` | green | your hull (or, on an admin board, an enemy hull still afloat) |
+| `.cell.active` | gold outline, `1/3` | claimed, not yet fired |
+
+Red therefore only ever means harm to the person reading it. Filled-versus-
+hollow carries the same distinction without hue, which matters because ship
+green and hit red are the pair a deuteranope cannot separate. `BoardLegend`
+prints this under both player boards — enemy waters names no ship colour on
+purpose, since an undamaged enemy hull is still secret.
+
+**Evidence.** A claimed tile is worked from the **Active tiles** slots: drop,
+paste or pick screenshots, and the submit that meets `required_evidence`
+*is* the shot — `add_evidence` fires it in the same transaction (0023), so a
+tile cannot sit fully evidenced and still hold a slot. Submitted evidence is
+immutable; staging exists so the change-your-mind step happens before upload.
+Clicking any square the team has claimed reopens `EvidencePanel` with what they
+submitted, the same component the organiser sees.
+
+**Artwork.** Ten of the ~90 tiles have real art. A claimed tile with none
+borrows the dragon warhammer (`TileIcon`, `standIn`), so a claimed square never
+looks like an unclaimed one. An *unclaimed* square still renders no image at
+all — no slug, no request, nothing in the network log.
 
 Claiming asks for confirmation, as firing already did. A cell is a small target
 on a phone and a claim costs one of the team's active slots until it is fired.
@@ -284,9 +327,12 @@ Roughly in priority order:
      game_id = ...` and compare against the same hash computed on the source.
      That catches a transcription slip that spot-checking will not.
 2. **Tile icons — 10 of ~90 done.** The plumbing is finished (0014, `TileIcon`,
-   `tools/make_icons.py`); what is left is artwork. Ten tiles have an icon; the
-   rest fall back to their coordinate, which is the pre-icon board, so this is
-   cosmetic and safe to leave half-done through an event.
+   `tools/make_icons.py`); what is left is artwork. In Demo Match 10 of the 100
+   tiles have an `icon` slug and 90 are null, so most claimed squares currently
+   show the dragon warhammer stand-in. Cosmetic, and safe to leave half-done
+   through an event — but the stand-in means an undrawn tile no longer *reads*
+   as undrawn, so count slugs in the database rather than looking at the board
+   when you want to know what is left.
 
    Only ~21 of the 90 distinct tile names matched anything in the set at
    `iftachShoham/HighSociety-Bingo` — that bingo had different tasks — so most
@@ -536,7 +582,17 @@ Roughly in priority order:
   17 cells), but nobody has yet seen the two meet on screen.
 - **An icon rendering on a claimed tile.** The redaction direction is proven
   (above); the *showing* direction needs a live claim on a tile that has an
-  icon — try G1.
+  icon — try G1 in Demo Match. The dragon-warhammer stand-in for a claimed tile
+  with no art is unseen too.
+- **Anything on the player side of the evidence work**, in a browser. All of it
+  was verified server-side (see below) and the organiser's half was verified on
+  screen, but nobody has watched a player upload a screenshot, see `1/3` become
+  `3/3`, watch the shot go off, or click a claimed square to read their own
+  submissions back. There is no player password in this repo, and the sessions
+  that did this work only ever had the admin login.
+- **The red hit on your own fleet.** Enemy-waters ember and water-blue misses
+  were confirmed on the deployed admin board; the fleet-owner's red needs a
+  player session with incoming shots against it.
 - A full game played through the player UI by two real people since the V4 rule
   changes. Every game-logic test has been driven from SQL or the admin console.
 - **Anything on a real phone.** The measurements above were taken in an emulated
@@ -544,3 +600,57 @@ Roughly in priority order:
   handset.
 - Behaviour with a realistic team size — everything so far has been 1–2 players
   per side.
+
+
+---
+
+## Session log — 2026-08-31, evidence and board colours
+
+Commits `48c1c25` … `61ab3e3` plus migrations `0021`–`0023`, all deployed and
+applied live.
+
+**Evidence.** Any member may submit; the submitter's name is recorded on every
+row (`uploaded_by_name`) and shown wherever evidence is read. Admins review but
+do not approve — there is no approval state to get stuck in. `tile_evidence`
+has a select policy and nothing else, and the `evidence` storage bucket has no
+update or delete policy, so a player cannot retract proof after submitting it.
+Storage paths are `{game_id}/{team_id}/{claim_id}/{uuid}.webp`; the bucket
+policies key on **path segment 2**, the team id, and `add_evidence` re-derives
+the whole prefix server-side and rejects a path that does not match the claim.
+
+**Why 0023 exists.** Boris found a tile reading `1/1` that had not fired, and
+ruled that the state must be impossible rather than recoverable: *"Only free an
+active tile once the old one fired."* The client used to call `add_evidence`
+then `fire_tile`, with a network between them. Now the requirement being met
+fires the shot inside the same transaction, under `for update` on the claim, so
+two members submitting the last piece at the same moment cannot double-fire.
+The **Complete & fire** button in `ActiveTiles` is kept only as a rescue hatch
+for rows predating this, and for anything an organiser edits in by hand.
+
+**Verified server-side, on the live database**, by impersonating a real member
+with `set_config('request.jwt.claims', …)`: the 2nd of 3 submissions did not
+fire, the 3rd returned `fired: true` with a result, and a 4th was refused with
+"That tile has already been fired". A full audit found zero claims holding full
+evidence while still active.
+
+**Board colours** (`61ab3e3`) — the change described under *What players see*.
+Verified on the deployed admin board: an ember burst at E2, hollow water rings
+at H7 and B9, a gold `2/3` claim at C4, green enemy hulls elsewhere.
+
+### Leftovers to clean up
+
+A throwaway game **"Evidence Demo (scratch)"**
+(`eeeeeeee-0000-0000-0000-0000000000f0`, teams Demo Alpha `…000a` / Demo Bravo
+`…000b`) was built to test all of this against real storage and real RLS rather
+than against Demo Match, which stayed in `placement` and untouched. It is still
+there, and deleting it is safe:
+
+- the game itself, its tiles, claims and evidence rows;
+- the uploaded objects under its `game_id` prefix in the `evidence` bucket;
+- two or three `tile_evidence` rows on claim `…00c5` whose storage objects were
+  never actually uploaded (the RPC was called directly during testing), so they
+  render as broken thumbnails;
+- `Soft Papi`'s membership of **both** scratch teams — added so one browser
+  session could act for either side. Check this before a real event.
+
+Demo Match is unaffected by all of the above.
