@@ -231,9 +231,6 @@ button.cell:disabled { cursor: default; }
   gap: 1.5rem;
   align-items: start;
 }
-/* Centred against the board rather than pinned to its top: two cards against
-   a 10x10 grid left a long tail of empty column under them. */
-.board-side { align-self: center; }
 .board-side .active-tiles { margin-top: 0; }
 /* One per row in a narrow column, and no centring cap — that was for the days
    when this sat across the full page. */
