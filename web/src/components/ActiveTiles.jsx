@@ -61,7 +61,7 @@ export default function ActiveTiles({
       `"${tile.name}" asks for ${tile.required_evidence}, and you have submitted ` +
       `${have}. Say it is done only if you have actually finished it by one of ` +
       'the shorter routes — the organiser reviews these, and it fires the shot now.',
-      { title: 'Finished it another way?', confirmLabel: 'It is done — fire' }
+      { title: 'Complete early?', confirmLabel: 'Complete Early' }
     ))) return;
     setBusyId(tile.claim_id);
     setError(null);
@@ -160,7 +160,7 @@ export default function ActiveTiles({
                   onClick={() => completeEarly(tile, mine.length)}
                   disabled={busyId === tile.claim_id}
                 >
-                  {busyId === tile.claim_id ? 'Firing…' : 'Done another way'}
+                  {busyId === tile.claim_id ? 'Firing…' : 'Complete Early'}
                 </button>
               )}
             </article>

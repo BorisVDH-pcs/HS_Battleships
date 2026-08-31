@@ -402,7 +402,7 @@ function Tiles({ game, tiles, busy, onSave }) {
               <p className="muted">
                 Add <code>+</code> after the amount — <code>… | 18+</code> — for a
                 tile that can be finished more than one way. The number is then
-                the worst case, and the team gets a <em>Done another way</em>
+                the worst case, and the team gets a <em>Complete Early</em>
                 {' '}button once it has submitted at least one screenshot. Use it
                 only where a cheaper route genuinely exists: without the{' '}
                 <code>+</code>, the amount is the only way to finish.
