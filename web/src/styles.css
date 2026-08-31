@@ -223,36 +223,6 @@ button.cell:disabled { cursor: default; }
    about the size the icons were drawn for. */
 .board { max-width: 780px; margin-inline: auto; }
 
-/* Board and slots side by side. align-items:start so the slots sit at the top
-   of the column rather than stretching down the height of the grid. */
-.board-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 780px) minmax(15rem, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-.board-side .active-tiles { margin-top: 0; }
-/* One per row in a narrow column, and no centring cap — that was for the days
-   when this sat across the full page. */
-.board-side .slots {
-  grid-template-columns: minmax(0, 1fr);
-  max-width: none;
-  margin-inline: 0;
-}
-
-/* Below this the two no longer fit beside each other. The slots go above the
-   board when they stack: they are the team's to-do list, and burying them
-   under a 10x10 grid is the layout this replaced. */
-@media (max-width: 1000px) {
-  .board-layout { grid-template-columns: minmax(0, 1fr); }
-  .board-side { order: -1; }
-  .board-side .slots {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-width: 34rem;
-    margin-inline: auto;
-  }
-}
-
 /* ---- active tiles ---- */
 
 .active-tiles { margin-top: 1.5rem; }
