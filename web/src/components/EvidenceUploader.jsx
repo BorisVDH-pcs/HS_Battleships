@@ -62,12 +62,18 @@ export default function EvidenceUploader({
     try {
       // Sequentially: parallel uploads racing the same claim is a good way to
       // sail past the required count and confuse the person doing it.
+      let last = null;
       for (const file of staged) {
-        await uploadEvidence({ gameId, teamId, claimId, file });
+        last = await uploadEvidence({ gameId, teamId, claimId, file });
       }
       setStaged([]);
-      // The caller fires when this says the requirement is met.
-      await onUploaded?.({ completed: willComplete });
+      // add_evidence() fires the shot itself once the requirement is met, and
+      // says so. `completed` is what the caller falls back on if it did not.
+      await onUploaded?.({
+        completed: willComplete,
+        fired: Boolean(last?.fired),
+        result: last?.result ?? null,
+      });
     } catch (err) {
       setError(err.message);
     } finally {

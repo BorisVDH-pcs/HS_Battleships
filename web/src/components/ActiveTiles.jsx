@@ -95,19 +95,23 @@ export default function ActiveTiles({
                 tileName={tile.name}
                 required={required}
                 evidence={mine}
-                onUploaded={async ({ completed }) => {
-                  // The submit that meets the requirement is the shot. There is
-                  // no separate button for it, so this is the whole path.
+                onUploaded={async ({ completed, fired, result }) => {
+                  // The submit that meets the requirement IS the shot, and
+                  // add_evidence fires it in the same transaction — so by the
+                  // time this runs the result is already known.
+                  if (fired) { onFired?.(tile, result); return; }
+                  // A server that has not been migrated yet returns no result;
+                  // fire the old way rather than strand the tile.
                   if (completed) await fire(tile, false);
                   else onRefresh?.();
                 }}
               />
 
-              {/* Only a recovery path. In the normal run the shot goes off with
-                  the final submit and this card is gone before it renders. It
-                  appears when the evidence is complete and the tile somehow is
-                  not fired — an upload that landed while the shot did not — so
-                  a full tile can never be stranded with no way to fire it. */}
+              {/* Rescue only. Since 0023 the shot goes off inside the same
+                  transaction as the last piece of evidence, so a tile cannot
+                  reach full evidence and stay active — this card is gone before
+                  the button renders. It stays for rows that predate that, and
+                  for anything an organiser edits into the database by hand. */}
               {ready && (
                 <button
                   onClick={() => fire(tile)}
