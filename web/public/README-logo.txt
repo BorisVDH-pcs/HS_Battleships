@@ -1,10 +1,14 @@
-Save the High Society logo here as:  logo.png
+The files in here are generated. Do not edit them by hand.
 
-Both the page header and the sign-in screen load it automatically. Until this
-file exists they fall back to a gold "HS Battleships" wordmark, so nothing
-breaks while it is missing.
+    logo.png              header + sign-in wordmark
+    icon.png              favicon
+    apple-touch-icon.png  home-screen icon
+    favicon.svg           hand-written fallback favicon (not generated)
 
-Recommended: transparent-background PNG, ~600px wide. The header renders it
-about 38px tall, the sign-in screen about 64px, so it is only ever scaled down.
+The masters are the two PNGs at the repo root. Re-derive after changing one:
 
-It is kept out of git on purpose — see web/src/components/Wordmark.jsx.
+    python tools/make_logo.py
+
+That crops the empty black margin, keys the black to transparency so the glow
+sits on the page rather than in a box, and scales the 3840x2160 master down to
+something a phone should be asked to download.

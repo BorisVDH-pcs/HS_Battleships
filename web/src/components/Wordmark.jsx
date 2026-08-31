@@ -3,11 +3,11 @@ import { useState } from 'react';
 /**
  * The clan logo, with the gold CSS wordmark as its fallback.
  *
- * The artwork is deliberately not committed: it is the clan's, it is large,
- * and the same file is wanted by HighSocietyScape, which keeps it out of its
- * repo for the same reason. Drop it at `web/public/logo.png` and every place
- * this component is used picks it up. Until then the wordmark stands in, so a
- * missing file costs nothing and never shows a broken image.
+ * `public/logo.png` is derived from the master at the repo root by
+ * `tools/make_logo.py` — cropped, keyed to transparency and scaled down from
+ * 2.6 MB, which is not a thing to send a player on a phone. The CSS fallback
+ * stays because a logo that fails to load should cost nothing: the header
+ * degrades to the gold wordmark rather than a broken image.
  */
 export default function Wordmark({ subtitle = 'Battleships' }) {
   const [failed, setFailed] = useState(false);

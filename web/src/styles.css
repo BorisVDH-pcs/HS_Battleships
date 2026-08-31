@@ -86,7 +86,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; }
   display: flex; align-items: center; gap: .7rem;
   text-transform: none; letter-spacing: 0;
 }
-.wordmark img { height: 38px; width: auto; display: block; }
+/* The logo is a stacked two-line wordmark, not a single line, so it needs
+   real height: at 38px each line would land under 20px. */
+.wordmark img { height: 54px; width: auto; display: block; }
 .wordmark .sub {
   font-size: 1.1rem; letter-spacing: .16em; text-transform: uppercase;
   background: linear-gradient(180deg, var(--gold-lit) 0%, var(--gold) 45%, var(--gold-deep) 100%);
@@ -96,9 +98,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; }
   filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
 }
 .login .wordmark { flex-direction: column; gap: .5rem; justify-content: center; }
-.login .wordmark img { height: 64px; }
+.login .wordmark img { height: 120px; }
 @media (max-width: 520px) {
-  .wordmark img { height: 30px; }
+  .wordmark img { height: 42px; }
   .wordmark .sub { font-size: .95rem; }
 }
 
