@@ -78,12 +78,16 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; }
      transparent fill and show through). */
   filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
 }
+/* Layout first, and unscoped: the sign-in screen uses this too, and while it
+   lived under `.top` the <h1> there stayed display:block, so text-align
+   centred the subtitle and left the block-level image against the left edge. */
+.wordmark { display: flex; align-items: center; gap: .7rem; }
+
 /* With the logo present the gradient fill would paint over the artwork, so the
-   wordmark variant drops it and keeps the treatment for the "Battleships"
+   header variant drops it and keeps the treatment for the "Battleships"
    subtitle only. Falling back to the plain <h1> keeps the rules above. */
 .top h1.wordmark {
   background: none; filter: none; color: var(--text);
-  display: flex; align-items: center; gap: .7rem;
   text-transform: none; letter-spacing: 0;
 }
 /* The logo is a stacked two-line wordmark, not a single line, so it needs
@@ -97,7 +101,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; }
   color: transparent;
   filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
 }
-.login .wordmark { flex-direction: column; gap: .5rem; justify-content: center; }
+.login .wordmark { flex-direction: column; align-items: center; gap: .5rem; }
 .login .wordmark img { height: 120px; }
 @media (max-width: 520px) {
   .wordmark img { height: 42px; }
