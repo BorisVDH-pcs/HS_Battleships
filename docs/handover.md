@@ -96,7 +96,7 @@ Bookkeeping only, but it makes the ledger a bad way to check what is applied.
 each username maps to a synthetic address:
 
 ```
-"Lil Sod"  ->  lil_sod@players.hs-battleships.invalid
+"Bludgenmaker"  ->  bludgenmaker@players.hs-battleships.invalid
 ```
 
 `.invalid` is IANA-reserved so nothing can ever be delivered. Supabase rejects
@@ -126,9 +126,9 @@ event and played in it could see its own team's answers. So:
 | Username | Role | Notes |
 |---|---|---|
 | `hs_admin` (HS Admin) | **admin** | Boris holds the password; not recorded anywhere, including here |
-| `demo` | captain, Kriegsmarine | throwaway |
-| `Lil Sod` | captain, Flikkerlikkers | throwaway |
-| `Soft Papi` | **captain**, Kriegsmarine | created by Boris to test signup; promoted while testing |
+| `demo` | unassigned | throwaway |
+| `Bludgenmaker` | **captain**, Team Bravo | active replacement for the removed `Lil Sod` test account |
+| `Soft Papi` | **captain**, Team Alpha | created by Boris to test signup; promoted while testing |
 
 All four are test accounts except `hs_admin`. Delete the demo data before a real
 event — see gaps below.
@@ -307,7 +307,7 @@ Roughly in priority order:
    fleet" card on their own page during placement, and can reposition until the
    admin starts the game. Members get a waiting message. `place_fleet` always
    allowed this — only the UI was missing.
-7. **Delete the demo data** before a real event: the `demo`, `Lil Sod` and
+7. **Delete the demo data** before a real event: the `demo`, `Bludgenmaker` and
    `Soft Papi` accounts. **Note the game itself now holds the real tiles** —
    "Demo Match" is only a name at this point. Rename it rather than deleting
    it, or re-import the tiles into whatever replaces it.
@@ -482,6 +482,11 @@ Roughly in priority order:
 
 **Implemented after this handover was first written:**
 
+- The old `Lil Sod` account was replaced by the already-created
+  `Bludgenmaker` account. The active account keeps its password and Team Bravo
+  captain membership; its profile and Auth metadata now consistently show
+  `Bludgenmaker`, and the unused `Lil Sod` login was removed. The New game form
+  now uses `Team Alpha` and `Team Bravo` as the two team-name placeholders.
 - Fixed hit-only scoring is live from commit `12dfb52` and migration 0020.
   Production verification showed every game at weights `0,1,0`, every returned
   total equal to its hit count, zero returned adjustments, the fixed-rule check
@@ -522,7 +527,7 @@ Roughly in priority order:
   dropped with a thumb. This is the first thing every captain does, so it is
   worth two minutes on a real handset.
 - **The overview showing a fleet in Boris's own browser.** The markup is
-  confirmed deployed and the data is confirmed present (Kriegsmarine: 5 ships,
+  confirmed deployed and the data is confirmed present (Team Bravo: 5 ships,
   17 cells), but nobody has yet seen the two meet on screen.
 - **An icon rendering on a claimed tile.** The redaction direction is proven
   (above); the *showing* direction needs a live claim on a tile that has an

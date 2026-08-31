@@ -10,7 +10,7 @@
 --     username  ->  lower(username), spaces to '_', strip other punctuation
 --     email     ->  <that>@players.hs-battleships.invalid
 --
--- e.g. "Lil Sod" -> lil_sod@players.hs-battleships.invalid
+-- e.g. "Bludgenmaker" -> bludgenmaker@players.hs-battleships.invalid
 
 
 -- ============================================================
@@ -34,12 +34,12 @@ values (
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated',
   -- vvv edit these two vvv
-  'lil_sod' || '@players.hs-battleships.invalid',
+  'bludgenmaker' || '@players.hs-battleships.invalid',
   crypt('choose-a-password', gen_salt('bf')),
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}',
   -- display_name is what shows in the feed; keep the real spelling
-  jsonb_build_object('display_name', 'Lil Sod', 'rsn', 'Lil Sod'),
+  jsonb_build_object('display_name', 'Bludgenmaker', 'rsn', 'Bludgenmaker'),
   '', '', '', '', '', '', '', ''
 );
 
@@ -111,7 +111,7 @@ select display_name, is_admin from profiles where is_admin;
 
 update auth.users
    set encrypted_password = crypt('new-password-here', gen_salt('bf'))
- where email = 'lil_sod@players.hs-battleships.invalid';
+ where email = 'bludgenmaker@players.hs-battleships.invalid';
 
 
 -- ============================================================
@@ -123,8 +123,8 @@ insert into team_members (team_id, profile_id, role)
 select t.id, p.id, 'member'
   from teams t
   join games g on g.id = t.game_id
-  join profiles p on p.display_name = 'Lil Sod'
- where g.name = 'Demo Match' and t.name = 'Kriegsmarine'
+  join profiles p on p.display_name = 'Bludgenmaker'
+ where g.name = 'Demo Match' and t.name = 'Team Bravo'
 on conflict (team_id, profile_id) do update set role = excluded.role;
 
 

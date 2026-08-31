@@ -267,8 +267,8 @@ function NewGame({ busy, onCreate }) {
       <h2>New game</h2>
       <div className="row">
         <label>Game name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Battleships V4" /></label>
-        <label>Team one<input value={a} onChange={(e) => setA(e.target.value)} placeholder="Flikkerlikkers" /></label>
-        <label>Team two<input value={b} onChange={(e) => setB(e.target.value)} placeholder="Kriegsmarine" /></label>
+        <label>Team one<input value={a} onChange={(e) => setA(e.target.value)} placeholder="Team Alpha" /></label>
+        <label>Team two<input value={b} onChange={(e) => setB(e.target.value)} placeholder="Team Bravo" /></label>
         <button
           disabled={busy || !name.trim() || !a.trim() || !b.trim()}
           onClick={() => { onCreate(name, a, b); setName(''); setA(''); setB(''); }}
