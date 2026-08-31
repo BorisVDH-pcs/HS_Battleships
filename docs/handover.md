@@ -229,6 +229,12 @@ two meanings, so it has two colours:
 | `.cell.ship` | green | your hull (or, on an admin board, an enemy hull still afloat) |
 | `.cell.active` | gold outline, `1/3` | claimed, not yet fired |
 
+A fired square **keeps its artwork**: the coloured ground and the mark sit on
+top of the picture rather than replacing it, so a board that has been shot at
+for an hour still reads as a board of tasks. `.cell` is already a centred grid,
+so the two are stacked with a shared `grid-area: 1 / 1` rather than absolute
+positioning — the mark stays centred at every cell size, phone included.
+
 Red therefore only ever means harm to the person reading it. Filled-versus-
 hollow carries the same distinction without hue, which matters because ship
 green and hit red are the pair a deuteranope cannot separate. `BoardLegend`
@@ -636,6 +642,16 @@ evidence while still active.
 **Board colours** (`61ab3e3`) — the change described under *What players see*.
 Verified on the deployed admin board: an ember burst at E2, hollow water rings
 at H7 and B9, a gold `2/3` claim at C4, green enemy hulls elsewhere.
+
+**Artwork under the marks** — a fired square no longer swaps its picture for a
+glyph. The icon dims (`.62` under a hit, `.5` under a miss) and the mark carries
+its own shadow, which is what keeps it legible over whatever the art happens to
+be. Checked against a grid of stand-ins at hit, miss and claimed states.
+
+One board is still artwork-free on purpose-for-now: the **admin overview**
+renders coordinates and evidence counts, never icons, because
+`admin_tile_progress` does not return `tiles.icon`. Adding it is a one-column
+migration if an organiser ever wants the pictures there too.
 
 ### Leftovers to clean up
 

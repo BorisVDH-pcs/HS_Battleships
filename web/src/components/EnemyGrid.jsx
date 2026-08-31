@@ -64,15 +64,20 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                     : `${label} — not yet claimed`}
                   onClick={() => (tile.revealed ? onInspect?.(tile) : onClaim(tile))}
                 >
-                  {fired
-                    ? (tile.claim_result === 'hit'
-                        ? <span className="mark">✸</span>
-                        : <span className="mark">○</span>)
-                    : <TileIcon
-                        slug={tile.icon}
-                        standIn={tile.revealed}
-                        fallback={<span className="coord-label">{label}</span>}
-                      />}
+                  {/* A fired square keeps its picture. The result is carried
+                      by the coloured ground and the mark over the top, so the
+                      board still reads as a board of tasks once most of it has
+                      been shot at. */}
+                  <TileIcon
+                    slug={tile.icon}
+                    standIn={tile.revealed}
+                    fallback={<span className="coord-label">{label}</span>}
+                  />
+                  {fired && (
+                    <span className="mark">
+                      {tile.claim_result === 'hit' ? '✸' : '○'}
+                    </span>
+                  )}
                 </button>
               );
             })}
