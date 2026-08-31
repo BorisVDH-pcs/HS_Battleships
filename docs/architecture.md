@@ -22,7 +22,7 @@ games ────────────────────────�
 | `ships` / `ship_cells` | Each team's placement. **Secret from the opponent** |
 | `tile_claims` | Claim → fire. A completed claim *is* a shot |
 | `game_events` | Append-only feed: powers Realtime and the Discord relay |
-| `score_events` | Manual adjustments + audit trail (the sheet's "+1" button) |
+| `score_events` | Legacy manual-adjustment history, retained but no longer used by scoring |
 
 ### The tile grid is shared
 Both teams see the same task at the same coordinate — that is how the original
@@ -42,19 +42,14 @@ kept in `PropertiesService`, which drifted on reset and could miss concurrent
 sinks — this cannot.
 
 ### Score is derived too
-`team_scores` totals each team from what the board already records — tiles fired,
-hits, enemy ships finished off — times per-game weights on `games`
-(`points_per_tile`, `points_per_hit`, `points_per_sink`), plus the sum of manual
-adjustments. Nothing stores a running total, so nothing can drift, and changing a
-weight simply re-totals both teams.
+`team_scores` counts each team's fired hits directly from `tile_claims`. One hit
+is one point; tiles completed, misses, sinkings and manual adjustments are worth
+zero. Nothing stores a running total, so it cannot drift from the board.
 
-`score_events` keeps its original job: the sheet's "+1" button, as an audit trail.
-Its `reason` is free text an admin types, which makes it the one place in the
-schema that *could* name a tile — so unlike every other public channel here it is
-**not** world-readable. Rows are visible to the team they concern and to admins;
-everyone sees the totals through `team_scores`, which exposes counts only. The
-`score_adjusted` event carries the delta and never the reason, for the same
-reason the shot events carry no tile name.
+The earlier configurable weights and manual-adjustment endpoints were retired
+in 0020. Their columns and `score_events` rows remain only as inactive migration
+history. A database constraint fixes the old weight columns at `0,1,0`, and
+`team_scores` ignores `score_events`, so neither can affect a score.
 
 ## Game rules, and where each is enforced
 
@@ -148,4 +143,5 @@ which is how the originals leaked.
   Yes — `admin_reset_game` (0013). Rolls back to `placement`, keeping the tiles
   and roster and optionally the fleets. Status is reset *before* the ships are
   deleted, because the freeze triggers reject ship writes outside `placement`.
-- Per-player scoring: derive purely from `tile_claims`, or keep manual adjustments?
+- ~~Per-player scoring: derive purely from `tile_claims`, or keep manual adjustments?~~
+  Fixed in 0020: team score is the count of hits, with no manual adjustments.

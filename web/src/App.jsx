@@ -187,7 +187,7 @@ export default function App() {
             />
           )}
 
-          <Scoreboard scores={scores} myTeamId={myTeamId} game={game.game} />
+          <Scoreboard scores={scores} myTeamId={myTeamId} />
 
           <div className="columns">
             <section>

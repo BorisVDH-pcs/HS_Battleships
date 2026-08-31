@@ -3,7 +3,6 @@ import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
-  adminAdjustScore, adminListScoreEvents, adminDeleteScoreEvent, adminSetScoring,
 } from '../lib/supabase.js';
 import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
@@ -24,7 +23,6 @@ export default function Admin() {
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
   const [scores, setScores] = useState([]);
-  const [scoreEvents, setScoreEvents] = useState([]);
   const [gameId, setGameId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -47,15 +45,13 @@ export default function Admin() {
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
-    if (!id) { setTiles([]); setScores([]); setScoreEvents([]); return; }
+    if (!id) { setTiles([]); setScores([]); return; }
     try {
-      const [t, adjustments, { data: sc }] = await Promise.all([
+      const [t, { data: sc }] = await Promise.all([
         adminListTiles(id),
-        adminListScoreEvents(id),
         supabase.rpc('team_scores', { p_game_id: id }),
       ]);
       setTiles(t ?? []);
-      setScoreEvents(adjustments ?? []);
       setScores(sc ?? []);
     } catch (err) {
       setError(err.message);
@@ -252,25 +248,10 @@ export default function Admin() {
             <AdminBoards gameId={game.id} teams={gameTeams} />
           </section>
 
-          <Scoring
-            key={game.id}
-            game={game}
-            gameTeams={gameTeams}
-            scores={scores}
-            scoreEvents={scoreEvents}
-            profiles={profiles}
-            members={members}
-            busy={busy}
-            onAward={(teamId, delta, reason, profileId) =>
-              run(() => adminAdjustScore(teamId, delta, reason, profileId), 'Score adjusted.')
-            }
-            onUndo={(id) =>
-              run(() => adminDeleteScoreEvent(id), 'Adjustment reverted.')
-            }
-            onWeights={(perTile, perHit, perSink) =>
-              run(() => adminSetScoring(game.id, perTile, perHit, perSink), 'Scoring updated.')
-            }
-          />
+          <section className="card">
+            <h2>Score</h2>
+            <Scoreboard scores={scores} myTeamId={null} />
+          </section>
         </>
       )}
     </div>
@@ -455,136 +436,6 @@ function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
         Players appear here once they have signed up on the login screen.
         Only a captain (or you) can place that team’s fleet.
       </p>
-    </section>
-  );
-}
-
-/**
- * Scoring. The totals themselves cannot be edited: they are derived by the
- * `team_scores` function from tiles fired, hits and sinkings. What an organiser
- * controls is the weighting, and the manual adjustments on top — which is all
- * the spreadsheet's "+1" button ever was.
- *
- * Mounted with key={game.id} by the parent, so switching games resets the form
- * rather than carrying the previous game's weights into it.
- */
-function Scoring({
-  game, gameTeams, scores, scoreEvents, profiles, members,
-  busy, onAward, onUndo, onWeights,
-}) {
-  const [teamId, setTeamId] = useState('');
-  const [delta, setDelta] = useState('1');
-  const [reason, setReason] = useState('');
-  const [profileId, setProfileId] = useState('');
-  const [perTile, setPerTile] = useState(String(game.points_per_tile ?? 1));
-  const [perHit, setPerHit] = useState(String(game.points_per_hit ?? 0));
-  const [perSink, setPerSink] = useState(String(game.points_per_sink ?? 0));
-
-  const n = Number(delta);
-  const canAward = Boolean(teamId) && Number.isInteger(n) && n !== 0 && reason.trim().length > 0;
-
-  const teamPlayers = members
-    .filter((m) => m.team_id === teamId)
-    .map((m) => profiles.find((p) => p.id === m.profile_id))
-    .filter(Boolean);
-
-  const weightsChanged =
-    Number(perTile) !== game.points_per_tile ||
-    Number(perHit) !== game.points_per_hit ||
-    Number(perSink) !== game.points_per_sink;
-
-  function award() {
-    onAward(teamId, n, reason.trim(), profileId || null);
-    setReason('');
-    setProfileId('');
-  }
-
-  return (
-    <section className="card">
-      <h2>Score</h2>
-
-      <Scoreboard scores={scores} myTeamId={null} game={game} />
-
-      <h3 style={{ marginTop: '1.2rem' }}>What earns points</h3>
-      <div className="row">
-        <label>Per tile completed
-          <input type="number" value={perTile} onChange={(e) => setPerTile(e.target.value)} />
-        </label>
-        <label>Per hit
-          <input type="number" value={perHit} onChange={(e) => setPerHit(e.target.value)} />
-        </label>
-        <label>Per ship sunk
-          <input type="number" value={perSink} onChange={(e) => setPerSink(e.target.value)} />
-        </label>
-        <button
-          disabled={busy || !weightsChanged}
-          onClick={() => onWeights(Number(perTile), Number(perHit), Number(perSink))}
-        >
-          Save
-        </button>
-      </div>
-      <p className="muted">
-        Changing these re-totals both teams immediately — nothing is stored, so
-        there is no history to rewrite.
-      </p>
-
-      <h3 style={{ marginTop: '1.2rem' }}>Manual adjustment</h3>
-      <div className="row">
-        <label>Team
-          <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setProfileId(''); }}>
-            <option value="">Choose…</option>
-            {gameTeams.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </label>
-        <label>Points
-          <input type="number" value={delta} onChange={(e) => setDelta(e.target.value)} />
-        </label>
-        <label>Reason
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Completed the bonus objective"
-          />
-        </label>
-        <label>Credit a player
-          <select
-            value={profileId}
-            disabled={!teamId}
-            onChange={(e) => setProfileId(e.target.value)}
-          >
-            <option value="">Nobody in particular</option>
-            {teamPlayers.map((p) => (
-              <option key={p.id} value={p.id}>{p.display_name}</option>
-            ))}
-          </select>
-        </label>
-        <button disabled={busy || !canAward} onClick={award}>Apply</button>
-      </div>
-      <p className="muted">
-        The other team sees only that the score moved, never the reason. Their own
-        team does see it, so keep tile names out of it — naming a tile they have
-        not claimed gives it away on the shared grid.
-      </p>
-
-      <h3 style={{ marginTop: '1.2rem' }}>Adjustments</h3>
-      <ul className="roster">
-        {scoreEvents.map((se) => (
-          <li key={se.id}>
-            <span>
-              <strong>{se.delta > 0 ? `+${se.delta}` : se.delta}</strong>{' '}
-              {se.team_name}
-              {se.display_name ? ` · ${se.display_name}` : ''}
-              <div className="meta">{se.reason}</div>
-            </span>
-            <button className="danger" disabled={busy} onClick={() => onUndo(se.id)}>
-              Undo
-            </button>
-          </li>
-        ))}
-        {scoreEvents.length === 0 && <li className="muted">No manual adjustments yet.</li>}
-      </ul>
     </section>
   );
 }

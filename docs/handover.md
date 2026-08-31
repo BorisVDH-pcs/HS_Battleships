@@ -1,6 +1,6 @@
 # Handover — HS_Battleships
 
-Current as of **2026-08-30**, end of session. Written to be picked up cold, by
+Current as of **2026-08-31**, end of session. Written to be picked up cold, by
 Boris or by another session with no memory of this one.
 
 ---
@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0019` are applied to the live project.
+`0001` through `0020` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -80,6 +80,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0017_restore_place_fleet_guards.sql` | Restores admin placement, grid-boundary validation and no-touch validation accidentally dropped by 0016, while retaining `fleet_placed` |
 | `0018_team_renamed_event_type.sql` | Adds the `team_renamed` event type in its own committed migration |
 | `0019_rename_team.sql` | Adds the guarded team-name RPC: admins may rename either team, captains only their own; emits `team_renamed` so open screens refresh |
+| `0020_fixed_hit_only_scoring.sql` | Fixes scoring at one point per hit, ignores legacy adjustments, constrains the old weight columns to `0,1,0`, and removes all four scoring-admin RPCs |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -149,8 +150,7 @@ All in the app, signed in as the admin:
 6. **Fleets** — captains place their own fleet from the player page. The admin
    Fleets card is a read-only live overview of both boards
 7. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
-8. **Score** — set what a tile, a hit and a sinking are worth (defaults: 1, 0, 0),
-   and award or dock points by hand with a reason. Every adjustment can be undone
+8. **Score** — read-only scoreboard. Every hit is one point; nothing else scores
 
 If it goes wrong mid-match, **Reset to placement** rolls the game back without
 losing the tiles or the roster — the two things that take real time to set up.
@@ -299,14 +299,10 @@ Roughly in priority order:
    reading unrelayed events is the intended shape.
 4. **Rotate the Discord webhook URLs** hardcoded in the old Apps Script files on
    Boris's Desktop. Advised repeatedly, never confirmed done.
-5. ~~**Scoring.**~~ **Done** — see 0009. Totals are derived by `team_scores`
-   (tiles × `points_per_tile` + hits × `points_per_hit` + sinks ×
-   `points_per_sink` + manual adjustments), the weights are per-game and
-   editable in the admin console, and `score_events` is now written and read
-   through `admin_adjust_score` / `admin_list_score_events` /
-   `admin_delete_score_event`. Defaults are 1 point per completed tile and
-   nothing else, which is what the spreadsheet did. Confirmed working in the
-   browser by Boris, who set it to 1 per hit and watched the totals re-derive.
+5. ~~**Scoring.**~~ **Done** — see 0020. `team_scores` is the count of fired
+   hits: one hit is one point and nothing else scores. The admin card is
+   read-only. Configurable weights and manual-adjustment RPCs were removed;
+   legacy rows remain stored but are ignored.
 6. ~~**Captain-facing placement.**~~ **Done.** A captain now sees a "Place your
    fleet" card on their own page during placement, and can reposition until the
    admin starts the game. Members get a waiting message. `place_fleet` always
@@ -449,19 +445,17 @@ Roughly in priority order:
   automatically once assigned — tested with the real `Soft Papi` account
 - Signup works end-to-end on the live site
 - Deployed bundle carries the right key and the current code
-- Scoring, server-side, against the live database: `team_scores` totals
-  cross-check against `ship_status` and the raw claim counts; `admin_adjust_score`
-  refuses a caller with no admin profile; an adjustment moves the total and
-  `admin_delete_score_event` puts it back; the `score_adjusted` payload carries
-  the delta and no `reason`; and an impersonated Flikkerlikkers player sees both
-  teams' totals but **zero** `score_events` rows. Test rows were deleted after.
+- Scoring, server-side, against the live database: every `team_scores.total`
+  equals its hit count, all returned adjustments are zero, the old weight
+  columns are `0,1,0`, their database constraint rejects other values, and the
+  four scoring-admin functions no longer exist.
 
 - Captain placement, server-side: a captain who is **not** an admin placed a full
   fleet through `place_fleet` on a throwaway game in `placement`; a plain member
   of the same team was refused with "Only a team captain or an admin may place
   the fleet". The throwaway game was deleted afterwards.
-- The admin Score card, in the browser, by Boris — changing the weighting to
-  1-per-hit re-derived both totals correctly.
+- The admin Score card in the browser: only the two-team scoreboard remains;
+  there are no weight, manual-adjustment or adjustment-history controls.
 - The admin tile board (**Show board** / **Show as list**), in the browser, by
   Boris.
 - **The 100 V4 tiles**, by checksum rather than by eye:

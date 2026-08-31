@@ -19,6 +19,9 @@ There is **no turn order**. A team plays whenever it has a free slot.
    and the slot frees up for the next claim.
 4. **Sink** — when every cell of a ship has been hit, it sinks. All five ships sunk ends the game.
 
+Scoring is fixed: **each hit is one point**. Completed tiles, missed shots,
+sunken ships and manual adjustments do not add points.
+
 Fleets are placed before the game starts and **frozen the moment it does** — for
 players, captains and admins alike. **Ships may not touch, not even at the
 corners**, so every ship is surrounded by at least one clear cell.
