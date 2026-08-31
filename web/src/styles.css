@@ -605,12 +605,16 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .cell.active.ready { border-color: var(--gold); box-shadow: var(--glow-md); }
 .cell.active.ready .tile-progress { color: var(--gold-lit); }
 button.cell.clickable { cursor: pointer; }
-button.cell.clickable:hover { border-color: var(--gold); background: var(--panel-2); }
+button.cell.clickable:hover { border-color: var(--gold); }
+/* A hit or a miss keeps its own colour on hover and when picked: the result is
+   the thing being read, and repainting it grey to say "you are pointing at it"
+   loses more than it gains. */
+button.cell.clickable:hover:not(.hit):not(.miss) { background: var(--panel-2); }
 button.cell.picked {
   border-color: var(--gold-lit);
   box-shadow: var(--glow-md);
-  background: var(--panel-2);
 }
+button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
 
 .tile-evidence-panel {
   margin-top: 1rem;
@@ -688,7 +692,7 @@ button.cell.picked {
  * over ten columns. `overflow-x` stays as a safety net for anything narrower
  * than an iPhone SE.
  *
- * Scoped to `.board` on purpose: AdminBoards renders a bare `.board-grid`
+ * Scoped to `.board` on purpose: AdminOverview renders a bare `.board-grid`
  * with no scrolling parent, and a floor there would push the whole page
  * sideways instead.
  */

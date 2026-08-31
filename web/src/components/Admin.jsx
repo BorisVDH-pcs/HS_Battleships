@@ -4,11 +4,10 @@ import {
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
 } from '../lib/supabase.js';
-import AdminBoards from './AdminBoards.jsx';
+import AdminOverview from './AdminOverview.jsx';
 import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
-import AdminTileBoards from './AdminTileBoards.jsx';
 import TileBoard from './TileBoard.jsx';
 
 const STEP_HINT = {
@@ -242,27 +241,19 @@ export default function Admin() {
           />
 
           <section className="card">
-            <h2>Fleets</h2>
+            <h2>Boards</h2>
             <p className="muted">
-              Live overview of each team’s placed ships and incoming shots.
-              Captains place their own fleets from the player page.
+              One board per team, showing the game from that team’s side: the
+              opponent’s ships they are hunting, and their own claims and shots
+              on top. A claimed square shows its evidence count — 1/3 is a team
+              mid-task — and clicking one opens what they have submitted for it.
             </p>
-            <AdminBoards gameId={game.id} teams={gameTeams} />
+            <AdminOverview gameId={game.id} teams={gameTeams} />
           </section>
 
           <section className="card">
             <h2>Score</h2>
             <Scoreboard scores={scores} myTeamId={null} />
-          </section>
-
-          <section className="card">
-            <h2>Task boards</h2>
-            <p className="muted">
-              The shared grid as each team has worked it. A claimed square shows
-              its evidence count — 1/3 is a team mid-task — and clicking one
-              opens what they have submitted for it.
-            </p>
-            <AdminTileBoards gameId={game.id} />
           </section>
 
           <section className="card">

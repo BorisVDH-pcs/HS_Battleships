@@ -12,6 +12,7 @@ import CaptainPlacement from './components/CaptainPlacement.jsx';
 import Admin from './components/Admin.jsx';
 import TeamNameEditor from './components/TeamNameEditor.jsx';
 import Wordmark from './components/Wordmark.jsx';
+import EvidencePanel from './components/EvidencePanel.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -24,6 +25,9 @@ export default function App() {
   // each of them half the page and left the cells too small to read the tile
   // art in. One at a time, full width.
   const [boardTab, setBoardTab] = useState('enemy');
+  // A claimed square the team has pressed to re-read its evidence. Held as an
+  // id rather than the row, so it survives a refresh of the tile list.
+  const [openTileId, setOpenTileId] = useState(null);
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -127,6 +131,9 @@ export default function App() {
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
   const sunkCount = myFleet.filter((s) => s.sunk).length;
+  // Re-read from `tiles` so the panel's counts follow a refresh rather than
+  // freezing at whatever they were when the square was pressed.
+  const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
 
   return (
     <main className="app">
@@ -251,11 +258,31 @@ export default function App() {
                 <EnemyGrid
                   tiles={tiles}
                   onClaim={onClaim}
+                  onInspect={(tile) =>
+                    setOpenTileId((id) => (id === tile.id ? null : tile.id))}
+                  openTileId={openTileId}
                   canClaim={canClaim}
                   busyTileId={busyTileId}
                 />
                 {isActive && !canClaim && myTeamId && (
                   <p className="muted">Both slots are full — fire one before claiming another.</p>
+                )}
+                {openTile && (
+                  <EvidencePanel
+                    title={openTile.name}
+                    coord={coordLabel(
+                      fromPosition(openTile.position).row,
+                      fromPosition(openTile.position).col
+                    )}
+                    meta={
+                      `${openTile.evidence_count} of ${openTile.required_evidence} submitted` +
+                      (openTile.claim_status === 'fired'
+                        ? ` · fired, ${openTile.claim_result}`
+                        : ' · not yet fired')
+                    }
+                    items={evidence.filter((e) => e.claim_id === openTile.claim_id)}
+                    onClose={() => setOpenTileId(null)}
+                  />
                 )}
               </>
             ) : (

@@ -13,8 +13,13 @@ import TileIcon from './TileIcon.jsx';
  * A claimed tile shows its icon instead of the coordinate. `tiles_for_me`
  * nulls the icon exactly as it nulls the name, so an unclaimed tile has no
  * filename to render and none to request.
+ *
+ * A square this team has claimed stays clickable after the claim: pressing it
+ * opens the evidence they have submitted for it. That is the only way back to a
+ * screenshot once a tile has been fired — the uploader is gone by then, and the
+ * tile is just a mark on the board.
  */
-export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
+export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTileId, openTileId }) {
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
 
   return (
@@ -41,15 +46,21 @@ export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
                 fired ? (tile.claim_result === 'hit' ? 'hit' : 'miss') : '',
                 active ? 'active' : '',
                 !tile.revealed && canClaim ? 'claimable' : '',
+                tile.revealed ? 'clickable' : '',
+                openTileId === tile.id ? 'picked' : '',
               ].filter(Boolean).join(' ');
 
               return (
                 <button
                   key={position}
                   className={cls}
-                  disabled={tile.revealed || !canClaim || busyTileId === tile.id}
-                  title={tile.revealed ? `${label} — ${tile.name}` : `${label} — not yet claimed`}
-                  onClick={() => onClaim(tile)}
+                  disabled={
+                    busyTileId === tile.id || (!tile.revealed && !canClaim)
+                  }
+                  title={tile.revealed
+                    ? `${label} — ${tile.name} · see evidence`
+                    : `${label} — not yet claimed`}
+                  onClick={() => (tile.revealed ? onInspect?.(tile) : onClaim(tile))}
                 >
                   {fired
                     ? (tile.claim_result === 'hit' ? '✕' : '·')

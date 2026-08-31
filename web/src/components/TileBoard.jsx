@@ -6,7 +6,7 @@ import TileIcon from './TileIcon.jsx';
  * The organiser's view of the tile content: all 100 squares with their real
  * names, laid out as the board.
  *
- * This is the counterpart to AdminBoards, which shows the fleets. Between them
+ * This is the counterpart to AdminOverview, which shows the fleets. Between them
  * an admin can see both secrets; neither is reachable without `is_admin()`,
  * because both are fed by `admin_list_*` definer functions. Players get
  * `tiles_for_me()` instead, which nulls `name` and `icon` until a tile is
