@@ -122,6 +122,7 @@ export default function App() {
   const isPlacement = game.game?.status === 'placement';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
+  const sunkCount = myFleet.filter((s) => s.sunk).length;
 
   return (
     <main className="app">
@@ -217,7 +218,9 @@ export default function App() {
 
           <div className="columns">
             <section>
-              <h2>Enemy waters</h2>
+              <div className="section-head">
+                <h2>Enemy waters</h2>
+              </div>
               <EnemyGrid
                 tiles={tiles}
                 onClaim={onClaim}
@@ -230,12 +233,19 @@ export default function App() {
             </section>
 
             <section>
-              <h2>Your fleet</h2>
+              {/* The count rides the heading rather than sitting above the
+                  grid: a line there pushed this board below the enemy one,
+                  and the two are meant to be read side by side. */}
+              <div className="section-head">
+                <h2>Your fleet</h2>
+                <span className="fleet-status">
+                  {myFleet.length - sunkCount} afloat, {sunkCount} sunk
+                </span>
+              </div>
               <MyFleet
                 myShipCells={myShipCells}
                 enemyShots={enemyShots}
                 tiles={tiles}
-                fleet={myFleet}
               />
             </section>
           </div>

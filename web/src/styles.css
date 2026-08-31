@@ -211,7 +211,19 @@ button.cell:disabled { cursor: default; }
 .cell.active .coord-label { opacity: 1; color: var(--gold-lit); }
 @media (pointer: coarse) { .coord-label { opacity: .8; } }
 
-.fleet-status { color: var(--muted); font-size: .85rem; margin: 0 0 .5rem; }
+/* Both columns get the same single-line heading row, so the two 10x10 grids
+   start at the same y and stay readable as a pair. */
+.section-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem;
+  /* Fixed, not min-height: the status text is .85rem against the h2's .8rem,
+     so letting content decide would leave this row a pixel taller than the
+     enemy side's and put the grids back out of step. */
+  height: 1.4rem;
+  margin-bottom: .7rem;
+}
+.section-head h2, .section-head .fleet-status { margin: 0; }
+.fleet-status { color: var(--muted); font-size: .85rem; }
 
 /* ---- active tiles ---- */
 

@@ -6,7 +6,7 @@ import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board
  * `myShipCells` comes straight from the database — RLS guarantees the opponent
  * cannot run this same query against your team.
  */
-export default function MyFleet({ myShipCells, enemyShots, tiles, fleet }) {
+export default function MyFleet({ myShipCells, enemyShots, tiles }) {
   const ships = new Set(myShipCells.map((c) => cellKey(c.row, c.col)));
 
   // Enemy shots reference tile ids; resolve them to coordinates via the tile list.
@@ -19,13 +19,8 @@ export default function MyFleet({ myShipCells, enemyShots, tiles, fleet }) {
     shots.set(cellKey(row, col), shot.result);
   }
 
-  const sunk = fleet.filter((s) => s.sunk).length;
-
   return (
     <div className="board">
-      <p className="fleet-status">
-        Fleet: {fleet.length - sunk} afloat, {sunk} sunk
-      </p>
       <div className="board-grid">
         <div className="corner" />
         {Array.from({ length: GRID }, (_, i) => (
