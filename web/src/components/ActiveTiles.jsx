@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { fireTile } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
 import TileIcon from './TileIcon.jsx';
+import EvidenceUploader from './EvidenceUploader.jsx';
 
 /**
  * The two slots. Replaces the spreadsheet's L6 / N6 cells: a team may hold at
@@ -16,11 +17,20 @@ import TileIcon from './TileIcon.jsx';
  * room, and an empty slot holds the same shape so the row does not jump as
  * tiles are claimed and fired.
  */
-export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
+export default function ActiveTiles({
+  tiles, maxActive, onFired, onRefresh, emptyHint, gameId, teamId, evidence = [],
+}) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
 
   const active = tiles.filter((t) => t.claim_status === 'active');
+
+  // Grouped once rather than filtered per card.
+  const byClaim = new Map();
+  for (const e of evidence) {
+    if (!byClaim.has(e.claim_id)) byClaim.set(e.claim_id, []);
+    byClaim.get(e.claim_id).push(e);
+  }
   const slots = Array.from({ length: maxActive }, (_, i) => active[i] ?? null);
 
   async function fire(tile) {
@@ -54,6 +64,11 @@ export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
 
           const { row, col } = fromPosition(tile.position);
           const label = coordLabel(row, col);
+          const mine = byClaim.get(tile.claim_id) ?? [];
+          // required_evidence is redacted for unclaimed tiles, but a tile in a
+          // slot is claimed by definition, so the fallback is belt and braces.
+          const required = tile.required_evidence ?? 1;
+          const ready = mine.length >= required;
 
           return (
             <article key={tile.id} className="slot filled">
@@ -71,7 +86,23 @@ export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
                 <span className="coord">{label}</span>
               </div>
 
-              <button onClick={() => fire(tile)} disabled={busyId === tile.claim_id}>
+              <EvidenceUploader
+                claimId={tile.claim_id}
+                gameId={gameId}
+                teamId={teamId}
+                required={required}
+                evidence={mine}
+                onUploaded={onRefresh}
+              />
+
+              {/* Disabled here and refused by the database: the trigger on
+                  tile_claims counts the rows itself, so a client that skips
+                  this check still cannot fire early. */}
+              <button
+                onClick={() => fire(tile)}
+                disabled={busyId === tile.claim_id || !ready}
+                title={ready ? undefined : `Attach ${required - mine.length} more before firing`}
+              >
                 {busyId === tile.claim_id ? 'Firing…' : 'Mark complete & fire'}
               </button>
             </article>

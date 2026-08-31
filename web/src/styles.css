@@ -279,6 +279,73 @@ button.cell:disabled { cursor: default; }
 }
 .slot button { margin-top: auto; }
 
+/* ---- evidence ---- */
+
+.evidence { display: grid; gap: .45rem; }
+.evidence-count { margin: 0; font-size: .8rem; color: var(--muted); }
+.evidence-count strong {
+  font-family: var(--display); color: var(--gold-dim); letter-spacing: .04em;
+}
+.evidence-count strong.met { color: var(--gold-lit); text-shadow: var(--glow-sm); }
+
+.evidence-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: .35rem;
+}
+.evidence-list li { width: 46px; }
+.evidence-list img,
+.evidence-pending {
+  display: block; width: 46px; height: 46px;
+  object-fit: cover; border-radius: 3px;
+  border: 1px solid var(--line);
+  background: #0b0906;
+}
+/* The uploader's name is the audit line, so it is always on screen rather than
+   hidden behind a hover a phone cannot perform. */
+.evidence-by {
+  display: block; font-size: .6rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.evidence-drop {
+  border: 1px dashed var(--line-lit);
+  border-radius: 3px;
+  padding: .5rem;
+  text-align: center;
+  font-size: .75rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.evidence-drop:hover,
+.evidence-drop:focus-visible { color: var(--gold-dim); border-color: var(--gold-deep); }
+.evidence-drop.over {
+  border-color: var(--gold); color: var(--gold-lit);
+  background: var(--panel-2); box-shadow: var(--glow-sm);
+}
+.evidence .error { font-size: .75rem; margin: 0; }
+
+/* The organiser's review: bigger thumbnails than the player's card, because
+   this is the screen where someone actually has to read a drop log. */
+.evidence-review { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.evidence-review li {
+  display: flex; gap: .8rem; align-items: center;
+  padding: .5rem; border: 1px solid var(--line); border-radius: 4px;
+  background: #0b0906;
+}
+.evidence-review img,
+.evidence-review .evidence-pending {
+  width: 84px; height: 84px; object-fit: cover;
+  border-radius: 3px; border: 1px solid var(--line); display: block;
+}
+.evidence-review .meta { display: grid; gap: .15rem; min-width: 0; }
+.evidence-review .meta strong { font-family: var(--display); letter-spacing: .03em; }
+.evidence-review .meta .muted { font-size: .75rem; }
+.evidence-review .coord {
+  color: var(--gold); font-family: var(--display); font-size: .8rem;
+  letter-spacing: .05em;
+}
+
 /* ---- feed ---- */
 
 .feed { margin-top: 1.5rem; }

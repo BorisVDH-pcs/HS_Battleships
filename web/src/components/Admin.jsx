@@ -7,6 +7,7 @@ import {
 import AdminBoards from './AdminBoards.jsx';
 import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
+import EvidenceReview from './EvidenceReview.jsx';
 import TileBoard from './TileBoard.jsx';
 
 const STEP_HINT = {
@@ -251,6 +252,16 @@ export default function Admin() {
           <section className="card">
             <h2>Score</h2>
             <Scoreboard scores={scores} myTeamId={null} />
+          </section>
+
+          <section className="card">
+            <h2>Evidence</h2>
+            <p className="muted">
+              Every screenshot submitted, newest first, with who submitted it.
+              There is nothing to approve — attaching the required number is what
+              lets a team fire. This is for settling a dispute, or catching one.
+            </p>
+            <EvidenceReview gameId={game.id} />
           </section>
         </>
       )}

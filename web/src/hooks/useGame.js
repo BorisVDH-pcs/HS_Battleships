@@ -22,6 +22,7 @@ export function useGame(gameId, session) {
     enemyShots: [],   // fired claims by the other team, onto my board
     events: [],
     scores: [],       // team_scores: derived totals for BOTH teams, no free text
+    evidence: [],     // my_evidence: my team's uploads, keyed to claims
   });
 
   const load = useCallback(async () => {
@@ -64,6 +65,11 @@ export function useGame(gameId, session) {
         supabase.rpc('team_scores', { p_game_id: gameId }),
       ]);
 
+      // Evidence is team-scoped by the function itself, so it needs no filter
+      // here — but it does need the game id, or a second game's uploads would
+      // appear against this board's claims.
+      const { data: evidence } = await supabase.rpc('my_evidence', { p_game_id: gameId });
+
       // Enemy shots land on my board: their fired claims, resolved to coordinates.
       let enemyShots = [];
       if (enemyTeamId) {
@@ -88,6 +94,7 @@ export function useGame(gameId, session) {
         enemyShots,
         events: events ?? [],
         scores: scores ?? [],
+        evidence: evidence ?? [],
       });
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }));

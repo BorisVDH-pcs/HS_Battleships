@@ -119,7 +119,7 @@ export default function App() {
     }
   }
 
-  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, scores } = game;
+  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, scores, evidence } = game;
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
@@ -233,6 +233,10 @@ export default function App() {
             <ActiveTiles
               tiles={tiles}
               maxActive={maxActive}
+              gameId={gameId}
+              teamId={myTeamId}
+              evidence={evidence}
+              onRefresh={() => game.refresh()}
               emptyHint={isPlacement
                 ? 'Nothing to claim until the game starts.'
                 : undefined}
