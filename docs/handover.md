@@ -489,7 +489,9 @@ Roughly in priority order:
   now uses `Team Alpha` and `Team Bravo` as the two team-name placeholders.
   Verified live in the signed-in admin panel from bundle `index-DwgXBECL.js`:
   the roster shows `Bludgenmaker · captain`, contains no `Lil Sod`, and both
-  placeholders render with the new examples.
+  placeholders render with the new examples. Bludgenmaker's password was reset
+  on 2026-08-31 and verified by matching the new value against Supabase's stored
+  hash; the password itself is deliberately not recorded here.
 - Fixed hit-only scoring is live from commit `12dfb52` and migration 0020.
   Production verification showed every game at weights `0,1,0`, every returned
   total equal to its hit count, zero returned adjustments, the fixed-rule check
