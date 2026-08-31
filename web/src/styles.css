@@ -288,24 +288,29 @@ button.cell:disabled { cursor: default; }
 }
 .evidence-count strong.met { color: var(--gold-lit); text-shadow: var(--glow-sm); }
 
-.evidence-list {
-  list-style: none; margin: 0; padding: 0;
-  display: flex; flex-wrap: wrap; gap: .35rem;
-}
-.evidence-list li { width: 46px; }
-.evidence-list img,
-.evidence-pending {
-  display: block; width: 46px; height: 46px;
-  object-fit: cover; border-radius: 3px;
-  border: 1px solid var(--line);
-  background: #0b0906;
-}
-/* The uploader's name is the audit line, so it is always on screen rather than
-   hidden behind a hover a phone cannot perform. */
+/* Who submitted, as one line. The thumbnails this replaces pushed the card from
+   219px to nearly 400px for images the player had just looked at — the
+   organiser's review screen is where they need to be legible. */
 .evidence-by {
-  display: block; font-size: .6rem; color: var(--muted);
+  margin: 0; font-size: .7rem; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Staged, not yet uploaded. This is the only point at which evidence can be
+   taken back: once submitted it is immutable by design. */
+.evidence-staged {
+  display: grid; gap: .4rem;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  padding: .45rem;
+  background: var(--panel-2);
+}
+.evidence-staged-name {
+  font-size: .72rem; color: var(--gold-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evidence-staged .row { gap: .4rem; }
+.evidence-staged button { flex: 1 1 0; padding: .35rem .5rem; font-size: .78rem; }
 
 .evidence-drop {
   border: 1px dashed var(--line-lit);
