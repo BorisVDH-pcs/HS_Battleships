@@ -53,7 +53,8 @@ export default function MyFleet({ myShipCells, enemyShots, tiles, fleet }) {
                 // Labelled like the enemy board, so the two grids sitting
                 // side by side read the same way.
                 <div key={key} className={cls} title={coordLabel(row, col)}>
-                  {shot === 'hit' ? '✕' : shot === 'miss' ? '·' : coordLabel(row, col)}
+                  {shot === 'hit' ? '✕' : shot === 'miss' ? '·'
+                    : <span className="coord-label">{coordLabel(row, col)}</span>}
                 </div>
               );
             })}

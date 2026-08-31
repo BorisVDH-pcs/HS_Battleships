@@ -53,7 +53,7 @@ export default function EnemyGrid({ tiles, onClaim, canClaim, busyTileId }) {
                 >
                   {fired
                     ? (tile.claim_result === 'hit' ? '✕' : '·')
-                    : <TileIcon slug={tile.icon} fallback={label} />}
+                    : <TileIcon slug={tile.icon} fallback={<span className="coord-label">{label}</span>} />}
                 </button>
               );
             })}

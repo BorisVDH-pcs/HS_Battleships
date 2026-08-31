@@ -11,6 +11,7 @@ import Scoreboard from './components/Scoreboard.jsx';
 import CaptainPlacement from './components/CaptainPlacement.jsx';
 import Admin from './components/Admin.jsx';
 import TeamNameEditor from './components/TeamNameEditor.jsx';
+import Wordmark from './components/Wordmark.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -81,7 +82,7 @@ export default function App() {
   if (!isSupabaseConfigured) {
     return (
       <main className="app">
-        <h1>HS Battleships</h1>
+        <Wordmark />
         <p className="error">
           Supabase is not configured. Copy <code>.env.example</code> to{' '}
           <code>web/.env</code> and fill in the project URL and anon key.
@@ -125,7 +126,7 @@ export default function App() {
   return (
     <main className="app">
       <header className="top">
-        <h1>HS Battleships</h1>
+        <Wordmark />
         <div className="who">
           <span className="name">{displayName || 'Signed in'}</span>
           <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
@@ -194,6 +195,9 @@ export default function App() {
           <ActiveTiles
             tiles={tiles}
             maxActive={maxActive}
+            emptyHint={isPlacement
+              ? 'Nothing to claim until the game starts.'
+              : undefined}
             onFired={(tile, result) => {
               setNotice(`${tile.name} — ${result.toUpperCase()}!`);
               game.refresh();

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Wordmark from './Wordmark.jsx';
 import { supabase } from '../lib/supabase.js';
 import { usernameToEmail, validateUsername, friendlyAuthError } from '../lib/auth.js';
 
@@ -57,7 +58,7 @@ export default function Login() {
 
   return (
     <div className="login">
-      <h1>HS Battleships</h1>
+      <Wordmark />
       <form onSubmit={submit}>
         <label>
           Username

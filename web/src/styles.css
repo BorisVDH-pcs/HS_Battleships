@@ -78,6 +78,30 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; }
      transparent fill and show through). */
   filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
 }
+/* With the logo present the gradient fill would paint over the artwork, so the
+   wordmark variant drops it and keeps the treatment for the "Battleships"
+   subtitle only. Falling back to the plain <h1> keeps the rules above. */
+.top h1.wordmark {
+  background: none; filter: none; color: var(--text);
+  display: flex; align-items: center; gap: .7rem;
+  text-transform: none; letter-spacing: 0;
+}
+.wordmark img { height: 38px; width: auto; display: block; }
+.wordmark .sub {
+  font-size: 1.1rem; letter-spacing: .16em; text-transform: uppercase;
+  background: linear-gradient(180deg, var(--gold-lit) 0%, var(--gold) 45%, var(--gold-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(232, 184, 60, .45));
+}
+.login .wordmark { flex-direction: column; gap: .5rem; justify-content: center; }
+.login .wordmark img { height: 64px; }
+@media (max-width: 520px) {
+  .wordmark img { height: 30px; }
+  .wordmark .sub { font-size: .95rem; }
+}
+
 .who {
   display: flex; gap: .75rem; align-items: baseline;
   color: var(--muted); font-size: .85rem;
@@ -151,11 +175,35 @@ button.cell:disabled { cursor: default; }
   box-shadow: 0 0 10px rgba(255, 122, 92, .45);
 }
 .cell.miss   { background: var(--miss); color: #5b646f; }
+
+/* The class arrives on an element that is already mounted — the realtime
+   refetch only swaps the className — so the animation fires exactly when a
+   shot resolves. On a fresh load the board lights up once, which is a
+   reasonable way to arrive at a game already in progress. */
+@keyframes hit-strike {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 122, 92, .85); }
+  60%  { box-shadow: 0 0 18px 5px rgba(255, 122, 92, .55); }
+  100% { box-shadow: 0 0 10px rgba(255, 122, 92, .45); }
+}
+.cell.hit { animation: hit-strike .55s ease-out; }
 .cell.active {
   border-color: var(--gold); color: var(--gold-lit);
   box-shadow: var(--glow-sm);
 }
 .cell.empty  { background: transparent; border-color: transparent; }
+
+/* Two boards means ~200 coordinates on screen at once, which drowns out the
+   tile icons as the artwork gets filled in. The axis rails carry the
+   coordinate; in-cell it is a whisper that comes back on hover or when the
+   tile is active. Coarse pointers have no hover, so they keep more of it. */
+.coord-label {
+  color: var(--gold-deep);
+  opacity: .55;
+  transition: opacity .12s, color .12s;
+}
+.cell:hover .coord-label,
+.cell.active .coord-label { opacity: 1; color: var(--gold-lit); }
+@media (pointer: coarse) { .coord-label { opacity: .8; } }
 
 .fleet-status { color: var(--muted); font-size: .85rem; margin: 0 0 .5rem; }
 
@@ -214,7 +262,16 @@ button.cell:disabled { cursor: default; }
   font-family: var(--display); font-size: 1.7rem; line-height: 1;
   color: var(--gold); font-variant-numeric: tabular-nums; flex: none;
 }
-.scoreboard li.leading .points { color: var(--gold-lit); text-shadow: var(--glow-sm); }
+.scoreboard li.leading .points {
+  color: var(--gold-lit); text-shadow: var(--glow-sm);
+  /* The score is the page's anchor now that it sits at the top. Size, not just
+     colour, so the standing resolves before you have read either name. */
+  font-size: 2.3rem;
+}
+.scoreboard li.leading {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.scoreboard li:not(.leading) .points { color: var(--gold-dim); }
 .scoreboard > .muted { margin: .5rem 0 0; }
 
 /* The admin console nests the scoreboard inside a card that already has a
@@ -264,6 +321,14 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--gold-deep); box-shadow: var(--glow-sm);
+}
+
+/* Everything else focusable had no visible state at all, so tabbing through the
+   page went dark. :focus-visible rather than :focus, so a mouse click on a
+   board cell does not leave a ring behind it. */
+:is(button, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 textarea { resize: vertical; min-height: 7rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; }
 label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); letter-spacing: .04em; }
@@ -494,4 +559,14 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   /* The tile grid stays scrollable rather than shrinking; the list view is
      the one that actually reads well on a phone. */
   .tile-board { min-width: 920px; }
+}
+
+/* Nothing here carries meaning that the colour change does not already carry,
+   so it can all go. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
 }

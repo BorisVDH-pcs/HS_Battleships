@@ -10,7 +10,7 @@ import { fromPosition, coordLabel } from '../lib/board.js';
  * "Fire" means the team finished the tile's in-game task. The result comes back
  * synchronously — no waiting on a recalculation.
  */
-export default function ActiveTiles({ tiles, maxActive, onFired }) {
+export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
 
@@ -49,7 +49,7 @@ export default function ActiveTiles({ tiles, maxActive, onFired }) {
           </article>
         ) : (
           <article key={`empty${i}`} className="slot empty">
-            <p>Empty slot — claim a tile on the enemy board.</p>
+            <p>{emptyHint ?? 'Empty slot — claim a tile on the enemy board.'}</p>
           </article>
         )
       )}

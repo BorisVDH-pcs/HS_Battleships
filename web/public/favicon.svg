@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="High Society">
+  <!-- Molten gold on near-black, matching the page theme. SVG rather than a
+       PNG so it stays sharp and stays in the repo as text. -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe9a3"/>
+      <stop offset="45%" stop-color="#e8b83c"/>
+      <stop offset="100%" stop-color="#8a6516"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="#07060a"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="11.5" fill="none" stroke="#3a2d15"/>
+  <text x="32" y="44.5" text-anchor="middle"
+        font-family="Cinzel, Georgia, 'Times New Roman', serif"
+        font-weight="700" font-size="32" fill="url(#gold)" filter="url(#glow)">HS</text>
+</svg>
