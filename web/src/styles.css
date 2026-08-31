@@ -299,6 +299,13 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   padding: 1.1rem 1.2rem;
 }
 .card > h2 { margin-top: 0; }
+
+/* The admin console spaces its cards with the `.admin` grid gap. The player
+   view has no such wrapper — its cards are plain siblings of the boards and
+   the scoreboard — so without this the placement card and the team-name card
+   meet border to border. 1.5rem matches the scoreboard and active-tile
+   rhythm, and collapses against them rather than stacking. */
+.app > .card { margin: 1.5rem 0; }
 .row { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
 .row > label { flex: 1 1 10rem; }
 .row > button { flex: none; }

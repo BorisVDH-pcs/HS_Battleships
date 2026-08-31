@@ -169,12 +169,24 @@ export default function App() {
             </p>
           )}
 
-          {myRole === 'captain' && myTeam && (
-            <section className="card">
-              <h2>Your team</h2>
-              <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
-            </section>
-          )}
+          {/* The score and the two slots are what a player checks most
+              often mid-game, so they sit above the boards rather than below
+              them — on a phone the grids are tall enough to push anything
+              underneath them off the screen entirely. */}
+          <Scoreboard scores={scores} myTeamId={myTeamId} />
+
+          {/* Directly under the score, and never conditional: the team should
+              be able to glance at the top of the page and see what it is
+              holding. Through placement both slots read as empty, which is
+              accurate — nothing can be claimed yet. */}
+          <ActiveTiles
+            tiles={tiles}
+            maxActive={maxActive}
+            onFired={(tile, result) => {
+              setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+              game.refresh();
+            }}
+          />
 
           {game.game.status === 'placement' && myTeamId && (
             <CaptainPlacement
@@ -187,7 +199,12 @@ export default function App() {
             />
           )}
 
-          <Scoreboard scores={scores} myTeamId={myTeamId} />
+          {myRole === 'captain' && myTeam && (
+            <section className="card">
+              <h2>Your team</h2>
+              <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
+            </section>
+          )}
 
           <div className="columns">
             <section>
@@ -213,15 +230,6 @@ export default function App() {
               />
             </section>
           </div>
-
-          <ActiveTiles
-            tiles={tiles}
-            maxActive={maxActive}
-            onFired={(tile, result) => {
-              setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-              game.refresh();
-            }}
-          />
 
           <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
         </>
