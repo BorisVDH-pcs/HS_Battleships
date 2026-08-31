@@ -14,6 +14,7 @@ import TeamNameEditor from './components/TeamNameEditor.jsx';
 import Wordmark from './components/Wordmark.jsx';
 import EvidencePanel from './components/EvidencePanel.jsx';
 import BoardLegend from './components/BoardLegend.jsx';
+import { useConfirm } from './components/ConfirmDialog.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -29,6 +30,9 @@ export default function App() {
   // A claimed square the team has pressed to re-read its evidence. Held as an
   // id rather than the row, so it survives a refresh of the tile list.
   const [openTileId, setOpenTileId] = useState(null);
+  // Above the early returns below, with the rest of the hooks — useConfirm
+  // holds state of its own.
+  const [confirm, confirmDialog] = useConfirm();
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -108,9 +112,10 @@ export default function App() {
     // free: it takes one of the team's active slots until the tile is fired.
     // Firing already confirms in ActiveTiles; claiming should too.
     const { row, col } = fromPosition(tile.position);
-    if (!window.confirm(
-      `Claim ${coordLabel(row, col)}? It takes one of your active slots.`
-    )) return;
+    if (!(await confirm(
+      `Claim ${coordLabel(row, col)}? It takes one of your active slots.`,
+      { title: `Claim ${coordLabel(row, col)}`, confirmLabel: 'Claim it' }
+    ))) return;
 
     setBusyTileId(tile.id);
     setNotice(null);
@@ -303,6 +308,10 @@ export default function App() {
         </>
       )}
       </>}
+
+      {/* Last in the tree and fixed-position, so it sits over whichever view is
+          on screen — the admin console included. */}
+      {confirmDialog}
     </main>
   );
 }

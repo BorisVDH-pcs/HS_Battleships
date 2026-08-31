@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
+import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
  * Attaching proof to an active tile.
@@ -33,6 +34,7 @@ export default function EvidenceUploader({
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
   const zoneRef = useRef(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   const have = evidence.length;
   const done = have >= required;
@@ -52,10 +54,11 @@ export default function EvidenceUploader({
   const willComplete = have + staged.length >= required;
 
   async function submit() {
-    if (willComplete && !window.confirm(
+    if (willComplete && !(await confirm(
       `This is the last piece of evidence for "${tileName}". Submitting it ` +
-      'completes the tile and fires the shot.'
-    )) return;
+      'completes the tile and fires the shot.',
+      { title: 'Fire the shot?', confirmLabel: 'Submit & fire' }
+    ))) return;
 
     setBusy(true);
     setError(null);
@@ -146,6 +149,7 @@ export default function EvidenceUploader({
       )}
 
       {error && <p className="error">{error}</p>}
+      {confirmDialog}
     </div>
   );
 }

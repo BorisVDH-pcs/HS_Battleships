@@ -9,6 +9,7 @@ import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
 import TileBoard from './TileBoard.jsx';
+import { useConfirm } from './ConfirmDialog.jsx';
 
 const STEP_HINT = {
   setup:     'Add the 100 tiles, then open placement.',
@@ -28,6 +29,7 @@ export default function Admin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   const game = games.find((g) => g.id === gameId) ?? null;
   const gameTeams = teams.filter((t) => t.game_id === gameId);
@@ -122,17 +124,22 @@ export default function Admin() {
                   <button
                     className="danger"
                     disabled={busy}
-                    onClick={() => {
+                    onClick={async () => {
                       // Deleting cascades to tiles, claims and the event feed, so
                       // make the caller name the game rather than trusting a click.
-                      const typed = window.prompt(
-                        `Delete "${g.name}" and everything in it? Type the game name to confirm.`
-                      );
-                      if (typed === null) return;
-                      if (typed.trim() !== g.name) { setError('Name did not match — nothing deleted.'); return; }
-                      run(() => adminDeleteGame(g.id), 'Game deleted.').then(() => {
-                        if (gameId === g.id) setGameId(null);
-                      });
+                      // The dialog holds its confirm button disabled until the
+                      // name matches, so there is no mismatch to report anymore.
+                      if (!(await confirm(
+                        `Delete "${g.name}" and everything in it — the 100 tiles, every claim, the roster and the feed.`,
+                        {
+                          title: 'Delete this game?',
+                          confirmLabel: 'Delete it',
+                          danger: true,
+                          requireText: g.name,
+                        }
+                      ))) return;
+                      await run(() => adminDeleteGame(g.id), 'Game deleted.');
+                      if (gameId === g.id) setGameId(null);
                     }}
                   >
                     Delete
@@ -171,14 +178,18 @@ export default function Admin() {
                 <button
                   className="danger"
                   disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm(
-                      `Reset "${game.name}" back to placement?\n\n` +
+                  onClick={async () => {
+                    if (!(await confirm(
                       'Cleared: every claim and shot, the activity feed, manual score ' +
                       'adjustments, the winner, and both fleets.\n' +
                       'Kept: the 100 tiles and the roster.\n\n' +
-                      'This cannot be undone.'
-                    )) return;
+                      'This cannot be undone.',
+                      {
+                        title: `Reset "${game.name}" to placement?`,
+                        confirmLabel: 'Reset it',
+                        danger: true,
+                      }
+                    ))) return;
                     run(() => adminResetGame(game.id, true),
                         'Game reset. Fleets need placing again.');
                   }}
@@ -188,14 +199,18 @@ export default function Admin() {
                 <button
                   className="ghost"
                   disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm(
-                      `Replay "${game.name}" with the same fleets?\n\n` +
+                  onClick={async () => {
+                    if (!(await confirm(
                       'Cleared: every claim and shot, the activity feed, manual score ' +
                       'adjustments, and the winner.\n' +
                       'Kept: the 100 tiles, the roster, and both fleets as placed.\n\n' +
-                      'This cannot be undone.'
-                    )) return;
+                      'This cannot be undone.',
+                      {
+                        title: `Replay "${game.name}" with the same fleets?`,
+                        confirmLabel: 'Reset, keep fleets',
+                        danger: true,
+                      }
+                    ))) return;
                     run(() => adminResetGame(game.id, false),
                         'Game reset with fleets intact — press Start game when ready.');
                   }}
@@ -267,6 +282,8 @@ export default function Admin() {
           </section>
         </>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

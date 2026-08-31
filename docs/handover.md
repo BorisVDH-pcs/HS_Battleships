@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0023` are applied to the live project.
+`0001` through `0024` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -84,6 +84,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0021_evidence.sql` | `tiles.required_evidence`, the `tile_evidence` table (select policy and nothing else, so submitted proof cannot be edited or deleted by anyone using the app), the private `evidence` storage bucket and its policies, `add_evidence`, `list_my_evidence`, `admin_list_evidence`, and the `claims_need_evidence` trigger |
 | `0022_admin_tile_progress.sql` | `admin_tile_progress` — every claim in a game with its evidence count, for the organiser's board |
 | `0023_evidence_fires.sql` | `add_evidence` now fires the shot itself in the same transaction once the requirement is met, so "fully evidenced but still active" cannot exist |
+| `0024_one_team_per_game.sql` | `my_team_in_game()`, and `tiles_for_me` / `my_evidence` / `claim_tile` scoped through it, so a player sitting in both teams of one game no longer sees the two sides merged |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -670,3 +671,155 @@ there, and deleting it is safe:
   session could act for either side. Check this before a real event.
 
 Demo Match is unaffected by all of the above.
+
+---
+
+## Session log — 2026-08-31 (later), the first real player session
+
+The first time anybody signed in as a **player** in a browser. Everything before
+this had been driven from SQL or the admin console, which is why the bug below
+survived twenty-three migrations.
+
+**Verified in a browser, player side** (previously all "not verified"):
+
+- The evidence UI renders: tile art, `0/2` and `2/3` counters, coordinate
+  badges, drop zones.
+- `EvidencePanel` read-back from a player's own board — signed-URL thumbnail,
+  submitter name, timestamp, `fired, hit`.
+- The **dragon-warhammer stand-in** on a claimed tile with no art of its own.
+  Exactly **one** `/icons/` request in the whole network log, so the redaction
+  direction still holds where it matters.
+- The **red hull hit** on your own fleet (J10), correctly distinct from the
+  ember on enemy waters, with the fleet-owner legend wording.
+- **0023 fires and emits its event**, proven from production rather than from
+  reading the code: evidence row `test-4.webp` and its `shot_fired` event share
+  the timestamp `18:05:12.38501+00` to the microsecond. `now()` is
+  transaction-scoped, so they were one transaction.
+
+### The bug: two memberships merged the two sides of a game
+
+`Soft Papi` sits in **both** scratch teams — added deliberately last session so
+one browser could act for either side. That made a latent bug visible.
+
+`my_team_ids()` answers "every team this player has ever been in, in any game".
+That is correct for the RLS policies and wrong for anything asking "my side of
+*this* game". Three callers asked the second question with the first function:
+
+- **`tiles_for_me`** left-joined claims from both teams. A tile claimed by each
+  side returned **twice** — measured at **101 rows for a 100-tile board**, with
+  a duplicate cell rendered on the grid — and the opponent's claims were painted
+  on the player's own board. Worse, they arrived in the **active-tile slots**
+  complete with working upload controls: a drop on Bravo's claim from Alpha's
+  board submitted evidence for Bravo and passed `add_evidence`'s membership
+  check while doing it. The slot counter read `2/2` when Alpha held one claim.
+- **`my_evidence`** returned both sides' uploads (9 rows instead of 5).
+- **`claim_tile`** used an unordered multi-row `select ... into`. PL/pgSQL does
+  not raise on that — it takes an arbitrary row — so a claim landed on **either
+  team**, nondeterministically and silently.
+
+Frontend, separately: `ship_status` was filtered by `game_id` but **not** by
+team, unlike `ship_cells` on the line above it, so the fleet header read
+**"10 afloat"** against a five-ship fleet. Both scratch fleets are on identical
+coordinates, so the *cells* looked right and only the count gave it away.
+
+**Fixed** by `0024` plus one frontend line. `my_team_in_game(p_game_id)` returns
+a single team, breaking the tie by team **name** so it agrees with the frontend,
+which takes the first of `teams` ordered by name.
+
+Verified against the live database by impersonating Soft Papi, and then in the
+browser: `tiles_for_me` returns **100 rows, 0 duplicated positions, 4 claims**
+(Alpha's only), `my_evidence` **5 rows**, `my_team_in_game` picks Demo Alpha,
+and the deployed page went from `Active tiles (2/2)` to **`Active tiles (1/2)`**
+with an "Empty slot" beside it. A1 and J10 — Bravo's claims — are `not yet
+claimed` again, and the grid is **100 cells** with exactly four marked squares.
+
+Deliberately **not** a constraint forbidding two memberships in one game: one
+browser acting for both sides is a useful testing trick, and Boris used it on
+purpose. The point of 0024 is that the state now renders honestly instead of
+blending. If that trade ever stops being worth it, a trigger on `team_members`
+is the place.
+
+> **Trap, freshly paid for.** `create or replace` on `tiles_for_me` failed with
+> *cannot change return type*, because the current definition is the one in
+> **0021**, not the newer-looking one in 0014 — the evidence work added
+> `required_evidence` and `evidence_count` to the return table. Read
+> `pg_get_functiondef()` before rewriting a function; the highest-numbered file
+> that mentions it is not necessarily the one that defines it.
+
+### Kriegsmarine and Flikkerlikkers are not users
+
+Evidence in the scratch game is signed by names that are not accounts, which
+looks alarming and is not. Every `tile_evidence` row has `uploaded_by` =
+Soft Papi's uuid; only the denormalised `uploaded_by_name` varies, across
+`Kriegsmarine`, `Flikkerlikkers`, `Bludgenmaker` and `Soft Papi`. Six rows share
+the timestamp `16:15:35.23725+00` and one sits exactly an hour earlier with the
+same fractional seconds — a seeded batch.
+
+`add_evidence` always writes `uploaded_by_name` from `profiles.display_name` for
+`auth.uid()`, so it **cannot** produce a mismatched name. Those rows were direct
+inserts from a session holding service-role access, seeding plausible OSRS names
+so the review screens looked populated. There are still only four accounts:
+`demo`, `HS Admin`, `Soft Papi`, `Bludgenmaker`. Nobody signed up unnoticed.
+
+### The player loop, finally driven by a human
+
+`window.confirm` is why nobody had ever completed a tile from a browser.
+
+Both halves of the player loop were gated on it — claiming a tile
+(`App.jsx`) and the submit that fires the shot (`EvidenceUploader.jsx`) — and a
+WebView draws a native dialog only if its host implements the JS-dialog
+delegate. Where the host does not, `confirm()` returns **false immediately
+without drawing anything**: measured at **1ms** in this app's own embedded
+browser. The caller cannot tell that apart from someone pressing Cancel, so the
+button silently did nothing. No request, no error, nothing in the console.
+
+The gate was also **asymmetric**: a submit that does not complete a tile never
+asked. So a player could upload the first two pieces of evidence perfectly
+normally and find only the third silently refusing — which is a maddening bug
+report to receive on the night, and the reason this is worth understanding
+rather than just patching.
+
+All five native dialogs are now `ConfirmDialog.jsx`, a promise-based
+`useConfirm()` hook so the call sites keep their old shape
+(`if (!(await confirm(...))) return;`). Escape cancels; Enter is deliberately
+unbound, since these stand in front of irreversible actions and a reflex press
+on the key that submitted the form behind them should not fire a shot. Unmount
+resolves `false`, so a screen that goes away mid-question cannot strand the
+caller's `busy` flag. `requireText` replaces the `window.prompt` on game
+deletion and is stricter — the confirm button stays disabled until the name
+matches, rather than accepting anything and reporting the mismatch after.
+
+The `useConfirm()` call in `App.jsx` sits above the early returns, per the trap
+above. Its dialog is last in the tree and `position: fixed`; checked that no
+ancestor carries a `transform` or `filter` that would trap it inside a card, and
+`z-index: 50` is the only z-index in the stylesheet.
+
+**Verified — the first tiles ever completed through the UI.** Boris ran four
+claim → upload → fire cycles in 51 seconds, each through two dialogs:
+
+| Time | Event | Tile |
+|---|---|---|
+| 19:04:04 | `shot_fired` miss, pos 33 | the C4 compost bucket that had been stuck |
+| 19:04:10 / :13 | `tile_claimed` pos 13, 17 | both slots held at once |
+| 19:04:22 / :33 | `shot_fired` **hit**, pos 17 then 13 | |
+| 19:04:38 | `tile_claimed` pos 24 | |
+| 19:04:55 | `shot_fired` miss, pos 24 | |
+
+Every claim and every shot emitted its event, so the feed and every open screen
+now refresh. Four real WebP objects landed under
+`{game}/{team}/{claim}/{uuid}.webp`, each written 0.2–0.3s before its shot
+event — so the browser re-encode, the path scheme, the storage-then-register
+order and 0023's same-transaction fire all hold from a real browser, not just
+from SQL. The two-active-slot limit held with two claims open at once. Claiming
+and cancelling was confirmed not to create a claim.
+
+### Still not verified
+
+- The `ship_status` filter and the dialog work are **built but not deployed** —
+  the live bundle is still `index-CLAWmv2s.js`. Until a push, a player on the
+  live site still meets the silent `confirm` and still reads "10 afloat".
+  Migration 0024 **is** live and is independently safe.
+- **A real handset.** Everything above was an emulated viewport at a 1.25 device
+  pixel ratio. The dialog's stacked 44px actions under 620px are unseen on
+  glass, and touch fleet placement is still untried.
+- A full two-person game since the V4 rule changes.
