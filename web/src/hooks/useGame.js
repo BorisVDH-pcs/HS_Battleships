@@ -55,7 +55,13 @@ export function useGame(gameId, session) {
         myTeamId
           ? supabase.from('ship_cells').select('*').eq('team_id', myTeamId)
           : supabase.from('ship_cells').select('*'),
-        supabase.from('ship_status').select('*').eq('game_id', gameId),
+        // Team-filtered for the same reason, and it is the stricter of the two:
+        // ship_status carries one row per ship, so a player sitting in both
+        // teams of this game counted ten hulls afloat against a five-ship
+        // fleet. The cells above hid it whenever the two fleets overlapped.
+        myTeamId
+          ? supabase.from('ship_status').select('*').eq('game_id', gameId).eq('team_id', myTeamId)
+          : supabase.from('ship_status').select('*').eq('game_id', gameId),
         supabase
           .from('game_events')
           .select('*')
