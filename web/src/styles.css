@@ -228,20 +228,57 @@ button.cell:disabled { cursor: default; }
 /* ---- active tiles ---- */
 
 .active-tiles { margin-top: 1.5rem; }
+
+/* Capped, not full-bleed: stretched across 1100px these two cards read as
+   banners rather than tiles, and the pair is easier to take in when it sits
+   at the width of the artwork it holds. */
+.slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: .8rem;
+  max-width: 34rem;
+}
 .slot {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: .8rem 1rem;
-  margin-bottom: .6rem;
+  padding: .8rem;
 }
+
+/* An empty slot keeps the filled card's shape so the row does not resize as
+   tiles are claimed and fired. */
 .slot.empty { color: var(--muted); border-style: dashed; background: none; }
-.slot.empty p { margin: 0; font-size: .85rem; }
-.slot header { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.slot.empty p { margin: auto 0 0; font-size: .85rem; }
+.slot.empty .slot-art { border-style: dashed; opacity: .45; }
+
+.slot-art {
+  height: 110px;
+  display: grid; place-items: center;
+  background: #0b0906;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.slot-art .tile-icon {
+  width: 84px; height: 84px;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+.slot-art-coord {
+  font-family: var(--display); font-size: 1.6rem;
+  color: var(--gold-deep); letter-spacing: .06em;
+}
+
+.slot-head { display: flex; justify-content: space-between; gap: .6rem; align-items: baseline; }
+.slot-head strong { line-height: 1.25; }
 .slot .coord {
   color: var(--gold); font-family: var(--display);
   font-variant-numeric: tabular-nums; letter-spacing: .05em;
+  flex: none;
 }
+.slot button { margin-top: auto; }
 
 /* ---- feed ---- */
 
@@ -560,6 +597,13 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 @media (max-width: 620px) {
   .app { padding: 1rem .75rem; }
   .card { padding: .7rem; }
+  .slots { gap: .5rem; }
+  .slot { padding: .55rem; gap: .45rem; }
+  .slot-art { height: 84px; }
+  .slot-art .tile-icon { width: 62px; height: 62px; }
+  .slot-head { flex-wrap: wrap; gap: .2rem .5rem; }
+  .slot button { padding-inline: .5rem; font-size: .82rem; }
+
   .tile-actions { gap: .35rem; }
   .tile-actions button { padding-inline: .45rem; font-size: .82rem; }
 

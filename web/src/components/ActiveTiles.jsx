@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fireTile } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
+import TileIcon from './TileIcon.jsx';
 
 /**
  * The two slots. Replaces the spreadsheet's L6 / N6 cells: a team may hold at
@@ -9,6 +10,11 @@ import { fromPosition, coordLabel } from '../lib/board.js';
  *
  * "Fire" means the team finished the tile's in-game task. The result comes back
  * synchronously — no waiting on a recalculation.
+ *
+ * Drawn as cards rather than rows: these two tiles are the team's whole to-do
+ * list, so they get the tile's own artwork at a size you can read across a
+ * room, and an empty slot holds the same shape so the row does not jump as
+ * tiles are claimed and fired.
  */
 export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
   const [busyId, setBusyId] = useState(null);
@@ -34,25 +40,45 @@ export default function ActiveTiles({ tiles, maxActive, onFired, emptyHint }) {
   return (
     <section className="active-tiles">
       <h2>Active tiles ({active.length}/{maxActive})</h2>
-      {slots.map((tile, i) =>
-        tile ? (
-          <article key={tile.id} className="slot filled">
-            <header>
-              <strong>{tile.name}</strong>
-              <span className="coord">
-                {coordLabel(fromPosition(tile.position).row, fromPosition(tile.position).col)}
-              </span>
-            </header>
-            <button onClick={() => fire(tile)} disabled={busyId === tile.claim_id}>
-              {busyId === tile.claim_id ? 'Firing…' : 'Mark complete & fire'}
-            </button>
-          </article>
-        ) : (
-          <article key={`empty${i}`} className="slot empty">
-            <p>{emptyHint ?? 'Empty slot — claim a tile on the enemy board.'}</p>
-          </article>
-        )
-      )}
+
+      <div className="slots">
+        {slots.map((tile, i) => {
+          if (!tile) {
+            return (
+              <article key={`empty${i}`} className="slot empty">
+                <div className="slot-art" aria-hidden="true" />
+                <p>{emptyHint ?? 'Empty slot — claim a tile on the enemy board.'}</p>
+              </article>
+            );
+          }
+
+          const { row, col } = fromPosition(tile.position);
+          const label = coordLabel(row, col);
+
+          return (
+            <article key={tile.id} className="slot filled">
+              {/* A claimed tile always has its name; the icon is optional, so
+                  the coordinate stands in as it does on the board itself. */}
+              <div className="slot-art">
+                <TileIcon
+                  slug={tile.icon}
+                  fallback={<span className="slot-art-coord">{label}</span>}
+                />
+              </div>
+
+              <div className="slot-head">
+                <strong>{tile.name}</strong>
+                <span className="coord">{label}</span>
+              </div>
+
+              <button onClick={() => fire(tile)} disabled={busyId === tile.claim_id}>
+                {busyId === tile.claim_id ? 'Firing…' : 'Mark complete & fire'}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+
       {error && <p className="error">{error}</p>}
     </section>
   );
