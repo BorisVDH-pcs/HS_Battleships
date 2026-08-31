@@ -15,12 +15,17 @@ import { uploadEvidence } from '../lib/evidence.js';
  * to change your mind is before it is uploaded. It also means a misdropped
  * screenshot is not permanently attached to the wrong tile.
  *
+ * The submit that meets the requirement also fires the shot — there is no
+ * separate "mark complete" press, because by then there is nothing left to
+ * say. That submit reads differently and asks first, since it is the
+ * irreversible one.
+ *
  * There are deliberately no thumbnails of submitted evidence here. They made
  * the card nearly twice as tall for something a player has already seen; the
  * organiser's review screen is where the images actually need looking at.
  */
 export default function EvidenceUploader({
-  claimId, gameId, teamId, required, evidence, onUploaded,
+  claimId, gameId, teamId, required, evidence, onUploaded, tileName,
 }) {
   const [staged, setStaged] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -42,7 +47,16 @@ export default function EvidenceUploader({
     setStaged((s) => [...s, ...images]);
   }
 
+  // Computed from what is staged, not from `evidence`, which does not update
+  // until the refetch after upload.
+  const willComplete = have + staged.length >= required;
+
   async function submit() {
+    if (willComplete && !window.confirm(
+      `This is the last piece of evidence for "${tileName}". Submitting it ` +
+      'completes the tile and fires the shot.'
+    )) return;
+
     setBusy(true);
     setError(null);
     try {
@@ -52,7 +66,8 @@ export default function EvidenceUploader({
         await uploadEvidence({ gameId, teamId, claimId, file });
       }
       setStaged([]);
-      onUploaded?.();
+      // The caller fires when this says the requirement is met.
+      await onUploaded?.({ completed: willComplete });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -72,8 +87,6 @@ export default function EvidenceUploader({
     return () => el.removeEventListener('paste', onPaste);
   });
 
-  const names = [...new Set(evidence.map((e) => e.uploaded_by_name))].join(', ');
-
   return (
     <div className="evidence">
       <p className="evidence-count">
@@ -81,10 +94,9 @@ export default function EvidenceUploader({
         {!done && <span className="muted"> — needed before you can fire</span>}
       </p>
 
-      {/* One muted line instead of a strip of thumbnails: who submitted is the
-          part a teammate needs, and it costs a line rather than a row. */}
-      {names && <p className="evidence-by">Submitted by {names}</p>}
-
+      {/* Who submitted is recorded on every row and shown on the organiser's
+          review screen. It is not repeated here: the count is the only part
+          the team acts on, and this card is already tall. */}
       {staged.length > 0 ? (
         <div className="evidence-staged">
           <span className="evidence-staged-name">
@@ -95,7 +107,9 @@ export default function EvidenceUploader({
               Remove
             </button>
             <button onClick={submit} disabled={busy}>
-              {busy ? 'Submitting…' : 'Submit'}
+              {busy
+                ? (willComplete ? 'Firing…' : 'Submitting…')
+                : (willComplete ? 'Submit & fire' : 'Submit')}
             </button>
           </div>
         </div>

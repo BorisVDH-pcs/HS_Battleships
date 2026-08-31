@@ -33,8 +33,10 @@ export default function ActiveTiles({
   }
   const slots = Array.from({ length: maxActive }, (_, i) => active[i] ?? null);
 
-  async function fire(tile) {
-    if (!confirm(`Complete "${tile.name}"? This fires the shot.`)) return;
+  // `asked` is false when the evidence uploader has already confirmed: the
+  // last submit and the shot are one action, so it must not ask twice.
+  async function fire(tile, asked = true) {
+    if (asked && !confirm(`Complete "${tile.name}"? This fires the shot.`)) return;
     setBusyId(tile.claim_id);
     setError(null);
     try {
@@ -90,21 +92,30 @@ export default function ActiveTiles({
                 claimId={tile.claim_id}
                 gameId={gameId}
                 teamId={teamId}
+                tileName={tile.name}
                 required={required}
                 evidence={mine}
-                onUploaded={onRefresh}
+                onUploaded={async ({ completed }) => {
+                  // The submit that meets the requirement is the shot. There is
+                  // no separate button for it, so this is the whole path.
+                  if (completed) await fire(tile, false);
+                  else onRefresh?.();
+                }}
               />
 
-              {/* Disabled here and refused by the database: the trigger on
-                  tile_claims counts the rows itself, so a client that skips
-                  this check still cannot fire early. */}
-              <button
-                onClick={() => fire(tile)}
-                disabled={busyId === tile.claim_id || !ready}
-                title={ready ? undefined : `Attach ${required - mine.length} more before firing`}
-              >
-                {busyId === tile.claim_id ? 'Firing…' : 'Mark complete & fire'}
-              </button>
+              {/* Only a recovery path. In the normal run the shot goes off with
+                  the final submit and this card is gone before it renders. It
+                  appears when the evidence is complete and the tile somehow is
+                  not fired — an upload that landed while the shot did not — so
+                  a full tile can never be stranded with no way to fire it. */}
+              {ready && (
+                <button
+                  onClick={() => fire(tile)}
+                  disabled={busyId === tile.claim_id}
+                >
+                  {busyId === tile.claim_id ? 'Firing…' : 'Complete & fire'}
+                </button>
+              )}
             </article>
           );
         })}

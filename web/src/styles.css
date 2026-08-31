@@ -288,14 +288,6 @@ button.cell:disabled { cursor: default; }
 }
 .evidence-count strong.met { color: var(--gold-lit); text-shadow: var(--glow-sm); }
 
-/* Who submitted, as one line. The thumbnails this replaces pushed the card from
-   219px to nearly 400px for images the player had just looked at — the
-   organiser's review screen is where they need to be legible. */
-.evidence-by {
-  margin: 0; font-size: .7rem; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
 /* Staged, not yet uploaded. This is the only point at which evidence can be
    taken back: once submitted it is immutable by design. */
 .evidence-staged {
