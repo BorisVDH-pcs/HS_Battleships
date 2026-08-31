@@ -321,16 +321,42 @@ function Tiles({ game, tiles, busy, onSave }) {
   const [open, setOpen] = useState(false);
 
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  // Three fields at most: name | icon | amount. Splitting on the FIRST pipe and
+  // keeping the remainder as the icon (which this did until now) meant a third
+  // field landed inside the slug, and admin_set_tiles then scrubbed it to
+  // `[A-Za-z0-9_-]` — so `Tile | slayer_helmet | 3` silently became the slug
+  // `slayer_helmet3` and a missing picture, rather than an evidence count.
   const rows = lines.map((line, i) => {
-    const [name, ...rest] = line.split('|');
+    const [name, icon, amount] = line.split('|');
+    const raw = (amount ?? '').trim();
+    // A trailing + marks a tile with more than one route to done: the number is
+    // the worst case, and the team may declare it finished sooner (0025).
+    const early = raw.endsWith('+');
+    const n = parseInt(early ? raw.slice(0, -1) : raw, 10);
     return {
       row: Math.floor(i / game.grid_size) + 1,
       col: (i % game.grid_size) + 1,
-      name: name.trim(),
+      name: (name ?? '').trim(),
       // Slug only; admin_set_tiles strips anything else server-side.
-      icon: rest.join('|').trim(),
+      icon: (icon ?? '').trim(),
+      // Omitted rather than defaulted, so the server keeps owning the default.
+      // It clamps to 1..30; this only decides whether to send a number at all.
+      ...(Number.isFinite(n) ? { amount: n } : {}),
+      ...(early ? { early: true } : {}),
     };
   });
+
+  // Worth naming before the save rather than after: the server clamps a silly
+  // amount into range instead of refusing it, so a typo would be stored as a
+  // plausible number and nobody would know which tile it landed on.
+  const badAmounts = rows
+    .map((r, i) => ({ line: i + 1, amount: r.amount }))
+    .filter((r) => r.amount !== undefined && (r.amount < 1 || r.amount > 30));
+  // A bare + with no number reads as "some other route" but sets no worst case,
+  // which would leave the tile at 1 and the marker doing nothing.
+  const earlyWithoutAmount = rows
+    .map((r, i) => ({ line: i + 1, ...r }))
+    .filter((r) => r.early && r.amount === undefined);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
 
@@ -366,18 +392,51 @@ function Tiles({ game, tiles, busy, onSave }) {
             <>
               <p className="muted" style={{ marginTop: '.8rem' }}>
                 One line per tile, in board order (A1, B1 … J1, then A2 …).
-                Optionally <code>name | icon</code>, where the icon names a file
-                in <code>web/public/icons</code> without the <code>.png</code>.
-                Needs exactly {need} lines.
+                <code>name | icon | amount</code>, where the icon names a file in{' '}
+                <code>web/public/icons</code> without the <code>.png</code>, and
+                amount is how many screenshots that tile needs before it fires
+                (1–30, default 1). Both are optional, but a tile with an amount
+                and no icon still needs the empty middle field —{' '}
+                <code>Tile || 3</code>. Needs exactly {need} lines.
               </p>
+              <p className="muted">
+                Add <code>+</code> after the amount — <code>… | 18+</code> — for a
+                tile that can be finished more than one way. The number is then
+                the worst case, and the team gets a <em>Done another way</em>
+                {' '}button once it has submitted at least one screenshot. Use it
+                only where a cheaper route genuinely exists: without the{' '}
+                <code>+</code>, the amount is the only way to finish.
+              </p>
+              {/* The placeholder's examples are invented on purpose: this string
+                  ships in the public bundle, and the tile list is secret #2 — a
+                  placeholder is no place to publish three real squares. */}
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={'Slayer tile | slayer_helmet\nDragon warhammer | dragon_warhammer\n…'}
+                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\n…'}
               />
+              {badAmounts.length > 0 && (
+                <p className="error">
+                  {badAmounts.length === 1
+                    ? `Line ${badAmounts[0].line} asks for ${badAmounts[0].amount} pieces of evidence`
+                    : `${badAmounts.length} lines ask for an amount`}
+                  {' '}outside 1–30. The server would clamp it into range rather
+                  than refuse it, so fix it here.
+                </p>
+              )}
+              {earlyWithoutAmount.length > 0 && (
+                <p className="error">
+                  {earlyWithoutAmount.length === 1
+                    ? `Line ${earlyWithoutAmount[0].line} has a + with no number`
+                    : `${earlyWithoutAmount.length} lines have a + with no number`}
+                  . That tile would need one screenshot anyway, so the marker
+                  would do nothing — give it the worst case, or drop the +.
+                </p>
+              )}
               <div className="row" style={{ marginTop: '.6rem' }}>
                 <button
-                  disabled={busy || rows.length !== need}
+                  disabled={busy || rows.length !== need
+                            || badAmounts.length > 0 || earlyWithoutAmount.length > 0}
                   onClick={() => onSave(rows).then(() => { setText(''); setOpen(false); })}
                 >
                   Save {rows.length} tiles

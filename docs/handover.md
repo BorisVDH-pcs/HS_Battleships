@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0024` are applied to the live project.
+`0001` through `0025` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -85,6 +85,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0022_admin_tile_progress.sql` | `admin_tile_progress` — every claim in a game with its evidence count, for the organiser's board |
 | `0023_evidence_fires.sql` | `add_evidence` now fires the shot itself in the same transaction once the requirement is met, so "fully evidenced but still active" cannot exist |
 | `0024_one_team_per_game.sql` | `my_team_in_game()`, and `tiles_for_me` / `my_evidence` / `claim_tile` scoped through it, so a player sitting in both teams of one game no longer sees the two sides merged |
+| `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -799,7 +800,7 @@ claim → upload → fire cycles in 51 seconds, each through two dialogs:
 
 | Time | Event | Tile |
 |---|---|---|
-| 19:04:04 | `shot_fired` miss, pos 33 | the C4 compost bucket that had been stuck |
+| 19:04:04 | `shot_fired` miss, pos 33 | the tile that had been stuck |
 | 19:04:10 / :13 | `tile_claimed` pos 13, 17 | both slots held at once |
 | 19:04:22 / :33 | `shot_fired` **hit**, pos 17 then 13 | |
 | 19:04:38 | `tile_claimed` pos 24 | |
@@ -823,3 +824,107 @@ and cancelling was confirmed not to create a claim.
   pixel ratio. The dialog's stacked 44px actions under 620px are unseen on
   glass, and touch fleet placement is still untried.
 - A full two-person game since the V4 rule changes.
+
+---
+
+## Session log — 2026-08-31 (later still), the real board
+
+### The 100 tiles are in, with art and evidence counts
+
+Demo Match holds the real V4 board: 100 tiles, 100 icons, per-tile evidence
+counts, and nine tiles flagged as having more than one route to done.
+
+Verified by checksum rather than by eye, all three matching the source exactly:
+
+| | |
+|---|---|
+| names | `869004d9a21d11c6c7faec51c91d5df8` |
+| icons | `bbbee3832b7c710f28b8684494a82af8` |
+| amounts (with `+`) | `48d9b8dc8e24a6ed06df71f75ce5e2ee` |
+
+Positions 1–100 all distinct, 91 distinct icons, max amount 20, 318 uploads if
+every tile were taken the long way.
+
+**The old name checksum was identical to the new one.** Demo Match already held
+exactly this list of names — so the import added the icons and the amounts, and
+changed no tile text at all. The old rows are in
+`tiles_backup_demo_match_pre_import`; drop it when it stops being reassuring.
+
+**The tile list is still not in this repo and must not be.** It lives in the
+database and the Middleman sheet. The paste-ready block was handed over as a
+file outside the repo.
+
+### Icons: 91 of 91
+
+Sourced from the OSRS wiki, every name checked against the wiki API before
+downloading rather than guessed — which was worth doing, because several were
+wrong — four of the names Boris supplied resolved, via the API's own
+redirects, to differently-named pages, and one was simply a misspelling. The
+corrected slugs are in `web/public/icons/`; the mapping from square to slug is
+not recorded here, for the same reason the tile list is not.
+5.7 MB of renders down to 393 KB through `tools/make_icons.py`.
+
+Where a square is about drops from one specific boss, the icon is **that boss**
+rather than one of its drops (Boris's call). It reads better and it covers the
+squares where no single item could stand for the set. Ten of the eleven item
+icons that displaced are gone; `serpentine_visage` was downloaded and then
+deleted once the square it was drawn for took a boss icon instead, so nothing
+unused is published.
+
+The filenames are public, and at 91 they disclose essentially the whole task
+pool — minus which square each sits on, which is the part that decides the game.
+Accepted deliberately, extending the trade the first ten icons already made.
+
+### Tiles with more than one route (0025)
+
+Some tasks can be finished several ways at different prices — "three of this,
+nine of that, or eighteen of the other". Others ask for one complete set out of
+several candidate sets, where the worst case is a **pigeonhole** count, not the
+set size: six candidate sets of four pieces means three near-misses across all
+six (eighteen) before the nineteenth must complete one. A second such tile has
+three candidate sets of four, so ten.
+
+Pricing those at the cheapest route was wrong — a team taking the long way round
+would have fired after three uploads looking under-evidenced. So **the amount is
+the worst case, and the team declares when it is actually done.** Nine tiles are
+flagged: the two set-completion ones and seven either/or ones.
+
+- `tiles.early_complete` is per tile, so a team cannot declare a plain
+  five-drop tile finished — that has one route and the number is the whole of it.
+- `complete_tile_early()` requires membership, an unfired claim, the tile flag,
+  and **at least one screenshot**. Without that floor, claim-then-declare would
+  be a free shot with no proof.
+- `tile_claims.completed_early` records it, because an early completion is
+  self-declared and the organiser must see which fires were. No new function was
+  needed: `admin_tile_progress` already returns `required_evidence`, `status`
+  and `evidence_count`, so an early completion reads as fired-with-fewer.
+- The 0021 trigger stays exactly as strict for every other tile. This adds a
+  second legitimate way to satisfy it, not a way around it.
+
+Paste syntax gained a third field and a marker: `name | icon | amount`, with a
+trailing `+` for a tile with a short route — `… | infernal_cape | 18+`.
+
+**Verified against the live database** in a rolled-back transaction: an
+unflagged tile refused an early completion, a flagged tile with zero evidence
+refused it, and a flagged tile with one screenshot against a required two fired
+and returned `declared_early: true`. The rollback left the claim active with no
+evidence and no events.
+
+> **Two traps paid for here.** The evidence cap lived in **two** places — the
+> clamp inside `admin_set_tiles` and a check constraint on the table. Raising
+> only the clamp gets a constraint violation on import, which is the good
+> outcome; the clamp alone would have quietly stored 10 where 19 was meant.
+> And `create or replace` cannot change a `RETURNS TABLE`, so `tiles_for_me` and
+> `admin_list_tiles` were dropped and rebuilt — grants re-applied in the same
+> migration, and verified afterwards (`authenticated` yes, `anon` no).
+
+### One more native dialog, found late
+
+`ActiveTiles` line 39 called a **bare `confirm(...)`**, which the earlier sweep
+for `window.confirm` missed. It only sat on the rescue-fire path, so it was not
+what blocked the player loop, but it was the same silent failure. Now on the
+in-app dialog with the rest. The sweep to use is:
+
+```bash
+grep -rnE '(^|[^.a-zA-Z_$])(confirm|alert|prompt)\s*\(' web/src/
+```

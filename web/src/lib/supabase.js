@@ -52,6 +52,18 @@ export async function fireTile(claimId) {
   return data;
 }
 
+/**
+ * "We finished this by the short route." Only tiles the organiser flagged as
+ * having more than one route accept this, and only with at least one screenshot
+ * already submitted — both refused server-side, in complete_tile_early (0025).
+ * Returns `{ fired, result, evidence_count, declared_early }`.
+ */
+export async function completeTileEarly(claimId) {
+  const { data, error } = await supabase.rpc('complete_tile_early', { p_claim_id: claimId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ---- Admin API -----------------------------------------------------------
 // Every one of these re-checks is_admin() server-side, so hiding the admin tab
 // in the UI is a convenience, never the control.

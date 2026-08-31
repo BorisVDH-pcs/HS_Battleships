@@ -729,6 +729,10 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
 .tile-list em { font-style: normal; color: var(--muted); }
 .tile-list em::before { content: ' — '; }
 
+/* The evidence count only prints when it is above the default, so it should
+   catch the eye rather than blend into the slug beside it. */
+.tile-list em.tile-amount { color: var(--gold); font-family: var(--display); }
+
 /* ---- phones ---- */
 /*
  * Captains place their fleet from a phone, so the boards have to survive a

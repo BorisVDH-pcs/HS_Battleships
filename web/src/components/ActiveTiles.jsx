@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { fireTile } from '../lib/supabase.js';
+import { fireTile, completeTileEarly } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
 import TileIcon from './TileIcon.jsx';
 import EvidenceUploader from './EvidenceUploader.jsx';
+import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
  * The two slots. Replaces the spreadsheet's L6 / N6 cells: a team may hold at
@@ -22,6 +23,7 @@ export default function ActiveTiles({
 }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   const active = tiles.filter((t) => t.claim_status === 'active');
 
@@ -36,12 +38,36 @@ export default function ActiveTiles({
   // `asked` is false when the evidence uploader has already confirmed: the
   // last submit and the shot are one action, so it must not ask twice.
   async function fire(tile, asked = true) {
-    if (asked && !confirm(`Complete "${tile.name}"? This fires the shot.`)) return;
+    if (asked && !(await confirm(
+      `Complete "${tile.name}"? This fires the shot.`,
+      { title: 'Fire the shot?', confirmLabel: 'Complete & fire' }
+    ))) return;
     setBusyId(tile.claim_id);
     setError(null);
     try {
       const result = await fireTile(tile.claim_id);
       onFired?.(tile, result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // The short route. The count on these tiles is the worst case, so a team that
+  // got there sooner says so rather than farming to a number it no longer needs.
+  async function completeEarly(tile, have) {
+    if (!(await confirm(
+      `"${tile.name}" asks for ${tile.required_evidence}, and you have submitted ` +
+      `${have}. Say it is done only if you have actually finished it by one of ` +
+      'the shorter routes — the organiser reviews these, and it fires the shot now.',
+      { title: 'Finished it another way?', confirmLabel: 'It is done — fire' }
+    ))) return;
+    setBusyId(tile.claim_id);
+    setError(null);
+    try {
+      const res = await completeTileEarly(tile.claim_id);
+      onFired?.(tile, res?.result ?? null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -122,12 +148,28 @@ export default function ActiveTiles({
                   {busyId === tile.claim_id ? 'Firing…' : 'Complete & fire'}
                 </button>
               )}
+
+              {/* Tiles with more than one route to done (0025). Hidden until
+                  there is something to review, because complete_tile_early
+                  refuses with no evidence at all — a button that only ever
+                  errors is worse than no button. Hidden once `ready`, since by
+                  then the ordinary submit fires it and "early" is meaningless. */}
+              {tile.early_complete && !ready && mine.length > 0 && (
+                <button
+                  className="ghost"
+                  onClick={() => completeEarly(tile, mine.length)}
+                  disabled={busyId === tile.claim_id}
+                >
+                  {busyId === tile.claim_id ? 'Firing…' : 'Done another way'}
+                </button>
+              )}
             </article>
           );
         })}
       </div>
 
       {error && <p className="error">{error}</p>}
+      {confirmDialog}
     </section>
   );
 }

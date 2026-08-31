@@ -119,6 +119,18 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
                     {/* The slug, not the picture: this view exists to check
                         that every tile got the icon it was meant to get. */}
                     <em>{t.icon || 'no icon'}</em>
+                    {/* Only when it is not the default. A column of "x1" would
+                        bury the handful of tiles that actually ask for more. */}
+                    {t.required_evidence > 1 && (
+                      <em className="tile-amount">
+                        &times;{t.required_evidence}{t.early_complete ? '+' : ''}
+                      </em>
+                    )}
+                    {/* A + with no count would be invisible otherwise, and it
+                        still changes what the tile allows. */}
+                    {t.early_complete && !(t.required_evidence > 1) && (
+                      <em className="tile-amount">+</em>
+                    )}
                   </>
                 ) : (
                   <span className="muted">— empty —</span>
