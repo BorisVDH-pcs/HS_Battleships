@@ -118,6 +118,7 @@ export default function App() {
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
+  const isPlacement = game.game?.status === 'placement';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
 
@@ -169,6 +170,17 @@ export default function App() {
             </p>
           )}
 
+          {/* Prep only, and first: naming the team is the opening move, and
+              once the game starts the name is settled. An admin can still
+              rename either team from the console if one has to be fixed
+              mid-event — rename_team itself has no phase guard. */}
+          {isPlacement && myRole === 'captain' && myTeam && (
+            <section className="card">
+              <h2>Your team</h2>
+              <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
+            </section>
+          )}
+
           {/* The score and the two slots are what a player checks most
               often mid-game, so they sit above the boards rather than below
               them — on a phone the grids are tall enough to push anything
@@ -188,7 +200,7 @@ export default function App() {
             }}
           />
 
-          {game.game.status === 'placement' && myTeamId && (
+          {isPlacement && myTeamId && (
             <CaptainPlacement
               isCaptain={myRole === 'captain'}
               teamId={myTeamId}
@@ -197,13 +209,6 @@ export default function App() {
               shipsPlaced={myFleet.length}
               onPlaced={() => game.refresh()}
             />
-          )}
-
-          {myRole === 'captain' && myTeam && (
-            <section className="card">
-              <h2>Your team</h2>
-              <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
-            </section>
           )}
 
           <div className="columns">
