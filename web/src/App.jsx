@@ -193,22 +193,6 @@ export default function App() {
               underneath them off the screen entirely. */}
           <Scoreboard scores={scores} myTeamId={myTeamId} />
 
-          {/* Directly under the score, and never conditional: the team should
-              be able to glance at the top of the page and see what it is
-              holding. Through placement both slots read as empty, which is
-              accurate — nothing can be claimed yet. */}
-          <ActiveTiles
-            tiles={tiles}
-            maxActive={maxActive}
-            emptyHint={isPlacement
-              ? 'Nothing to claim until the game starts.'
-              : undefined}
-            onFired={(tile, result) => {
-              setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-              game.refresh();
-            }}
-          />
-
           {isPlacement && myTeamId && (
             <CaptainPlacement
               isCaptain={myRole === 'captain'}
@@ -243,25 +227,49 @@ export default function App() {
               )}
             </div>
 
-            {boardTab === 'enemy' ? (
-              <>
-                <EnemyGrid
-                  tiles={tiles}
-                  onClaim={onClaim}
-                  canClaim={canClaim}
-                  busyTileId={busyTileId}
-                />
-                {isActive && !canClaim && myTeamId && (
-                  <p className="muted">Both slots are full — fire one before claiming another.</p>
+            <div className="board-layout">
+              <div className="board-main">
+                {boardTab === 'enemy' ? (
+                  <>
+                    <EnemyGrid
+                      tiles={tiles}
+                      onClaim={onClaim}
+                      canClaim={canClaim}
+                      busyTileId={busyTileId}
+                    />
+                    {isActive && !canClaim && myTeamId && (
+                      <p className="muted">Both slots are full — fire one before claiming another.</p>
+                    )}
+                  </>
+                ) : (
+                  <MyFleet
+                    myShipCells={myShipCells}
+                    enemyShots={enemyShots}
+                    tiles={tiles}
+                  />
                 )}
-              </>
-            ) : (
-              <MyFleet
-                myShipCells={myShipCells}
-                enemyShots={enemyShots}
-                tiles={tiles}
-              />
-            )}
+              </div>
+
+              {/* Beside the board rather than above it: what the team is
+                  holding and where it can shoot are read together, and the
+                  slots were costing a whole row to say very little. When the
+                  two cannot sit side by side the slots go first — they are
+                  the to-do list, and a 10x10 grid above them is a long way to
+                  scroll past on a phone. */}
+              <aside className="board-side">
+                <ActiveTiles
+                  tiles={tiles}
+                  maxActive={maxActive}
+                  emptyHint={isPlacement
+                    ? 'Nothing to claim until the game starts.'
+                    : undefined}
+                  onFired={(tile, result) => {
+                    setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                    game.refresh();
+                  }}
+                />
+              </aside>
+            </div>
           </section>
 
           <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
