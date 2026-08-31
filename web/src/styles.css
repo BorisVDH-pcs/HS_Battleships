@@ -237,6 +237,7 @@ button.cell:disabled { cursor: default; }
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: .8rem;
   max-width: 34rem;
+  margin-inline: auto;
 }
 .slot {
   display: flex;
