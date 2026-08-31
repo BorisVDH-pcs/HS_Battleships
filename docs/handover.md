@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0025` are applied to the live project.
+`0001` through `0026` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -86,6 +86,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0023_evidence_fires.sql` | `add_evidence` now fires the shot itself in the same transaction once the requirement is met, so "fully evidenced but still active" cannot exist |
 | `0024_one_team_per_game.sql` | `my_team_in_game()`, and `tiles_for_me` / `my_evidence` / `claim_tile` scoped through it, so a player sitting in both teams of one game no longer sees the two sides merged |
 | `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through |
+| `0026_sunk_from_cells.sql` | `ship_status` decides `sunk` from the cells a ship occupies rather than the stored `ships.size`, counting DISTINCT hit cells with `>=`; `fire_tile` announces the derived size; `assert_fleets_consistent` added and called from `start_game` |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -929,3 +930,77 @@ in-app dialog with the rest. The sweep to use is:
 ```bash
 grep -rnE '(^|[^.a-zA-Z_$])(confirm|alert|prompt)\s*\(' web/src/
 ```
+
+---
+
+## Session log — 2026-08-31, a ship that sank twice and not at all
+
+Boris read the activity feed and caught it: *"Demo Alpha sank a 4-tile ship"*
+after a hit on F2, when the ship was five tiles and did not finish until D2.
+
+He was right on both counts, and the cause was in the schema rather than the
+display.
+
+### What happened
+
+`ship_status` decided `sunk` as `count(hits) = ships.size`. In the scratch game
+one Bravo ship occupied **five** cells while its `size` column said **four**
+(and its neighbour said five while occupying four -- the two were swapped).
+
+So on the fourth hit the count reached four, `4 = 4`, and the ship was announced
+sunk, reporting `size: 4`. On the fifth hit the count reached five, `5 = 4` was
+false, and the ship silently **un-sank**: no second event, and `sunk` reading
+false with every cell of it destroyed.
+
+Three weaknesses had to line up, and all three are worth naming:
+
+1. **`sunk` trusted a denormalised column** instead of the cells sitting right
+   there to be counted.
+2. **It compared with `=`.** Equality lets a sink reverse itself the moment the
+   count passes the size. A threshold cannot.
+3. **It counted `tile_claims` rows, not distinct cells.** Two fired hit-claims
+   on one square -- which nothing in the schema forbids -- would have sunk a
+   ship early on its own, with no corrupt data needed at all.
+
+### Where the bad data came from — not the app
+
+`place_fleet` **cannot** produce this. It derives the size from
+`jsonb_array_length(cells)`, raises if the caller's declared size disagrees, and
+stores the derived value. Every other fleet in the database is consistent; only
+that one Bravo fleet was wrong, in the same scratch game that already carried
+hand-written `fired_at` values and invented uploader names. It was edited
+directly with service-role access.
+
+That makes the schema fix the point, not the data fix: a win condition should
+not rest on "the number is right because the only writer keeps it right".
+
+### The fix (0026)
+
+`sunk` is now `count(distinct hit cells) >= count(distinct cells)`, and the
+`size` the view reports is the true cell count, so a wrong `ships.size` can no
+longer say anything about a game. `fire_tile` reads the sunk flag and the size
+from **one** `ship_status` row, so the announcement cannot disagree with the
+decision. `assert_fleets_consistent()` is called from `start_game`, which is the
+last moment anyone looks at a board before it counts for something.
+
+**Verified on the live database.** After the migration the ship reads size 5,
+hits 5, sunk true. Then, in a rolled-back transaction, D2 was returned to
+unfired and re-fired: `shot_fired` hit at position 14, immediately followed by
+`ship_sunk` with **`size: 5`**. Under the old logic that replay produced a sink
+*before* D2 and no event *at* D2, which is precisely the reported symptom.
+
+### Two leftovers in the scratch game
+
+- **The stale feed rows.** The false "sank a 4-tile ship" at F2 is still in
+  `game_events`, and the correct sinking at D2 was never recorded. The game
+  *state* is right (the ship reads sunk); only the history is wrong. Left alone
+  rather than rewritten, since editing an event log to look tidier is a habit
+  worth not starting.
+- **`ships.size` is still 4 and 5 on those two ships.** Cosmetic now -- nothing
+  reads it for game logic -- but `assert_fleets_consistent` will refuse to start
+  that game if it is ever reset to placement, which is the intended behaviour
+  and not a bug to chase. The repair statement is at the bottom of 0026 and is a
+  no-op on a clean database; it could not run here because
+  `freeze_fleet_after_placement` correctly rejects writes to `ships` while a
+  game is active. Reset that game to placement and the same statement works, or
+  simply re-place Bravo's fleet through the UI, which writes correct sizes.
