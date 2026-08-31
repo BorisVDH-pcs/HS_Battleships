@@ -166,8 +166,12 @@ export default function AdminOverview({ gameId, teams }) {
                       let body = <span className="coord-label">{label}</span>;
 
                       if (cell?.status === 'fired') {
-                        cls += cell.result === 'hit' ? ' hit' : ' miss';
-                        body = cell.result === 'hit' ? '✕' : '·';
+                        // Each board is labelled with the team doing the
+                        // shooting, so a hit is always their good news.
+                        cls += cell.result === 'hit' ? ' hit dealt' : ' miss';
+                        body = cell.result === 'hit'
+                          ? <span className="mark">✸</span>
+                          : <span className="mark">○</span>;
                       } else {
                         // An unfired hull stays visible under a claim, so the
                         // enemy fleet reads as a fleet however much is claimed.
@@ -209,7 +213,7 @@ export default function AdminOverview({ gameId, teams }) {
 
       <p className="legend">
         <span className="key ship" /> enemy ship afloat
-        <span className="key hit" /> hit
+        <span className="key hit dealt" /> hit
         <span className="key miss" /> miss
         <span className="key active" /> claimed, not yet fired
       </p>

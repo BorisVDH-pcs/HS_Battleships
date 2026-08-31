@@ -43,7 +43,9 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
               const active = tile.claim_status === 'active';
               const cls = [
                 'cell',
-                fired ? (tile.claim_result === 'hit' ? 'hit' : 'miss') : '',
+                // 'dealt' colours it as the shooter's news, not the fleet
+                // owner's: this is the board the team is firing at.
+                fired ? (tile.claim_result === 'hit' ? 'hit dealt' : 'miss') : '',
                 active ? 'active' : '',
                 !tile.revealed && canClaim ? 'claimable' : '',
                 tile.revealed ? 'clickable' : '',
@@ -63,7 +65,9 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                   onClick={() => (tile.revealed ? onInspect?.(tile) : onClaim(tile))}
                 >
                   {fired
-                    ? (tile.claim_result === 'hit' ? '✕' : '·')
+                    ? (tile.claim_result === 'hit'
+                        ? <span className="mark">✸</span>
+                        : <span className="mark">○</span>)
                     : <TileIcon slug={tile.icon} fallback={<span className="coord-label">{label}</span>} />}
                 </button>
               );

@@ -1,9 +1,19 @@
 /* High Society theme — molten gold on black, after the clan logo.
  *
  * The palette is deliberately narrow: the page is near-black, and gold carries
- * every meaning that isn't hit/miss. Glow is the accent, not another hue, so the
- * two colours that DO carry game meaning (hit red, ship green) stay unmistakable
- * against it.
+ * every meaning that isn't a shot result. Glow is the accent, not another hue,
+ * so the colours that DO carry game meaning stay unmistakable against it.
+ *
+ * A hit is one event with two meanings, so it has two colours. On a board you
+ * are shooting at, a hit is your good news and burns ember. On your own fleet,
+ * the same hit is damage and stays red. Red therefore only ever means harm to
+ * the person reading it, which is what people already expect it to mean.
+ *
+ * Hue is never the only signal: a hit is a filled cell with a solid burst, a
+ * miss is a flat cell with a hollow ring. Filled versus hollow survives
+ * greyscale, a dim phone screen, and red-green colour blindness - which matters
+ * here, because ship green and hit red are exactly the pair a deuteranope
+ * cannot separate.
  */
 
 :root {
@@ -22,11 +32,17 @@
   --text:      #efe3c8;
   --muted:     #8d7c56;
 
-  --hit:       #b8321f;
-  --hit-lit:   #ff7a5c;
-  --miss:      #1e222a;
-  --ship:      #2c5f43;
-  --ship-lit:  #4f9d74;
+  --hit:        #b8321f;   /* damage taken - your own fleet only */
+  --hit-lit:    #ff7a5c;
+  --strike:     #b8560f;   /* damage dealt - the board you shoot at */
+  --strike-lit: #ff9d3d;
+  /* Water, not emptiness. The old miss was within a shade of the board
+     background, so a spent square read as an unplayed one. */
+  --miss:       #131b26;
+  --miss-lit:   #2a3849;
+  --miss-ink:   #6d8199;
+  --ship:       #2c5f43;
+  --ship-lit:   #4f9d74;
 
   --glow-sm: 0 0 6px rgba(232, 184, 60, .35);
   --glow-md: 0 0 14px rgba(232, 184, 60, .30);
@@ -176,11 +192,26 @@ button.cell.claimable:hover {
 button.cell:disabled { cursor: default; }
 
 .cell.ship   { background: var(--ship); border-color: var(--ship-lit); color: #cfe9db; }
+
+/* Bare .hit is the fleet-owner's view: something of yours is burning. */
 .cell.hit    {
   background: var(--hit); color: #fff; border-color: var(--hit-lit);
   box-shadow: 0 0 10px rgba(255, 122, 92, .45);
 }
-.cell.miss   { background: var(--miss); color: #5b646f; }
+/* .dealt is the shooter's view of the same square. Ember rather than gold:
+   gold is already the claim outline, and a filled gold cell beside a
+   gold-edged one blurs on a busy board. */
+.cell.hit.dealt {
+  background: var(--strike); border-color: var(--strike-lit);
+  box-shadow: 0 0 10px rgba(255, 157, 61, .45);
+}
+.cell.miss   {
+  background: var(--miss); color: var(--miss-ink); border-color: var(--miss-lit);
+}
+/* The burst wants to fill its square; the ring wants room around it, so it
+   reads as a splash in open water rather than another filled cell. */
+.cell.hit .mark  { font-size: 1.15em; line-height: 1; }
+.cell.miss .mark { font-size: .8em; line-height: 1; }
 
 /* The class arrives on an element that is already mounted — the realtime
    refetch only swaps the className — so the animation fires exactly when a
@@ -191,7 +222,13 @@ button.cell:disabled { cursor: default; }
   60%  { box-shadow: 0 0 18px 5px rgba(255, 122, 92, .55); }
   100% { box-shadow: 0 0 10px rgba(255, 122, 92, .45); }
 }
+@keyframes strike-dealt {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 157, 61, .85); }
+  60%  { box-shadow: 0 0 18px 5px rgba(255, 157, 61, .55); }
+  100% { box-shadow: 0 0 10px rgba(255, 157, 61, .45); }
+}
 .cell.hit { animation: hit-strike .55s ease-out; }
+.cell.hit.dealt { animation: strike-dealt .55s ease-out; }
 .cell.active {
   border-color: var(--gold); color: var(--gold-lit);
   box-shadow: var(--glow-sm);
@@ -557,10 +594,11 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   display: inline-block; vertical-align: -2px; margin-right: .3rem;
   border: 1px solid var(--line);
 }
-.legend .key.ship   { background: var(--ship);  border-color: var(--ship-lit); }
-.legend .key.hit    { background: var(--hit);   border-color: var(--hit-lit); }
-.legend .key.miss   { background: var(--miss); }
-.legend .key.active { background: var(--panel); border-color: var(--gold); }
+.legend .key.ship      { background: var(--ship);   border-color: var(--ship-lit); }
+.legend .key.hit       { background: var(--hit);    border-color: var(--hit-lit); }
+.legend .key.hit.dealt { background: var(--strike); border-color: var(--strike-lit); }
+.legend .key.miss      { background: var(--miss);   border-color: var(--miss-lit); }
+.legend .key.active    { background: var(--panel);  border-color: var(--gold); }
 
 /* ---- fleet placer ---- */
 

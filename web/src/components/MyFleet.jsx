@@ -40,6 +40,8 @@ export default function MyFleet({ myShipCells, enemyShots, tiles }) {
               const cls = [
                 'cell',
                 isShip ? 'ship' : '',
+                // No 'dealt' here: on your own fleet a hit is damage, and
+                // red is the one place it should mean exactly that.
                 shot === 'hit' ? 'hit' : '',
                 shot === 'miss' ? 'miss' : '',
               ].filter(Boolean).join(' ');
@@ -48,7 +50,8 @@ export default function MyFleet({ myShipCells, enemyShots, tiles }) {
                 // Labelled like the enemy board, so the two grids sitting
                 // side by side read the same way.
                 <div key={key} className={cls} title={coordLabel(row, col)}>
-                  {shot === 'hit' ? '✕' : shot === 'miss' ? '·'
+                  {shot === 'hit' ? <span className="mark">✸</span>
+                    : shot === 'miss' ? <span className="mark">○</span>
                     : <span className="coord-label">{coordLabel(row, col)}</span>}
                 </div>
               );

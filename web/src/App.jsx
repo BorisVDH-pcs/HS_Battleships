@@ -13,6 +13,7 @@ import Admin from './components/Admin.jsx';
 import TeamNameEditor from './components/TeamNameEditor.jsx';
 import Wordmark from './components/Wordmark.jsx';
 import EvidencePanel from './components/EvidencePanel.jsx';
+import BoardLegend from './components/BoardLegend.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -264,6 +265,7 @@ export default function App() {
                   canClaim={canClaim}
                   busyTileId={busyTileId}
                 />
+                <BoardLegend view="enemy" />
                 {isActive && !canClaim && myTeamId && (
                   <p className="muted">Both slots are full — fire one before claiming another.</p>
                 )}
@@ -286,11 +288,14 @@ export default function App() {
                 )}
               </>
             ) : (
-              <MyFleet
-                myShipCells={myShipCells}
-                enemyShots={enemyShots}
-                tiles={tiles}
-              />
+              <>
+                <MyFleet
+                  myShipCells={myShipCells}
+                  enemyShots={enemyShots}
+                  tiles={tiles}
+                />
+                <BoardLegend view="fleet" />
+              </>
             )}
           </section>
 
