@@ -5,15 +5,28 @@
  * so the colours that DO carry game meaning stay unmistakable against it.
  *
  * A hit is one event with two meanings, so it has two colours. On a board you
- * are shooting at, a hit is your good news and burns ember. On your own fleet,
+ * are shooting at, a hit is your good news and reads green. On your own fleet,
  * the same hit is damage and stays red. Red therefore only ever means harm to
- * the person reading it, which is what people already expect it to mean.
+ * the person reading it, and green only ever means good, which is what people
+ * already expect both to mean.
+ *
+ * The two greens are not the same green. A hull afloat is the muted --ship; a
+ * hull you have struck is the brighter --strike, and carries the burst. They
+ * only ever meet on the organiser's boards, which draw the enemy fleet and the
+ * shots landing on it together, and there the brightness plus the mark is what
+ * separates "still floating" from "already hit".
  *
  * Hue is never the only signal: a hit is a filled cell with a solid burst, a
  * miss is a flat cell with a hollow ring. Filled versus hollow survives
  * greyscale, a dim phone screen, and red-green colour blindness - which matters
- * here, because ship green and hit red are exactly the pair a deuteranope
- * cannot separate.
+ * here, because green and red are exactly the pair a deuteranope cannot
+ * separate, and this palette now uses both for a hit.
+ *
+ * That is safe only because the two never share a board: green-for-a-hit
+ * appears on enemy waters and the organiser's boards, red-for-a-hit only on
+ * your own fleet. Which board you are on is never ambiguous - it is a tab you
+ * pressed - so the hue is confirming what the context already says rather than
+ * carrying the meaning alone.
  */
 
 :root {
@@ -34,8 +47,11 @@
 
   --hit:        #b8321f;   /* damage taken - your own fleet only */
   --hit-lit:    #ff7a5c;
-  --strike:     #b8560f;   /* damage dealt - the board you shoot at */
-  --strike-lit: #ff9d3d;
+  /* Damage dealt - the board you shoot at. Green because it is your good
+     news, and brighter than --ship so a struck hull stays distinct from one
+     still afloat where the organiser's boards draw both. */
+  --strike:     #2f9e57;
+  --strike-lit: #7bf0a5;
   /* Water, not emptiness. The old miss was within a shade of the board
      background, so a spent square read as an unplayed one. */
   --miss:       #131b26;
@@ -198,12 +214,12 @@ button.cell:disabled { cursor: default; }
   background: var(--hit); color: #fff; border-color: var(--hit-lit);
   box-shadow: 0 0 10px rgba(255, 122, 92, .45);
 }
-/* .dealt is the shooter's view of the same square. Ember rather than gold:
-   gold is already the claim outline, and a filled gold cell beside a
-   gold-edged one blurs on a busy board. */
+/* .dealt is the shooter's view of the same square: a hull you struck, so green
+   rather than red. Not gold, which is already the claim outline - a filled gold
+   cell beside a gold-edged one blurs on a busy board. */
 .cell.hit.dealt {
   background: var(--strike); border-color: var(--strike-lit);
-  box-shadow: 0 0 10px rgba(255, 157, 61, .45);
+  box-shadow: 0 0 10px rgba(123, 240, 165, .45);
 }
 .cell.miss   {
   background: var(--miss); color: var(--miss-ink); border-color: var(--miss-lit);
@@ -236,9 +252,9 @@ button.cell:disabled { cursor: default; }
   100% { box-shadow: 0 0 10px rgba(255, 122, 92, .45); }
 }
 @keyframes strike-dealt {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 157, 61, .85); }
-  60%  { box-shadow: 0 0 18px 5px rgba(255, 157, 61, .55); }
-  100% { box-shadow: 0 0 10px rgba(255, 157, 61, .45); }
+  0%   { box-shadow: 0 0 0 0 rgba(123, 240, 165, .85); }
+  60%  { box-shadow: 0 0 18px 5px rgba(123, 240, 165, .55); }
+  100% { box-shadow: 0 0 10px rgba(123, 240, 165, .45); }
 }
 .cell.hit { animation: hit-strike .55s ease-out; }
 .cell.hit.dealt { animation: strike-dealt .55s ease-out; }

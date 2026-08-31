@@ -225,10 +225,10 @@ two meanings, so it has two colours:
 
 | | Looks like | Means |
 |---|---|---|
-| `.cell.hit.dealt` | ember fill, solid burst `✸` | a hull *you* struck — enemy waters, and every admin board |
+| `.cell.hit.dealt` | **bright green** fill, solid burst `✸` | a hull *you* struck — enemy waters, and every admin board |
 | `.cell.hit` | red fill, solid burst `✸` | damage *you took* — your own fleet only |
 | `.cell.miss` | water blue, hollow ring `○` | a square already spent |
-| `.cell.ship` | green | your hull (or, on an admin board, an enemy hull still afloat) |
+| `.cell.ship` | **muted** green | your hull (or, on an admin board, an enemy hull still afloat and unstruck) |
 | `.cell.active` | gold outline, `1/3` | claimed, not yet fired |
 
 A fired square **keeps its artwork**: the coloured ground and the mark sit on
@@ -598,7 +598,7 @@ Roughly in priority order:
   `3/3`, watch the shot go off, or click a claimed square to read their own
   submissions back. There is no player password in this repo, and the sessions
   that did this work only ever had the admin login.
-- **The red hit on your own fleet.** Enemy-waters ember and water-blue misses
+- **The red hit on your own fleet.** Enemy-waters hits and water-blue misses
   were confirmed on the deployed admin board; the fleet-owner's red needs a
   player session with incoming shots against it.
 - A full game played through the player UI by two real people since the V4 rule
@@ -642,7 +642,8 @@ fire, the 3rd returned `fired: true` with a result, and a 4th was refused with
 evidence while still active.
 
 **Board colours** (`61ab3e3`) — the change described under *What players see*.
-Verified on the deployed admin board: an ember burst at E2, hollow water rings
+Verified on the deployed admin board (when a dealt hit was still ember; it is
+green from 2026-08-31): a burst at E2, hollow water rings
 at H7 and B9, a gold `2/3` claim at C4, green enemy hulls elsewhere.
 
 **Artwork under the marks** — a fired square no longer swaps its picture for a
