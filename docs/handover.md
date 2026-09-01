@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0029` are applied to the live project.
+`0001` through `0031` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -90,6 +90,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0027_fire_only_while_active.sql` | A shot may only be fired while the game is `active`. `fire_tile`, `add_evidence` and `complete_tile_early` all refuse once a game is finished, and the winner update is narrowed to `status = 'active'` so a win cannot overwrite a win |
 | `0028_claim_released_event_type.sql` | Adds the `claim_released` event type (separate file for the same reason as 0008, 0012, 0015 and 0018) |
 | `0029_admin_release_claim.sql` | `admin_release_claim` — an organiser gives a team back a slot on a tile it cannot finish. Deletes the claim (so the square is lockable again), refuses a fired one, and emits `claim_released` |
+| `0030_event_order.sql` | `game_events.created_at` defaults to `clock_timestamp()` instead of `now()`. Two events written by one shot no longer share a timestamp, so the feed's order is defined rather than incidental |
+| `0031_three_active_tiles.sql` | Three active tiles per team instead of two: the column default, the `admin_create_game` argument default, and any game not yet under way. No application code changed — the limit was always read from `games.max_active_tiles` |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -1191,3 +1193,113 @@ Still unverified: the **admin** half of this session's work — the Release butt
 and the finished-game gate — because there is no admin password in this repo and
 the session that wrote it only ever had a player's browser. Both are covered
 server-side by tests that did run.
+
+---
+
+## Session log — playing it properly, and what that turned up
+
+The ask was to watch a match from both sides at once. Two things came out of it
+that outlast the demo: two simulation scripts in `web/scripts/`, and three fixes.
+
+### Watching both sides
+
+The browser pane inside Claude is tabbed, not split, so it cannot show two
+clients at once — side by side has to be two windows on the user's own desktop.
+The session that runs the match does not need a browser at all, which is the
+useful part: the moves go through the same RPCs by way of the database, and both
+windows redraw on their own over Realtime.
+
+One trap worth knowing. A session lives in `localStorage`, which is per-origin,
+so two ordinary tabs on the same site are both whoever signed in last. Two
+sides needs two browsers, or one incognito, or one on localhost and one on the
+live site. The scratch game had `Soft Papi` as captain of Demo Alpha *and* a
+member of Demo Bravo — one account quietly playing both teams. `Bludgenmaker` is
+now captain of Demo Bravo, so the two sides are genuinely two accounts.
+
+### Why the pacing had to leave the database
+
+The first attempt paced a match with `pg_sleep()` between moves and it arrived
+in the watching browsers as one lump at the end. Realtime pushes on **commit**,
+and the MCP database connection runs everything sent to it as a single
+transaction. A procedure with `COMMIT` inside is refused outright:
+
+    ERROR: 2D000: invalid transaction termination
+
+`dblink` would give each statement its own connection, but it wants the database
+password. So the pacing lives in a Node script instead, where one RPC per HTTP
+request is one transaction each.
+
+### The scripts
+
+Both sign in as two ordinary players and call the same RPCs the app calls —
+`place_fleet`, `start_game`, `claim_tile`, `add_evidence`,
+`complete_tile_early`. Neither ever calls `fire_tile`: the shot goes off when the
+evidence requirement is met, exactly as it does for a real upload. Passwords come
+from the environment and are never written down.
+
+- **`simulate-match.mjs`** — a scripted replay. Fixed fleets, fixed shot lists,
+  17 hits from 17 shots. Useful for a quick demo, honest about proving nothing.
+- **`simulate-hunt.mjs`** — a real game. Both fleets random each run, and each
+  team learns a square only from what `add_evidence` hands back for its own
+  shot, plus the public `ship_sunk` events. It hunts on a parity lattice, works
+  the line on a hit, and uses the no-touch rule: diagonals of a hit are water,
+  and the ring around a sunk ship is water, both crossed off without firing.
+  It holds `max_active_tiles` tiles at once, submits screenshots one at a time,
+  and takes the short route on tiles that allow it.
+- **`hunt-selftest.mjs`** — plays the search against thousands of boards with no
+  database at all. Over 3000 games: **46.1 shots average, 36.9% on target, zero
+  failures**, against 17 for perfect play and ~95 for firing at random. It fails
+  the run if the average drifts toward random, because a targeting bug that
+  degrades to guessing still finishes every game — counting is the only way to
+  see it. The no-touch deduction is checked here too: marking a real ship cell
+  as water would leave a board that can never be cleared.
+
+### Three fixes
+
+**0030 — the feed's order was undefined.** Watching a match, a ship appeared to
+sink before the shot that sank it. `created_at` defaulted to `now()`, which in
+Postgres is the *transaction* start time — one value for every statement in it.
+`fire_tile` writes `shot_fired` and then `ship_sunk` in one transaction, so both
+carried the same value to the microsecond, and the feed orders on that column
+alone. Which line landed on top was whatever the planner returned. The same tie
+sat between `shot_fired` and `game_won`. `clock_timestamp()` fixes it; measured
+1.3ms apart afterwards. In a newest-first feed the sinking does belong *above*
+its shot — that part was never wrong, only undefined.
+
+**0031 — three active tiles.** A gameplay change, and no code needed touching:
+the limit was read from `games.max_active_tiles` by the trigger and by
+`ActiveTiles.jsx`, and hardcoded in neither. Verified against the trigger in a
+rolled-back transaction — three lock-ins accepted, the fourth refused. Running
+and finished games are deliberately left alone.
+
+**The placement board was a quarter of the size of the board it prepares you
+for** — 210px with 17px cells, against 744px and 70px. `.board` carries
+`margin-inline: auto`, harmless on a block element, but `.placer` is a grid
+container and an auto margin on a grid item cancels the default stretch: the
+item sizes to content and `1fr` columns collapse to minimum. `width: 100%` puts
+it back. It now matches at 704px with 66px cells, and every cell carries its
+coordinate, which also gives the cells accessible names.
+
+The boards section — tabs, enemy waters, own fleet, active tiles — is now hidden
+until the game starts. During preparation none of it could say anything but "not
+yet", and it pushed the one thing a captain has to do off the top of the screen.
+
+### Still not verified
+
+Unchanged from the last session: a real handset, touch fleet placement, a full
+game played by two actual people, and the **admin** console's own screens. The
+release button and the finished-game gate are still covered only server-side.
+
+Fleet placement *was* driven through the real UI this session — hull picked,
+cell clicked, ship placed at C3–G3, labels hidden under the hull, cleared again
+— but with a mouse, not a finger.
+
+### Open, not done
+
+`start_game` has **no permission check at all** and is granted to
+`authenticated`. Any signed-in player can start any game sitting in preparation
+once both fleets are placed. It is inconsistent with `admin_open_placement` and
+`admin_reset_game`, which both gate on `is_admin()`. Low severity — it can only
+happen once, only from preparation, only with both fleets ready, and it records
+`by: auth.uid()` — but a player could start the game while a captain is still
+arranging hulls. One migration would close it.

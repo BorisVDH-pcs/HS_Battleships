@@ -632,6 +632,22 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /* ---- fleet placer ---- */
 
 .placer { display: grid; gap: 1rem; }
+
+/*
+ * The placement board is the same board, at the same size.
+ *
+ * It used to come out at 210px with 17px cells, against 744px and 70px for the
+ * board it is preparing you for — a quarter of the size, on the one screen where
+ * you are picking exact squares. `.board` carries `margin-inline: auto` to
+ * centre it, which is harmless on a block element, but `.placer` is a grid
+ * container and an auto margin on a grid item cancels the default stretch. The
+ * item then sizes to content, and `1fr` columns with nothing to divide up
+ * collapse to their minimum.
+ *
+ * An explicit width puts the stretch back; max-width and the centring still
+ * apply, so it matches the game board exactly.
+ */
+.placer .board { width: 100%; }
 .placer .yard { display: flex; gap: .5rem; flex-wrap: wrap; }
 .placer .yard button { font-family: var(--display); letter-spacing: .05em; }
 .placer .yard button.placed { opacity: .4; }

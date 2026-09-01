@@ -222,6 +222,13 @@ export default function App() {
             />
           )}
 
+          {/* Nothing here means anything until the game starts: there is no
+              enemy to shoot at, your own fleet is the thing you are still
+              arranging above, and no tile can be locked in yet. Showing all
+              three during preparation left the placement board sharing the
+              screen with two boards that could only say "not yet", and pushed
+              the one thing a captain has to do off the top. */}
+          {!isPreparation && (
           <section className="boards">
             {/* The same tab strip the admin console uses, so this reads as part
                 of the app rather than a second idea about tabs. */}
@@ -263,9 +270,6 @@ export default function App() {
                 teamId={myTeamId}
                 evidence={evidence}
                 onRefresh={() => game.refresh()}
-                emptyHint={isPreparation
-                  ? 'Nothing to lock in until the game starts.'
-                  : undefined}
                 onFired={(tile, result) => {
                   setNotice(`${tile.name} — ${result.toUpperCase()}!`);
                   game.refresh();
@@ -317,6 +321,7 @@ export default function App() {
               </>
             )}
           </section>
+          )}
 
           <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
         </>

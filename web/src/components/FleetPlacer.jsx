@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { placeFleet } from '../lib/supabase.js';
 import {
-  GRID, colLetter, cellKey, shipFootprint, placementError, blockedCells,
+  GRID, colLetter, coordLabel, cellKey, shipFootprint, placementError, blockedCells,
 } from '../lib/board.js';
 
 const SHIP_NAMES = { 2: 'Cutter', 3: 'Frigate', 4: 'Galleon', 5: 'Man o’ War' };
@@ -174,13 +174,23 @@ export default function FleetPlacer({ teamId, teamName, fleet, onPlaced }) {
                   isPreview ? (preview.error ? 'preview-bad' : 'preview') : '',
                   !isShip && !isPreview && noGo.has(key) ? 'no-go' : '',
                 ].filter(Boolean).join(' ');
+                const label = coordLabel(row, col);
                 return (
                   <button
                     key={key}
                     className={cls}
+                    title={label}
                     onMouseEnter={() => setHover({ row, col })}
                     onClick={() => onCellClick(row, col)}
-                  />
+                  >
+                    {/* Same coordinate the rest of the app speaks in. A captain
+                        arranging hulls is reading positions off a board they
+                        will later discuss out loud — "we're hit at C7" — and the
+                        axis strips alone make you count across to work that out.
+                        Hidden under a placed hull, which has its own colour to
+                        show and needs no label. */}
+                    {!isShip && <span className="coord-label">{label}</span>}
+                  </button>
                 );
               }),
             ];

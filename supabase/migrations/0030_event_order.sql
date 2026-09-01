@@ -1,0 +1,29 @@
+-- Two events from one shot must not share a timestamp.
+--
+-- Spotted while watching a simulated match: a ship appeared to sink before the
+-- shot that sank it. The ordering was not wrong so much as undefined.
+--
+-- `created_at` defaulted to now(), and now() in Postgres is the START OF THE
+-- TRANSACTION — one value for every statement in it, however many. fire_tile()
+-- inserts `shot_fired` and then, if the last cell of a hull goes, `ship_sunk`,
+-- both inside the same transaction. So both rows carried the same value to the
+-- microsecond:
+--
+--   ship_sunk    2026-09-01 18:35:43.144951+00
+--   shot_fired   2026-09-01 18:35:43.144951+00
+--
+-- The feed orders by created_at alone (newest first, EventFeed.jsx). With a tie
+-- there is nothing to order on, so which line lands on top is whatever the
+-- planner happens to return — stable enough to look fine for a while, and free
+-- to flip at any point. The same tie sits between `shot_fired` and `game_won`
+-- at the end of a match, where the victory can render below the winning shot.
+--
+-- clock_timestamp() reads the wall clock at each statement instead, so events
+-- written in one transaction come out distinct and in the order they happened.
+--
+-- Only new rows are affected; ties already recorded stay tied. A bigserial
+-- ordering column would be sturdier still — immune to a clock adjustment — but
+-- that means changing the feed query, the realtime path and every consumer, for
+-- an ordering guarantee this already provides.
+
+alter table game_events alter column created_at set default clock_timestamp();
