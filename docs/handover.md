@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0027` are applied to the live project.
+`0001` through `0029` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -88,6 +88,8 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through |
 | `0026_sunk_from_cells.sql` | `ship_status` decides `sunk` from the cells a ship occupies rather than the stored `ships.size`, counting DISTINCT hit cells with `>=`; `fire_tile` announces the derived size; `assert_fleets_consistent` added and called from `start_game` |
 | `0027_fire_only_while_active.sql` | A shot may only be fired while the game is `active`. `fire_tile`, `add_evidence` and `complete_tile_early` all refuse once a game is finished, and the winner update is narrowed to `status = 'active'` so a win cannot overwrite a win |
+| `0028_claim_released_event_type.sql` | Adds the `claim_released` event type (separate file for the same reason as 0008, 0012, 0015 and 0018) |
+| `0029_admin_release_claim.sql` | `admin_release_claim` — an organiser gives a team back a slot on a tile it cannot finish. Deletes the claim (so the square is lockable again), refuses a fired one, and emits `claim_released` |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -158,6 +160,12 @@ All in the app, signed in as the admin:
    Fleets card is a read-only live overview of both boards
 7. **Start game** — refuses without 2 teams, 100 tiles and 2 complete fleets
 8. **Score** — read-only scoreboard. Every hit is one point; nothing else scores
+
+If a team locks in a square it cannot finish, **do not reset the game** — open
+**Boards**, click the gold square, and press **Release this tile**. That is the
+small tool for the small problem: it hands back the one slot, puts the square
+back on the board, and touches nothing else. It also deletes that tile's
+submitted screenshots, and says how many before you confirm.
 
 If it goes wrong mid-match, **Reset to placement** rolls the game back without
 losing the tiles or the roster — the two things that take real time to set up.
@@ -315,21 +323,18 @@ the raw wiki renders are 100-1280px and average 92 KB against roughly 4 KB here.
 
 Roughly in priority order:
 
-0. **A locked-in tile cannot be released.** There is no `unclaim` RPC anywhere,
-   and no UI for one. A tile leaves `active` only by firing, which needs its
-   full evidence count. So a team that locks in a square it cannot actually
-   finish has lost one of its two slots for good — and two such squares and
-   **that team is out of the game**. The only ways back are
-   `complete_tile_early` (flagged tiles only), `admin_reset_game` (which
-   destroys every locked-in tile, the feed and the score), or hand-written SQL
-   on the night.
+0. ~~**A locked-in tile cannot be released.**~~ **Done** — see 0028/0029. A tile
+   used to leave `active` only by firing, which needs its full evidence count,
+   so a team that locked in a square it could not finish had lost a slot for
+   good — and two of them and that team was out of the game.
 
-   Found by simulation, not yet fixed, because it is a design decision rather
-   than a bug: an admin-only release is safe, while letting a captain drop a
-   square themselves turns lock-in into a way to *read* a tile name and then
-   back out, which leaks secret #2. Admin-only, emitting a `game_event` so open
-   screens refresh, is the recommendation. Worth doing before a real event —
-   "we misread the tile and locked in the wrong square" is going to happen.
+   `admin_release_claim` gives the slot back, from the organiser's **Boards**
+   card: click the gold square, read the evidence, press **Release this tile**.
+
+   **Admin only, and it must stay that way.** A captain able to drop their own
+   square could lock in, read the name through `tiles_for_me`, release, and
+   repeat — secret #2 handed over a square at a time, for free. Requiring an ask
+   keeps the cost.
 
 1. ~~**Real tile content.**~~ **Done.** The 100 V4 tiles are loaded into Demo
    Match. Names only, no `rules` — the source list did not have any.
@@ -1122,3 +1127,67 @@ approaching.
   with everything else here, no player session has been driven through it.
 - Everything already on the "not verified" list above: a real handset, touch
   fleet placement, and a full game played by two actual people.
+
+---
+
+## Session log — 2026-09-01 (later), giving a slot back
+
+`admin_release_claim`, migrations 0028 (the event type) and 0029 (the RPC),
+closing gap 0 from earlier the same day.
+
+**Why an organiser and not a captain.** Locking in a tile reveals its name to
+that team through `tiles_for_me`. If a captain could drop the square again, the
+loop is: lock in, read the name, release, repeat — the whole task list, a square
+at a time, for nothing. Having to ask an organiser is what keeps it expensive,
+and the release lands in the feed where somebody notices it. This is the one
+decision in the feature; everything else follows from it.
+
+**It deletes the claim rather than flagging it.** That restores the state before
+the lock-in exactly: the slot is free, `unique (team_id, tile_id)` no longer
+blocks the square, and nothing phantom is left for `team_scores` or
+`tiles_for_me` to trip over. A third `claim_status` value would have meant
+revisiting every `status = 'active'` filter in the schema — the active-limit
+trigger, `team_scores`, `tiles_for_me`, `admin_tile_progress` — which is not a
+change to make with an event approaching.
+
+Two consequences, both deliberate:
+
+- `tile_evidence.claim_id` is ON DELETE CASCADE, so the tile's screenshots go
+  with it. The RPC counts them first and returns the number, and the console
+  prints it in the confirmation, so nobody destroys six uploads thinking they
+  are freeing an empty slot. Player-facing immutability is unchanged:
+  `tile_evidence` still has no delete policy at all.
+- The storage objects behind those rows stay in the bucket, orphaned. Harmless
+  at event scale, and deleting them properly belongs to the storage API.
+
+A **fired** claim is refused outright — releasing one would silently undo a shot,
+and with it a hit, a sinking, possibly a win.
+
+**Verified against the live database, rolled back.** A team was deliberately
+stranded — both slots held, two of three screenshots on one, a third lock-in
+correctly refused — and then: both captains refused ("Admins only"), the admin
+released the tile and got back `position=55, evidence deleted=2`, the claim row
+was gone, its evidence had cascaded, the team was down to one held slot, it
+could lock in a fresh square, and the released square could be locked in again.
+A fired tile was refused, a nonexistent claim was refused, two `claim_released`
+events were emitted, and no tile name reached the world-readable payload:
+
+```json
+{"by": "…", "tile_id": "…", "position": 55, "evidence_deleted": 2}
+```
+
+**The console.** The button sits under the evidence panel in **Boards**, not on
+the square itself, so the organiser has looked at what they are about to destroy
+before they can press it. It renders only for a tile still being worked.
+
+### Verified in a browser, at last
+
+The lock-in vocabulary was confirmed on a running dev server in a real player
+session (Soft Papi, Demo Alpha, the scratch game): the empty slot reads *"Empty
+slot — lock in a tile on the enemy board"*, the legend reads *"locked in, not
+yet fired"*, and the feed reads *"Demo Alpha locked in a tile at D2."*
+
+Still unverified: the **admin** half of this session's work — the Release button
+and the finished-game gate — because there is no admin password in this repo and
+the session that wrote it only ever had a player's browser. Both are covered
+server-side by tests that did run.

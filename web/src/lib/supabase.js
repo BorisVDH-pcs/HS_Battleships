@@ -107,8 +107,22 @@ export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 
 /**
- * Roll a game back to placement. Keeps the tiles and the roster; clears claims,
- * the feed, manual score adjustments, the winner, and (by default) the fleets.
+ * Roll a game back to preparation. Keeps the tiles and the roster; clears
+ * locked-in tiles, the feed, manual score adjustments, the winner, and (by
+ * default) the fleets.
  */
 export const adminResetGame = (gameId, clearFleets = true) =>
   rpc('admin_reset_game', { p_game_id: gameId, p_clear_fleets: clearFleets });
+
+/**
+ * Give a team its slot back on a tile it cannot finish (0029).
+ *
+ * Admin only, and deliberately so: a captain able to drop their own square could
+ * lock in, read the tile name, release, and repeat, which hands over the task
+ * list a square at a time. The claim is deleted rather than flagged, so the
+ * square becomes lockable again — and its submitted screenshots go with it.
+ * Returns `{ released, position, evidence_deleted }`; show that count before
+ * confirming. A fired tile is refused.
+ */
+export const adminReleaseClaim = (claimId) =>
+  rpc('admin_release_claim', { p_claim_id: claimId });

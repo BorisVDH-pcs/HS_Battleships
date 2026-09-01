@@ -25,6 +25,10 @@ export default function EventFeed({ events, teams, myTeamId }) {
         return 'The game has begun — fleets are locked.';
       case 'tile_claimed':
         return `${who} locked in a tile${at ? ` at ${at}` : ''}.`;
+      case 'claim_released':
+        // Says an organiser did it, because a tile going back on the board with
+        // no explanation reads like a bug to whoever is watching the feed.
+        return `An admin released ${who}'s tile${at ? ` at ${at}` : ''}.`;
       case 'shot_fired':
         return `${who} fired${at ? ` at ${at}` : ''} — ${e.payload?.result === 'hit' ? 'HIT' : 'miss'}.`;
       case 'ship_sunk':

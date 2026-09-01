@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase, adminListShipCells } from '../lib/supabase.js';
+import { supabase, adminListShipCells, adminReleaseClaim } from '../lib/supabase.js';
 import EvidencePanel from './EvidencePanel.jsx';
+import { useConfirm } from './ConfirmDialog.jsx';
 import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board.js';
 
 /**
@@ -30,6 +31,8 @@ export default function AdminOverview({ gameId, teams }) {
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
   const panelRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -102,6 +105,37 @@ export default function AdminOverview({ gameId, teams }) {
   }
 
   const shown = selected ? evidence.filter((e) => e.claim_id === selected.claim_id) : [];
+
+  /**
+   * Hand a slot back. Names the square, the team and — the part worth reading
+   * twice — how many screenshots go with it, because the claim's evidence
+   * cascades and the count is the thing an organiser will regret not seeing.
+   */
+  async function release(cell) {
+    const at = coordLabel(fromPosition(cell.position).row, fromPosition(cell.position).col);
+    const n = shown.length;
+    if (!(await confirm(
+      `${at} — "${cell.tile_name}" goes back on the board and ${cell.team_name} ` +
+      'gets the slot back.\n' +
+      (n > 0
+        ? `Its ${n} submitted screenshot${n === 1 ? '' : 's'} will be deleted with it.\n`
+        : 'Nothing has been submitted for it yet.\n') +
+      '\nThis cannot be undone.',
+      { title: `Release ${at}?`, confirmLabel: 'Release it', danger: true }
+    ))) return;
+
+    setReleasing(true);
+    try {
+      await adminReleaseClaim(cell.claim_id);
+      setSelected(null);
+      await load();
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReleasing(false);
+    }
+  }
 
   return (
     <>
@@ -236,8 +270,30 @@ export default function AdminOverview({ gameId, teams }) {
             items={shown}
             onClose={() => setSelected(null)}
           />
+
+          {/* Only for a tile still being worked. A fired one is a shot that has
+              already counted, and the RPC refuses it too. Sits under the
+              evidence rather than on the square itself, so the organiser has
+              looked at what they are about to destroy before they can press
+              it. */}
+          {selected.status === 'active' && (
+            <p className="row" style={{ marginTop: '.6rem' }}>
+              <button
+                className="danger"
+                disabled={releasing}
+                onClick={() => release(selected)}
+              >
+                {releasing ? 'Releasing…' : 'Release this tile'}
+              </button>
+              <span className="muted">
+                Gives {selected.team_name} the slot back. The square can be
+                locked in again — by either team.
+              </span>
+            </p>
+          )}
         </div>
       )}
+      {confirmDialog}
     </>
   );
 }
