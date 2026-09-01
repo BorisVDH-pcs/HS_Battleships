@@ -7,7 +7,7 @@ import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
  * The two slots. Replaces the spreadsheet's L6 / N6 cells: a team may hold at
- * most `max_active_tiles` claimed-but-unfired tiles, enforced by a database
+ * most `max_active_tiles` locked-in-but-unfired tiles, enforced by a database
  * trigger rather than by checking whether two cells happen to be full.
  *
  * "Fire" means the team finished the tile's in-game task. The result comes back
@@ -16,7 +16,7 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * Drawn as cards rather than rows: these two tiles are the team's whole to-do
  * list, so they get the tile's own artwork at a size you can read across a
  * room, and an empty slot holds the same shape so the row does not jump as
- * tiles are claimed and fired.
+ * tiles are locked in and fired.
  */
 export default function ActiveTiles({
   tiles, maxActive, onFired, onRefresh, emptyHint, gameId, teamId, evidence = [],
@@ -85,7 +85,7 @@ export default function ActiveTiles({
             return (
               <article key={`empty${i}`} className="slot empty">
                 <div className="slot-art" aria-hidden="true" />
-                <p>{emptyHint ?? 'Empty slot — claim a tile on the enemy board.'}</p>
+                <p>{emptyHint ?? 'Empty slot — lock in a tile on the enemy board.'}</p>
               </article>
             );
           }
@@ -93,14 +93,14 @@ export default function ActiveTiles({
           const { row, col } = fromPosition(tile.position);
           const label = coordLabel(row, col);
           const mine = byClaim.get(tile.claim_id) ?? [];
-          // required_evidence is redacted for unclaimed tiles, but a tile in a
-          // slot is claimed by definition, so the fallback is belt and braces.
+          // required_evidence is redacted for tiles nobody has locked in, but one in
+          // a slot is locked in by definition, so the fallback is belt and braces.
           const required = tile.required_evidence ?? 1;
           const ready = mine.length >= required;
 
           return (
             <article key={tile.id} className="slot filled">
-              {/* A claimed tile always has its name; the artwork is optional,
+              {/* A locked-in tile always has its name; the artwork is optional,
                   so an undrawn tile borrows the stand-in, exactly as it does on
                   the board itself. */}
               <div className="slot-art">

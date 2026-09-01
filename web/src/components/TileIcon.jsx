@@ -3,15 +3,15 @@ import { useState } from 'react';
 /**
  * A tile's icon, with a stand-in behind it and the coordinate behind that.
  *
- * `slug` is null for any tile this team has not claimed — `tiles_for_me()`
+ * `slug` is null for any tile this team has not locked in — `tiles_for_me()`
  * redacts it exactly as it redacts the name. That redaction is also why the
- * images cannot leak: with no slug there is no filename, so an unclaimed tile
+ * images cannot leak: with no slug there is no filename, so a tile nobody has
  * produces no request and shows up nowhere in the network log. `standIn` is
- * what separates the two reasons a slug can be missing: an unclaimed tile has
- * none because it is secret, a claimed one because nobody has drawn it yet.
+ * what separates the two reasons a slug can be missing: a tile nobody locked in
+ * has none because it is secret, a locked-in one because nobody drew it yet.
  *
- * Ten of the ninety tiles have artwork so far, so most claimed tiles would
- * otherwise fall back to a coordinate and look exactly like the unclaimed ones
+ * Ten of the ninety tiles have artwork so far, so most locked-in tiles would
+ * otherwise fall back to a coordinate and look exactly like the untouched ones
  * around them. They borrow the dragon warhammer instead: obviously a
  * placeholder once real art lands beside it, and until then the board reads as
  * a board of items.

@@ -10,10 +10,11 @@ import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
 import TileBoard from './TileBoard.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
+import { statusLabel } from '../lib/status.js';
 
 const STEP_HINT = {
-  setup:     'Add the 100 tiles, then open placement.',
-  placement: 'Place both fleets, then start the game.',
+  setup:     'Add the 100 tiles, then open preparation.',
+  placement: 'Place both fleets, then start the game.',   // status value is still `placement`
   active:    'The game is running.',
   finished:  'This game is over.',
 };
@@ -114,7 +115,7 @@ export default function Admin() {
               <li key={g.id} className={g.id === gameId ? 'on' : ''}>
                 <div>
                   <strong>{g.name}</strong>{' '}
-                  <span className={`pill ${g.status}`}>{g.status}</span>
+                  <span className={`pill ${g.status}`}>{statusLabel(g.status)}</span>
                   <div className="meta">{names.join(' vs ') || 'no teams'}</div>
                 </div>
                 <div className="row">
@@ -125,12 +126,12 @@ export default function Admin() {
                     className="danger"
                     disabled={busy}
                     onClick={async () => {
-                      // Deleting cascades to tiles, claims and the event feed, so
+                      // Deleting cascades to tiles, locked-in tiles and the event feed, so
                       // make the caller name the game rather than trusting a click.
                       // The dialog holds its confirm button disabled until the
                       // name matches, so there is no mismatch to report anymore.
                       if (!(await confirm(
-                        `Delete "${g.name}" and everything in it — the 100 tiles, every claim, the roster and the feed.`,
+                        `Delete "${g.name}" and everything in it — the 100 tiles, every locked-in tile, the roster and the feed.`,
                         {
                           title: 'Delete this game?',
                           confirmLabel: 'Delete it',
@@ -154,14 +155,14 @@ export default function Admin() {
       {game && (
         <>
           <section className="card">
-            <h2>{game.name} — {game.status}</h2>
+            <h2>{game.name} — {statusLabel(game.status)}</h2>
             <p className="muted">{STEP_HINT[game.status]}</p>
             <div className="row">
               <button
                 disabled={busy || game.status !== 'setup'}
-                onClick={() => run(() => adminOpenPlacement(game.id), 'Placement is open.')}
+                onClick={() => run(() => adminOpenPlacement(game.id), 'Preparation is open.')}
               >
-                Open placement
+                Open preparation
               </button>
               <button
                 disabled={busy || game.status !== 'placement'}
@@ -180,12 +181,12 @@ export default function Admin() {
                   disabled={busy}
                   onClick={async () => {
                     if (!(await confirm(
-                      'Cleared: every claim and shot, the activity feed, manual score ' +
+                      'Cleared: every locked-in tile and shot, the activity feed, manual score ' +
                       'adjustments, the winner, and both fleets.\n' +
                       'Kept: the 100 tiles and the roster.\n\n' +
                       'This cannot be undone.',
                       {
-                        title: `Reset "${game.name}" to placement?`,
+                        title: `Reset "${game.name}" to preparation?`,
                         confirmLabel: 'Reset it',
                         danger: true,
                       }
@@ -194,14 +195,14 @@ export default function Admin() {
                         'Game reset. Fleets need placing again.');
                   }}
                 >
-                  Reset to placement
+                  Reset to preparation
                 </button>
                 <button
                   className="ghost"
                   disabled={busy}
                   onClick={async () => {
                     if (!(await confirm(
-                      'Cleared: every claim and shot, the activity feed, manual score ' +
+                      'Cleared: every locked-in tile and shot, the activity feed, manual score ' +
                       'adjustments, and the winner.\n' +
                       'Kept: the 100 tiles, the roster, and both fleets as placed.\n\n' +
                       'This cannot be undone.',
@@ -259,8 +260,8 @@ export default function Admin() {
             <h2>Boards</h2>
             <p className="muted">
               One board per team, showing the game from that team’s side: the
-              opponent’s ships they are hunting, and their own claims and shots
-              on top. A claimed square shows its evidence count — 1/3 is a team
+              opponent’s ships they are hunting, and their own locked-in tiles and shots
+              on top. A locked-in square shows its evidence count — 1/3 is a team
               mid-task — and clicking one opens what they have submitted for it.
             </p>
             <AdminOverview gameId={game.id} teams={gameTeams} />
@@ -380,7 +381,7 @@ function Tiles({ game, tiles, busy, onSave }) {
       )}
 
       {locked ? (
-        <p className="muted">Tiles are locked once the game is {game.status}.</p>
+        <p className="muted">Tiles are locked once the game is {statusLabel(game.status)}.</p>
       ) : (
         <>
           {tiles.length === 0 && (

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * that apart from someone pressing Cancel, so the action silently does nothing.
  *
  * That mattered more here than it usually would, because both halves of the
- * player loop were gated on it: claiming a tile, and the submit that fires the
+ * player loop were gated on it: locking in a tile, and the submit that fires the
  * shot. Worse, the gate was asymmetric -- a submit that does not complete a
  * tile never asked -- so a player in an in-app browser could upload the first
  * two pieces of evidence normally and then find the third silently refusing,
@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *
  * Promise-based, so the call sites keep the shape they already had:
  *
- *   if (!(await confirm('Claim A1?'))) return;
+ *   if (!(await confirm('Lock in A1?'))) return;
  *
  * `requireText` reproduces the type-the-name guard that game deletion used
  * window.prompt for. It is slightly stricter than the original: the confirm

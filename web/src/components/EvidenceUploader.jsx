@@ -63,7 +63,7 @@ export default function EvidenceUploader({
     setBusy(true);
     setError(null);
     try {
-      // Sequentially: parallel uploads racing the same claim is a good way to
+      // Sequentially: parallel uploads racing the same locked-in tile is a good way
       // sail past the required count and confuse the person doing it.
       let last = null;
       for (const file of staged) {

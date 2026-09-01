@@ -4,17 +4,17 @@ import TileIcon from './TileIcon.jsx';
 
 /**
  * The enemy board: 100 tiles labelled A1..J10. A tile shows only its coordinate
- * until this team claims it — the task itself stays hidden server-side (see
+ * until this team locks it in — the task itself stays hidden server-side (see
  * `tiles_for_me`). Fired tiles show the hit/miss they produced.
  *
  * The coordinate rather than the 1..100 position, because that is what people
  * say out loud and type into Discord, and it matches the axes and the feed.
  *
- * A claimed tile shows its icon instead of the coordinate. `tiles_for_me`
- * nulls the icon exactly as it nulls the name, so an unclaimed tile has no
+ * A locked-in tile shows its icon instead of the coordinate. `tiles_for_me`
+ * nulls the icon exactly as it nulls the name, so a tile nobody has locked in has no
  * filename to render and none to request.
  *
- * A square this team has claimed stays clickable after the claim: pressing it
+ * A square this team has locked in stays clickable afterwards: pressing it
  * opens the evidence they have submitted for it. That is the only way back to a
  * screenshot once a tile has been fired — the uploader is gone by then, and the
  * tile is just a mark on the board.
@@ -61,7 +61,7 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                   }
                   title={tile.revealed
                     ? `${label} — ${tile.name} · see evidence`
-                    : `${label} — not yet claimed`}
+                    : `${label} — not yet locked in`}
                   onClick={() => (tile.revealed ? onInspect?.(tile) : onClaim(tile))}
                 >
                   {/* A fired square keeps its picture. The result is carried

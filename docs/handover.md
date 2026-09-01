@@ -1,6 +1,6 @@
 # Handover — HS_Battleships
 
-Current as of **2026-08-31**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
+Current as of **2026-09-01**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
 Boris or by another session with no memory of this one.
 
 ---
@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0026` are applied to the live project.
+`0001` through `0027` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -87,6 +87,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0024_one_team_per_game.sql` | `my_team_in_game()`, and `tiles_for_me` / `my_evidence` / `claim_tile` scoped through it, so a player sitting in both teams of one game no longer sees the two sides merged |
 | `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through |
 | `0026_sunk_from_cells.sql` | `ship_status` decides `sunk` from the cells a ship occupies rather than the stored `ships.size`, counting DISTINCT hit cells with `>=`; `fire_tile` announces the derived size; `assert_fleets_consistent` added and called from `start_game` |
+| `0027_fire_only_while_active.sql` | A shot may only be fired while the game is `active`. `fire_tile`, `add_evidence` and `complete_tile_early` all refuse once a game is finished, and the winner update is narrowed to `status = 'active'` so a win cannot overwrite a win |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -313,6 +314,22 @@ the raw wiki renders are 100-1280px and average 92 KB against roughly 4 KB here.
 ## Known gaps / next steps
 
 Roughly in priority order:
+
+0. **A locked-in tile cannot be released.** There is no `unclaim` RPC anywhere,
+   and no UI for one. A tile leaves `active` only by firing, which needs its
+   full evidence count. So a team that locks in a square it cannot actually
+   finish has lost one of its two slots for good — and two such squares and
+   **that team is out of the game**. The only ways back are
+   `complete_tile_early` (flagged tiles only), `admin_reset_game` (which
+   destroys every locked-in tile, the feed and the score), or hand-written SQL
+   on the night.
+
+   Found by simulation, not yet fixed, because it is a design decision rather
+   than a bug: an admin-only release is safe, while letting a captain drop a
+   square themselves turns lock-in into a way to *read* a tile name and then
+   back out, which leaks secret #2. Admin-only, emitting a `game_event` so open
+   screens refresh, is the recommendation. Worth doing before a real event —
+   "we misread the tile and locked in the wrong square" is going to happen.
 
 1. ~~**Real tile content.**~~ **Done.** The 100 V4 tiles are loaded into Demo
    Match. Names only, no `rules` — the source list did not have any.
@@ -1004,3 +1021,104 @@ unfired and re-fired: `shot_fired` hit at position 14, immediately followed by
   `freeze_fleet_after_placement` correctly rejects writes to `ships` while a
   game is active. Reset that game to placement and the same statement works, or
   simply re-place Bravo's fleet through the UI, which writes correct sizes.
+
+---
+
+## Session log — 2026-09-01, a simulated match, and the win it gave away
+
+The first full game-to-a-winner this project has ever played. Driven from SQL
+rather than a browser, but through the real RPCs with `auth.uid()` set to real
+accounts, and every write inside a transaction that was rolled back — nothing
+was persisted to Demo Match or the scratch game.
+
+**Game one, played to a result.** Create → 100 tiles (1–3 evidence each, nine
+flagged early) → roster → both fleets placed by their captains → start → **47
+lock-ins and 47 shots** → Alpha wins 17–12. Both completion routes exercised,
+and a plain member uploading against the captain's locked-in tile.
+
+Everything held. Every shot result matched the ground-truth fleet position; no
+premature fires; zero tiles left fully evidenced but still active; `ship_status`
+sizes matched actual cell counts on all ten ships; eight `ship_sunk` events for
+eight sunk ships; one `tile_claimed` and one `shot_fired` per claim; both scores
+equalled the true hit count; no coordinates anywhere in the feed. Every guard
+refused what it should: non-captain placement, touching ships, off-grid ships,
+wrong fleet sizes, starting with a fleet missing, a non-admin starting,
+placement once active, a third concurrent lock-in, the opponent evidencing our
+tile, a mismatched evidence path, early completion on a single-route tile,
+re-firing, and evidence on a fired tile.
+
+**The two secrets held, tested as a real `authenticated` role with RLS live**
+rather than as the service role: direct reads of `tiles`, the enemy `ships`,
+`ship_cells`, enemy `ship_status` and enemy evidence all returned **0 rows**,
+and `tiles_for_me` returned 100 rows, 100 distinct positions, revealing exactly
+17 names against 17 lock-ins.
+
+### The bug: the losing team could take the win
+
+`claim_tile` checks the game is `active`. `fire_tile` never did. So a tile
+locked in *before* the match ended stayed fireable afterwards, through all three
+routes — `add_evidence`, `complete_tile_early`, and the rescue Fire button — and
+the winner update ran unconditionally, overwriting whoever had already won.
+
+Reproduced deliberately: Bravo was left one cell short, holding an open lock-in.
+Alpha completed its hunt and won. Bravo then submitted the evidence it had
+already been working on:
+
+```
+before:  status=finished  winner=Sim Alpha
+after:   status=finished  winner=Sim Bravo
+```
+
+Two `game_won` events, and a 17–17 scoreboard.
+
+Not a corner case. Each team may hold two open tiles, so both sides are nearly
+always carrying live ones at the moment somebody wins — and `ActiveTiles` was
+rendered in **every** status, upload controls and all. A team finishing an
+upload ten seconds after losing rewrote the result, with nobody doing anything
+unusual.
+
+**Fixed by 0027 plus one frontend gate.** The guard goes in `fire_tile`, which
+all three routes funnel through; `add_evidence` and `complete_tile_early` check
+too, so a team that is too late is told before it uploads rather than after; and
+the winner update is narrowed to `where id = ... and status = 'active'`, with
+the `game_won` event moved inside `if found` so it cannot fire twice.
+`ActiveTiles` is now hidden once the game is `finished`.
+
+Verified by replaying the same scenario against the live database, rolled back:
+all three routes refused, ordinary play unaffected (16 hits landed normally
+first), the winner unchanged, and exactly one `game_won` event.
+
+> **Trap.** The bug needed *two* things to be true, and only one of them was in
+> the RPC. The server let the shot through, and the client kept offering it.
+> Either alone would have been survivable; together they made a lost game
+> winnable by carrying on as normal. Worth remembering when reading a guard:
+> ask what the page is still showing, not only what the function permits.
+
+### Vocabulary: lock in, and preparation
+
+On Boris's instruction, players no longer "claim" a tile — they **lock in** a
+tile — and the phase before the game is **preparation**, not placement.
+
+This is a rename of the words, not of the schema. `tile_claims`, `claim_tile`,
+`tile_claimed` and the `placement` value of `game_status` are all unchanged,
+because renaming an enum value would break every `= 'placement'` comparison in
+the PL/pgSQL guards at once — `place_fleet`, `start_game`, `admin_set_tiles`,
+`admin_open_placement`, `admin_reset_game` and both freeze triggers — and the
+architecture is frozen until the event is over.
+
+`lib/status.js` holds the one translation, `statusLabel()`, and every screen
+that prints a raw status goes through it, so the two cannot drift. Comments that
+describe what a *player* does now say "lock in"; comments naming a database
+object still say claim, because that is still its name.
+
+If the schema rename is ever wanted, it is a single migration renaming the enum
+value and rewriting the seven function bodies that compare against it, plus a
+coordinated frontend deploy — and it should not be attempted with an event
+approaching.
+
+### Still not verified
+
+- **The fix in a browser.** 0027 is applied and the gate is committed, but as
+  with everything else here, no player session has been driven through it.
+- Everything already on the "not verified" list above: a real handset, touch
+  fleet placement, and a full game played by two actual people.

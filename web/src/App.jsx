@@ -15,6 +15,7 @@ import Wordmark from './components/Wordmark.jsx';
 import EvidencePanel from './components/EvidencePanel.jsx';
 import BoardLegend from './components/BoardLegend.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
+import { statusLabel } from './lib/status.js';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -27,7 +28,7 @@ export default function App() {
   // each of them half the page and left the cells too small to read the tile
   // art in. One at a time, full width.
   const [boardTab, setBoardTab] = useState('enemy');
-  // A claimed square the team has pressed to re-read its evidence. Held as an
+  // A locked-in square the team has pressed to re-read its evidence. Held as an
   // id rather than the row, so it survives a refresh of the tile list.
   const [openTileId, setOpenTileId] = useState(null);
   // Above the early returns below, with the rest of the hooks — useConfirm
@@ -108,13 +109,13 @@ export default function App() {
   if (!session) return <main className="app"><Login /></main>;
 
   async function onClaim(tile) {
-    // A grid cell is a small target, especially on a phone, and a claim is not
-    // free: it takes one of the team's active slots until the tile is fired.
-    // Firing already confirms in ActiveTiles; claiming should too.
+    // A grid cell is a small target, especially on a phone, and locking a tile
+    // in is not free: it takes one of the team's active slots until the tile is
+    // fired. Firing already confirms in ActiveTiles; locking in should too.
     const { row, col } = fromPosition(tile.position);
     if (!(await confirm(
-      `Claim ${coordLabel(row, col)}? It takes one of your active slots.`,
-      { title: `Claim ${coordLabel(row, col)}`, confirmLabel: 'Claim it' }
+      `Lock in ${coordLabel(row, col)}? It takes one of your active slots.`,
+      { title: `Lock in ${coordLabel(row, col)}`, confirmLabel: 'Lock it in' }
     ))) return;
 
     setBusyTileId(tile.id);
@@ -133,7 +134,11 @@ export default function App() {
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
-  const isPlacement = game.game?.status === 'placement';
+  // The database enum still calls this phase `placement`; the players call it
+  // preparation. Renaming the value itself would break every guard that
+  // compares against the string, so the rename is in the words, not the schema.
+  const isPreparation = game.game?.status === 'placement';
+  const isFinished = game.game?.status === 'finished';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
   const sunkCount = myFleet.filter((s) => s.sunk).length;
@@ -152,7 +157,7 @@ export default function App() {
       </header>
 
       {/* An admin has no team, so the player view would show them an empty
-          board and a claim button that cannot work. They get the organiser's
+          board and a lock-in button that cannot work. They get the organiser's
           console instead, which carries its own both-boards overview. */}
       {isAdmin && <Admin />}
 
@@ -179,7 +184,7 @@ export default function App() {
       {game.game && !waitingForTeam && (
         <>
           <p className="status">
-            <strong>{game.game.name}</strong> — {game.game.status}
+            <strong>{game.game.name}</strong> — {statusLabel(game.game.status)}
             {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
           </p>
 
@@ -193,7 +198,7 @@ export default function App() {
               once the game starts the name is settled. An admin can still
               rename either team from the console if one has to be fixed
               mid-event — rename_team itself has no phase guard. */}
-          {isPlacement && myRole === 'captain' && myTeam && (
+          {isPreparation && myRole === 'captain' && myTeam && (
             <section className="card">
               <h2>Your team</h2>
               <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
@@ -206,7 +211,7 @@ export default function App() {
               underneath them off the screen entirely. */}
           <Scoreboard scores={scores} myTeamId={myTeamId} />
 
-          {isPlacement && myTeamId && (
+          {isPreparation && myTeamId && (
             <CaptainPlacement
               isCaptain={myRole === 'captain'}
               teamId={myTeamId}
@@ -242,22 +247,31 @@ export default function App() {
 
             {/* Sits with the board rather than up by the score: what the team
                 is holding and where it can shoot belong together, and this
-                keeps it below the placement card during prep. */}
-            <ActiveTiles
-              tiles={tiles}
-              maxActive={maxActive}
-              gameId={gameId}
-              teamId={myTeamId}
-              evidence={evidence}
-              onRefresh={() => game.refresh()}
-              emptyHint={isPlacement
-                ? 'Nothing to claim until the game starts.'
-                : undefined}
-              onFired={(tile, result) => {
-                setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-                game.refresh();
-              }}
-            />
+                keeps it below the preparation card during prep.
+
+                Hidden once the game is finished. The slots carry working upload
+                controls, and a submit that completes a tile fires the shot — so
+                leaving them on screen after a result invited a team to finish a
+                tile it was still working on and fire into a match that was
+                already decided. 0027 refuses that server-side; this stops the
+                page offering it in the first place. */}
+            {!isFinished && (
+              <ActiveTiles
+                tiles={tiles}
+                maxActive={maxActive}
+                gameId={gameId}
+                teamId={myTeamId}
+                evidence={evidence}
+                onRefresh={() => game.refresh()}
+                emptyHint={isPreparation
+                  ? 'Nothing to lock in until the game starts.'
+                  : undefined}
+                onFired={(tile, result) => {
+                  setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                  game.refresh();
+                }}
+              />
+            )}
 
             {boardTab === 'enemy' ? (
               <>
@@ -272,7 +286,7 @@ export default function App() {
                 />
                 <BoardLegend view="enemy" />
                 {isActive && !canClaim && myTeamId && (
-                  <p className="muted">Both slots are full — fire one before claiming another.</p>
+                  <p className="muted">Both slots are full — fire one before locking in another.</p>
                 )}
                 {openTile && (
                   <EvidencePanel

@@ -10,7 +10,7 @@ import TileIcon from './TileIcon.jsx';
  * an admin can see both secrets; neither is reachable without `is_admin()`,
  * because both are fed by `admin_list_*` definer functions. Players get
  * `tiles_for_me()` instead, which nulls `name` and `icon` until a tile is
- * claimed — so nothing here may ever be rendered on a player's page.
+ * locked in — so nothing here may ever be rendered on a player's page.
  *
  * Two layouts, because they answer different questions. The grid answers
  * "what is at G7"; the list answers "did all 100 import correctly", which is
@@ -51,7 +51,7 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
 
       {view && (
         <p className="muted" style={{ marginTop: '.6rem' }}>
-          Admin only — these names are hidden from players until claimed.
+          Admin only — these names are hidden from players until they lock a square in.
         </p>
       )}
 

@@ -23,7 +23,7 @@ export default function BoardLegend({ view }) {
 
   return (
     <p className="legend">
-      <span className="key active" /> claimed, not yet fired
+      <span className="key active" /> locked in, not yet fired
       <span className="key hit dealt" /> your hit
       <span className="key miss" /> your miss
     </p>

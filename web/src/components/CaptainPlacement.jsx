@@ -2,7 +2,8 @@ import { useState } from 'react';
 import FleetPlacer from './FleetPlacer.jsx';
 
 /**
- * The placement phase, as a player sees it.
+ * The preparation phase, as a player sees it. (The database status is still
+ * spelled `placement`; see lib/status.js.)
  *
  * `place_fleet()` has allowed a captain since 0002 — until now only the admin
  * console ever called it, so the organiser had to position both fleets himself.
@@ -26,7 +27,7 @@ export default function CaptainPlacement({
   if (!isCaptain) {
     return (
       <section className="card">
-        <h2>Fleet placement</h2>
+        <h2>Fleet preparation</h2>
         <p className="muted">
           {done
             ? `Your captain has positioned the ${teamName} fleet. The game starts once both teams are ready.`

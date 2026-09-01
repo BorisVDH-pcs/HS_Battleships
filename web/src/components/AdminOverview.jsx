@@ -13,10 +13,10 @@ import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board
  *
  * A board is labelled with the team that SHOOTS at it, which is the board that
  * team is playing against: the opponent's hulls are the targets, and this team's
- * claims and shots are the marks on it. So Team Alpha's board carries Bravo's
+ * locked-in tiles and shots are the marks on it. So Team Alpha's board carries Bravo's
  * ships and Alpha's hits — read it and you are reading Alpha's game.
  *
- * Claimed squares are buttons. Clicking one opens the evidence submitted for it.
+ * Locked-in squares are buttons. Clicking one opens the evidence submitted for it.
  *
  * Every row here pairs a tile's name, or an enemy hull, with a team — precisely
  * what a player must never see. admin_tile_progress(), admin_list_ship_cells()
@@ -109,7 +109,7 @@ export default function AdminOverview({ gameId, teams }) {
         {teams.map((team) => {
           const enemy = teams.find((t) => t.id !== team.id);
 
-          // This team's own claims: what they have worked and fired.
+          // This team's own locked-in tiles: what they have worked and fired.
           const mine = new Map(
             rows.filter((r) => r.team_id === team.id).map((r) => [r.position, r])
           );
@@ -144,7 +144,7 @@ export default function AdminOverview({ gameId, teams }) {
                 {shipIds.size === 0
                   ? 'No fleet to shoot at yet.'
                   : `${sunk.length} of ${shipIds.size} sunk · ${hits.length} hits`}
-                {' · '}{claimed.length} claimed · {partial.length} part-done
+                {' · '}{claimed.length} locked in · {partial.length} part-done
               </p>
               <div className="board-grid">
                 <div className="corner" />
@@ -173,8 +173,8 @@ export default function AdminOverview({ gameId, teams }) {
                           ? <span className="mark">✸</span>
                           : <span className="mark">○</span>;
                       } else {
-                        // An unfired hull stays visible under a claim, so the
-                        // enemy fleet reads as a fleet however much is claimed.
+                        // An unfired hull stays visible under a locked-in tile, so
+                        // the enemy fleet reads as a fleet however much is taken.
                         if (isShip) cls += ' ship';
                         if (cell?.claim_id) {
                           const met = cell.evidence_count >= cell.required_evidence;
@@ -215,7 +215,7 @@ export default function AdminOverview({ gameId, teams }) {
         <span className="key ship" /> enemy ship afloat
         <span className="key hit dealt" /> hit
         <span className="key miss" /> miss
-        <span className="key active" /> claimed, not yet fired
+        <span className="key active" /> locked in, not yet fired
       </p>
 
       {selected && (
