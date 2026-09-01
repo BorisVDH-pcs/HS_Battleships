@@ -57,7 +57,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0031` are applied to the live project.
+`0001` through `0032` are applied to the live project.
 
 | File | What it does |
 |---|---|
@@ -92,6 +92,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0029_admin_release_claim.sql` | `admin_release_claim` — an organiser gives a team back a slot on a tile it cannot finish. Deletes the claim (so the square is lockable again), refuses a fired one, and emits `claim_released` |
 | `0030_event_order.sql` | `game_events.created_at` defaults to `clock_timestamp()` instead of `now()`. Two events written by one shot no longer share a timestamp, so the feed's order is defined rather than incidental |
 | `0031_three_active_tiles.sql` | Three active tiles per team instead of two: the column default, the `admin_create_game` argument default, and any game not yet under way. No application code changed — the limit was always read from `games.max_active_tiles` |
+| `0032_discord_relay.sql` | The Discord relay `game_events.relayed_at` was always for. `pg_net`, a locked-down `discord_webhooks` table, `discord_line()` (payload only — so it cannot name a tile), `relay_pending()` batching the backlog into one message, a deferred constraint trigger so a shot and its sinking arrive together, and `relay_reconcile()` to replay anything Discord refused. **The webhook URL is not in the repo** — it lives in `discord_webhooks` |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -1303,3 +1304,64 @@ once both fleets are placed. It is inconsistent with `admin_open_placement` and
 happen once, only from preparation, only with both fleets ready, and it records
 `by: auth.uid()` — but a player could start the game while a captain is still
 arranging hulls. One migration would close it.
+
+---
+
+## Session log — the Discord relay
+
+Built at last: `game_events.relayed_at` has existed since 0001 and
+architecture.md has described this since the rebuild. Gap 3 is closed.
+
+**Webhook, not a bot.** The traffic is one-way, so a bot's gateway connection,
+its always-on process and its server-scoped token would all be paid for and left
+unused. A webhook is a URL; if it leaks, the damage is "someone can post in that
+channel" rather than "someone can act as the game". A bot only earns its place
+if Discord ever needs to talk back — `/score`, reactions, mirrored uploads.
+
+**Secret #2 protects itself, structurally.** `discord_line()` builds its message
+from the event payload alone, and payloads carry `position` but never a tile's
+name or icon. The relay cannot leak the task list because there is nothing in its
+input to leak. If anyone ever joins `discord_line()` to `tiles` to make a message
+read better, that property is gone — don't.
+
+**Where the URL lives.** In `discord_webhooks`, RLS on with no policies, and
+`revoke all` from anon and authenticated on top. Verified as a real player:
+selecting from `discord_webhooks`, selecting from `discord_relay_log`, and
+calling `relay_pending()` are all `permission denied`. It must never become a
+`VITE_` variable — Vite inlines those into the public bundle, which would let any
+player post as the game. To rotate it, update the row; nothing else changes.
+
+**Why a deferred constraint trigger.** `fire_tile()` writes `shot_fired` and then
+`ship_sunk` in one transaction. A normal AFTER trigger runs on the first row
+before the second exists, so the shot and the sinking would arrive as two
+messages. `deferrable initially deferred` fires at commit, when both are visible,
+and `relay_pending()` sends them as one. It also batches under load: a Discord
+webhook allows roughly five requests per five seconds, and posting per row would
+spend that allowance on a single shot.
+
+The trigger body catches everything and downgrades it to a warning. It runs
+inside the transaction of the move that caused it, so an error there would roll
+back a player's shot because a chat service was having a bad day.
+
+**Relay accounting.** `relayed_at` is set when the request is queued, because
+that is the only moment the sending transaction knows about — pg_net is
+fire-and-forget. `discord_relay_log` records which events went in which request,
+and `relay_reconcile()` reads the outcomes back out of `net._http_response`,
+un-marking anything Discord refused so the next flush retries it. That is the
+replayable backlog architecture.md promises. Worth running on a schedule, or by
+hand after an event.
+
+**Tested end to end.** A real `game_reset` went through the trigger to the live
+channel: HTTP **204**, `relay_reconcile()` reporting 1 checked and 0 failed. The
+185 events already in the scratch game were marked relayed first — history is not
+news, and dumping it would have flooded the channel.
+
+### Not done
+
+- **No team-private webhook yet.** The table has a `game_id` and a `label` and
+  will hold more than one row, but only the general channel is wired. The Sheets
+  version also posted to a team channel that *did* name tiles; that would need a
+  second lookup and a message builder allowed to read `tiles` for one team only.
+  A team channel is anyway only as private as its membership list.
+- **No `@role` ping.** `teams.discord_role_id` exists and is unused.
+- **`relay_reconcile()` is manual.** pg_cron is available but not installed.
