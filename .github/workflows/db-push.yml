@@ -9,10 +9,9 @@ on:
     inputs:
       run_repair:
         description: >-
-          One-off: the previous repair (dc8c86d) wrongly marked 0034-0039 as
-          applied when they were never actually run. Type 'yes' to revert
-          just those six to unapplied and push for real. Remove this input
-          and the repair-history job once it has run successfully.
+          One-off. 'diagnose' dumps the real remote schema and migration
+          history (read-only, no changes) so we know ground truth instead of
+          guessing. Remove this input and the diagnose job once done.
         required: false
         default: "no"
 
@@ -51,8 +50,8 @@ jobs:
       - name: Push migrations
         run: supabase db push
 
-  repair-history:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'yes'
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'diagnose'
     runs-on: ubuntu-latest
     environment: supabase-production
     env:
@@ -69,11 +68,10 @@ jobs:
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
-      - name: Mark 0034-0039 as not yet applied
-        run: supabase migration repair --status reverted 0034 0035 0036 0037 0038 0039
+      - name: Migration history (local vs remote, per tracking table)
+        run: supabase migration list
 
-      - name: Preview migrations to apply
-        run: supabase db push --dry-run
-
-      - name: Push migrations for real
-        run: supabase db push
+      - name: Actual remote schema (ground truth, read-only)
+        run: |
+          supabase db dump --linked --schema public -f schema.sql
+          cat schema.sql
