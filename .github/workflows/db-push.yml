@@ -6,6 +6,16 @@ on:
     paths:
       - "supabase/migrations/**"
   workflow_dispatch:
+    inputs:
+      run_repair:
+        description: >-
+          One-off: repair migration history instead of pushing. Type 'yes' to
+          run it. Reconciles orphaned remote-only migration versions (applied
+          outside this workflow) with the local 0001-0039 files, which are
+          already reflected in the production schema. Remove this input and
+          the repair-history job once it has run successfully.
+        required: false
+        default: "no"
 
 # A bad migration mutates production data, so only ever run migrations
 # forward (never `supabase db reset`), and never let two pushes race.
@@ -15,6 +25,7 @@ concurrency:
 
 jobs:
   push:
+    if: github.event.inputs.run_repair != 'yes'
     runs-on: ubuntu-latest
     # Configure this environment under Settings -> Environments with a
     # required reviewer if you want a human approval gate before migrations
@@ -40,3 +51,45 @@ jobs:
 
       - name: Push migrations
         run: supabase db push
+
+  repair-history:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'yes'
+    runs-on: ubuntu-latest
+    environment: supabase-production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Mark orphaned remote-only versions as reverted
+        run: |
+          supabase migration repair --status reverted \
+            20260830151944 20260830152019 20260830152620 20260830154132 \
+            20260830161902 20260830165013 20260830173222 20260830173420 \
+            20260830175125 20260830175450 20260830180909 20260830180940 \
+            20260830191109 20260830193302 20260830193329 20260830200500 \
+            20260830202225 20260830202237 20260831060234 20260831172306 \
+            20260831172352 20260831173757 20260831180436 20260831184926 \
+            20260831194824 20260831195311 20260831202358 20260901170249 \
+            20260901173521 20260901173532 20260901184521 20260901185917 \
+            20260901193333
+
+      - name: Mark local migrations as already applied
+        run: |
+          supabase migration repair --status applied \
+            0001 0002 0003 0004 0005 0006 0007 0008 0009 0010 \
+            0011 0012 0013 0014 0015 0016 0017 0018 0019 0020 \
+            0021 0022 0023 0024 0025 0026 0027 0028 0029 0030 \
+            0031 0032 0033 0034 0035 0036 0037 0038 0039
+
+      - name: Preview pending migrations after repair
+        run: supabase db push --dry-run
