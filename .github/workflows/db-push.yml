@@ -10,8 +10,10 @@ on:
       run_repair:
         description: >-
           One-off. 'diagnose' dumps the real remote schema and migration
-          history (read-only, no changes) so we know ground truth instead of
-          guessing. Remove this input and the diagnose job once done.
+          history (read-only). 'fix-0033' reverts just 0033's falsely-applied
+          tracked status (confirmed via diagnose: evidence_submitted enum
+          value doesn't actually exist) then pushes 0033 and 0035-0040 for
+          real. Remove this input and both one-off jobs once done.
         required: false
         default: "no"
 
@@ -23,7 +25,7 @@ concurrency:
 
 jobs:
   push:
-    if: github.event.inputs.run_repair != 'diagnose'
+    if: github.event.inputs.run_repair != 'diagnose' && github.event.inputs.run_repair != 'fix-0033'
     runs-on: ubuntu-latest
     # Configure this environment under Settings -> Environments with a
     # required reviewer if you want a human approval gate before migrations
@@ -94,3 +96,30 @@ jobs:
 
           echo "=== tile_evidence full definition ==="
           sed -n '/CREATE TABLE "public"\."tile_evidence"/,/);/p' schema.sql
+
+  fix-0033:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'fix-0033'
+    runs-on: ubuntu-latest
+    environment: supabase-production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Mark 0033 as not yet applied
+        run: supabase migration repair --status reverted 0033
+
+      - name: Preview migrations to apply
+        run: supabase db push --dry-run
+
+      - name: Push migrations for real
+        run: supabase db push
