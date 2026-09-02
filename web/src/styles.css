@@ -823,6 +823,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .legend .key.hit       { background: var(--hit);    border-color: var(--hit-lit); }
 .legend .key.hit.sunk  { background: var(--dead);   border-color: var(--dead-lit); }
 .legend .key.hit.dealt { background: var(--strike); border-color: var(--strike-lit); }
+.legend .key.hit.dealt.sunk { background: var(--dead); border-color: var(--dead-lit); }
 .legend .key.miss      { background: var(--miss);   border-color: var(--miss-lit); }
 .legend .key.active    { background: var(--panel);  border-color: var(--gold); }
 
