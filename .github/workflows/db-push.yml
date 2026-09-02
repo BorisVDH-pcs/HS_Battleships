@@ -6,6 +6,15 @@ on:
     paths:
       - "supabase/migrations/**"
   workflow_dispatch:
+    inputs:
+      run_repair:
+        description: >-
+          One-off: the previous repair (dc8c86d) wrongly marked 0034-0039 as
+          applied when they were never actually run. Type 'yes' to revert
+          just those six to unapplied and push for real. Remove this input
+          and the repair-history job once it has run successfully.
+        required: false
+        default: "no"
 
 # A bad migration mutates production data, so only ever run migrations
 # forward (never `supabase db reset`), and never let two pushes race.
@@ -15,6 +24,7 @@ concurrency:
 
 jobs:
   push:
+    if: github.event.inputs.run_repair != 'yes'
     runs-on: ubuntu-latest
     # Configure this environment under Settings -> Environments with a
     # required reviewer if you want a human approval gate before migrations
@@ -39,4 +49,31 @@ jobs:
         run: supabase db push --dry-run
 
       - name: Push migrations
+        run: supabase db push
+
+  repair-history:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'yes'
+    runs-on: ubuntu-latest
+    environment: supabase-production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Mark 0034-0039 as not yet applied
+        run: supabase migration repair --status reverted 0034 0035 0036 0037 0038 0039
+
+      - name: Preview migrations to apply
+        run: supabase db push --dry-run
+
+      - name: Push migrations for real
         run: supabase db push
