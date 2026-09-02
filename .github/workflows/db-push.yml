@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   push:
-    if: github.event.inputs.run_repair != 'yes'
+    if: github.event.inputs.run_repair != 'diagnose'
     runs-on: ubuntu-latest
     # Configure this environment under Settings -> Environments with a
     # required reviewer if you want a human approval gate before migrations
@@ -74,4 +74,11 @@ jobs:
       - name: Actual remote schema (ground truth, read-only)
         run: |
           supabase db dump --linked --schema public -f schema.sql
-          cat schema.sql
+          echo "--- event_type enum values ---"
+          grep -A5 "CREATE TYPE \"public\".\"event_type\"" schema.sql || echo "(enum not found)"
+          echo "--- pet_jar tables ---"
+          grep -n "pet_jar_submissions\|pet_jar_previews" schema.sql || echo "(not found)"
+          echo "--- discord_webhooks.team_id / tile_evidence.public_url / pet_jar_submissions.public_url ---"
+          grep -n "team_id.*uuid\|public_url" schema.sql || echo "(not found)"
+          echo "--- teams.pet_jar_count ---"
+          grep -n "pet_jar_count" schema.sql || echo "(not found)"
