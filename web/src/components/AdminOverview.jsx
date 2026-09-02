@@ -168,6 +168,7 @@ export default function AdminOverview({ gameId, teams }) {
             shipCells.filter((c) => c.ship_id === id)
               .every((c) => hitAt(cellKey(c.row, c.col)))
           );
+          const sunkIds = new Set(sunk);
           const hits = [...hulls.keys()].filter(hitAt);
 
           return (
@@ -201,10 +202,14 @@ export default function AdminOverview({ gameId, teams }) {
 
                       if (cell?.status === 'fired') {
                         // Each board is labelled with the team doing the
-                        // shooting, so a hit is always their good news.
-                        cls += cell.result === 'hit' ? ' hit dealt' : ' miss';
+                        // shooting, so a hit is always their good news — unless
+                        // the whole ship under it is down, at which point it
+                        // stops burning and just goes dark like MyFleet's own
+                        // sunk squares.
+                        const shipDown = cell.result === 'hit' && sunkIds.has(hulls.get(cellKey(row, col)));
+                        cls += cell.result === 'hit' ? ` hit dealt${shipDown ? ' sunk' : ''}` : ' miss';
                         body = cell.result === 'hit'
-                          ? <span className="mark">✸</span>
+                          ? <span className="mark">{shipDown ? '☠' : '✸'}</span>
                           : <span className="mark">○</span>;
                       } else {
                         // An unfired hull stays visible under a locked-in tile, so
@@ -248,6 +253,7 @@ export default function AdminOverview({ gameId, teams }) {
       <p className="legend">
         <span className="key ship" /> enemy ship afloat
         <span className="key hit dealt" /> hit
+        <span className="key hit dealt sunk" /> ship sunk
         <span className="key miss" /> miss
         <span className="key active" /> locked in, not yet fired
       </p>
