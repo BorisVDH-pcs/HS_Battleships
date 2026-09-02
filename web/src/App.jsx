@@ -321,8 +321,6 @@ export default function App() {
               <div className="side-col">
                 <Scoreboard scores={scores} myTeamId={myTeamId} />
 
-                <StatsPanel gameId={gameId} teams={teams} myTeamId={myTeamId} />
-
                 {/* Hidden once the game is finished. The slots carry working
                     upload controls, and a submit that completes a tile fires
                     the shot — so leaving them on screen after a result
@@ -345,6 +343,11 @@ export default function App() {
                     }}
                   />
                 )}
+
+                {/* Below the active tiles rather than above: the two slots are
+                    the thing a player checks and acts on constantly, this is
+                    read-only context they check less often. */}
+                <StatsPanel gameId={gameId} teams={teams} myTeamId={myTeamId} />
 
                 {!isFinished && myTeamId && (
                   <PetJar

@@ -66,6 +66,14 @@
 
   --display: "Cinzel", Georgia, "Times New Roman", serif;
   --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Two feels, not one duration reused everywhere. --ease-out is the settle of
+     a critically-damped spring (no overshoot) for anything that just needs to
+     arrive gracefully. --ease-bounce carries a little overshoot, reserved for
+     moments something arrives with momentum behind it (a fired shot, a
+     materialising sheet) rather than every fade. */
+  --ease-out:    cubic-bezier(.22, 1, .36, 1);
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
 }
 
 * { box-sizing: border-box; }
@@ -84,7 +92,7 @@ body {
   min-height: 100vh;
 }
 
-.app { max-width: 1320px; margin: 0 auto; padding: 1.5rem; }
+.app { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
 
 /* ---- headings ---- */
 
@@ -195,16 +203,28 @@ h3 { font-size: .95rem; letter-spacing: .06em; color: var(--gold-dim); margin: 0
   font-size: .7rem;
   font-family: inherit;
   padding: 0;
-  transition: background .12s, border-color .12s, box-shadow .12s;
+  /* A shallow socket for the un-fired default state — it sits recessed into
+     the tray above, rather than flat paint. Every state below that carries
+     its own box-shadow (hit, miss, active, hover) overrides it outright. */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4);
+  transition: background .15s var(--ease-out), border-color .15s var(--ease-out),
+              box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
 }
 button.cell { cursor: default; }
 button.cell.claimable { cursor: pointer; color: var(--gold-dim); }
+/* Lift toward the pointer rather than just recolour — the raised state and
+   the glow together read as the cell coming up out of the tray to meet the
+   cursor. z-index keeps it clear of the neighbours it now slightly overlaps. */
 button.cell.claimable:hover {
   border-color: var(--gold);
   background: var(--panel-2);
   color: var(--gold-lit);
   box-shadow: var(--glow-sm);
+  transform: scale(1.06);
+  position: relative;
+  z-index: 1;
 }
+button.cell.claimable:active { transform: scale(.92); }
 button.cell:disabled { cursor: default; }
 
 .cell.ship   { background: var(--ship); border-color: var(--ship-lit); color: #cfe9db; }
@@ -228,6 +248,14 @@ button.cell:disabled { cursor: default; }
    reads as a splash in open water rather than another filled cell. */
 .cell.hit .mark  { font-size: 1.7em; line-height: 1; }
 .cell.miss .mark { font-size: .8em; line-height: 1; }
+/* The mark only exists once a shot has resolved, so it mounts fresh at the
+   moment of firing — the payoff a fired shot deserves, on the one glyph that
+   carries the result. */
+.cell .mark { animation: mark-in .3s var(--ease-bounce); }
+@keyframes mark-in {
+  from { opacity: 0; transform: scale(.4); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* A fired square keeps its artwork underneath. .cell is already a centred
    grid, so stacking is one shared grid area rather than absolute positioning
@@ -285,38 +313,84 @@ button.cell:disabled { cursor: default; }
 .fleet-status { color: var(--muted); font-size: .85rem; margin: 0; }
 
 /* Board centered, activity feed to its left, score + active tiles to its
-   right. The side columns are fixed-ish widths so the board keeps the most
-   room; below 1100px there isn't space for three columns at all, so it drops
-   to a single stack with the board first. */
+   right. The side columns are `fr`-based rather than a fixed pixel width, so
+   on a wide screen they grow with the page instead of leaving bare margin
+   either side of a narrow three-column strip; the board's own max-width
+   still caps how much of that growth it eats. Below 1100px there isn't space
+   for three columns at all, so it drops to a single stack with the board
+   first. */
 .board-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 2.6fr) minmax(260px, 1fr);
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
 }
 .board-layout .feed-col,
 .board-layout .board-col,
 .board-layout .side-col { min-width: 0; }
+/* The feed is the one column with no natural content to fill its height, so
+   it stretches to match whichever of the other two columns is tallest (in
+   practice, the board column) and gives its list the rest to scroll in,
+   rather than sitting on a fixed 640px guess. */
+.board-layout .feed-col { display: flex; flex-direction: column; }
+.board-layout .feed-col .feed { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 @media (max-width: 1100px) {
   .board-layout { grid-template-columns: 1fr; }
   .board-layout .board-col { order: 1; }
   .board-layout .side-col { order: 2; }
   .board-layout .feed-col { order: 3; }
+  .board-layout .feed-col { display: block; }
+  .board-layout .feed-col .feed { display: block; }
 }
 
 /* Capped rather than full-bleed. Across 1100px the cells reach ~105px and the
    64px tile art is being upscaled; at this width they land near 72px, which is
    about the size the icons were drawn for. */
-.board { max-width: 780px; margin-inline: auto; }
+/* The grid used to sit directly on the page background, so it read as a loose
+   scatter of tiles rather than a single object. A shallow recessed tray under
+   it — inset shadow, not a raised card — reads as a surface the pieces sit
+   *in*, the way felt does under real game pieces. */
+.board {
+  max-width: 780px; margin-inline: auto;
+  padding: .6rem;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--bg-lift), #0a0810);
+  box-shadow: inset 0 2px 14px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .02);
+  /* Enemy waters and your fleet are two different mounted components, not one
+     board with swapped content, so this fires fresh every tab switch — the
+     new tray settles into place instead of hard-cutting to the other view. */
+  animation: board-in .3s var(--ease-out);
+}
+@keyframes board-in {
+  from { opacity: 0; transform: translateY(4px) scale(.99); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* ---- active tiles ---- */
 
 .active-tiles { margin: 1.25rem 0; }
+.side-col { display: grid; gap: 1.1rem; align-content: start; }
+/* Each block in the side column reads as its own panel rather than text
+   floating loose against the page — the same card vocabulary the admin
+   console already uses, just with a little less padding since these sit in a
+   narrower column. */
 .side-col .scoreboard,
 .side-col .active-tiles,
 .side-col .pet-jar,
-.side-col .stats-panel { margin: 0; }
-.side-col { display: grid; gap: 1.25rem; }
+.side-col .stats-panel {
+  margin: 0;
+  padding: .85rem .9rem;
+  border: 1px solid var(--line);
+  border-top-color: var(--line-lit);
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(27, 22, 16, .55), rgba(20, 17, 12, .6));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .side-col .scoreboard,
+  .side-col .active-tiles,
+  .side-col .pet-jar,
+  .side-col .stats-panel { background: var(--panel); }
+}
 
 /* ---- stats panel ---- */
 
@@ -352,25 +426,29 @@ button.cell:disabled { cursor: default; }
 .pet-jar-previewed li { display: flex; align-items: center; gap: .5rem; font-size: .8rem; }
 .pet-jar-previewed .tile-icon { width: 28px; height: 28px; }
 
-/* Capped, not full-bleed: stretched across 1100px these two cards read as
-   banners rather than tiles, and the pair is easier to take in when it sits
-   at the width of the artwork it holds. */
+/* Stacked rather than side by side: the side column is narrow, and two cards
+   squeezed into it edge to edge left each one too tight to read the artwork
+   or the tile name comfortably. One above the other gives each slot the full
+   column width instead. */
 .slots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: .8rem;
-  max-width: 34rem;
-  margin-inline: auto;
 }
 .slot {
   display: flex;
   flex-direction: column;
   gap: .6rem;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: linear-gradient(180deg, rgba(27, 22, 16, .78), rgba(20, 17, 12, .82));
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
   border: 1px solid var(--line);
+  border-top-color: var(--line-lit);
   border-radius: 4px;
   padding: .8rem;
+  transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out), border-color .2s var(--ease-out);
 }
+.slot:not(.empty):hover { transform: translateY(-2px); border-color: var(--line-lit); box-shadow: var(--glow-sm); }
 
 /* An empty slot keeps the filled card's shape so the row does not resize as
    tiles are claimed and fired. */
@@ -437,8 +515,10 @@ button.cell:disabled { cursor: default; }
   font-size: .75rem;
   color: var(--muted);
   cursor: pointer;
-  transition: border-color .12s, color .12s, background .12s;
+  transition: border-color .15s var(--ease-out), color .15s var(--ease-out),
+              background .15s var(--ease-out), transform .1s var(--ease-out);
 }
+.evidence-drop:active { transform: scale(.98); }
 .evidence-drop:hover,
 .evidence-drop:focus,
 .evidence-drop:focus-visible { color: var(--gold-dim); border-color: var(--gold-deep); }
@@ -487,7 +567,16 @@ button.cell:disabled { cursor: default; }
    everything, and is height-capped with its own scroll so a long game does
    not keep growing the page underneath it. */
 .feed-col .feed { margin-top: 0; }
-.feed-col .feed ul { max-height: 640px; overflow-y: auto; }
+.feed-col .feed ul {
+  flex: 1; min-height: 0; max-height: 640px; overflow-y: auto;
+  /* A hard edge under a fixed cap reads as a cut-off list; a soft fade at the
+     scroll boundary reads as "more above/below" instead. */
+  mask-image: linear-gradient(to bottom, transparent, black 14px, black calc(100% - 14px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 14px, black calc(100% - 14px), transparent);
+}
+@media (max-width: 1100px) {
+  .feed-col .feed ul { flex: none; max-height: 640px; }
+}
 .feed ul { list-style: none; padding: 0; margin: 0; }
 .feed li {
   display: flex; gap: .75rem;
@@ -527,6 +616,9 @@ button.cell:disabled { cursor: default; }
   /* The score is the page's anchor now that it sits at the top. Size, not just
      colour, so the standing resolves before you have read either name. */
   font-size: 2.3rem;
+  /* Large display type reads as over-spaced at this size unless tracking
+     tightens with it. */
+  letter-spacing: -.01em;
 }
 .scoreboard li.leading {
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -549,9 +641,12 @@ button {
   font: inherit; font-weight: 700;
   letter-spacing: .03em;
   cursor: pointer;
-  transition: box-shadow .15s, filter .15s;
+  transition: box-shadow .2s var(--ease-out), filter .2s var(--ease-out), transform .12s var(--ease-out);
 }
 button:hover:not(:disabled) { box-shadow: var(--glow-md); filter: brightness(1.06); }
+/* Feedback belongs on the press, not the release — the instant a thumb lands
+   the button should already look pressed. */
+button:active:not(:disabled) { transform: scale(.97); filter: brightness(.97); box-shadow: none; }
 button:disabled { opacity: .35; cursor: default; }
 
 button.ghost {
@@ -596,7 +691,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /* ---- login ---- */
 
 .login { max-width: 340px; margin: 4rem auto; }
-.login h1 { text-align: center; font-size: 1.7rem; }
+.login h1 { text-align: center; font-size: 1.7rem; letter-spacing: -.01em; }
 .login form { display: grid; gap: .8rem; margin: 1.4rem 0; }
 .message { color: var(--muted); font-size: .85rem; }
 .login .forgot { margin-top: 1.5rem; line-height: 1.4; }
@@ -612,14 +707,19 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   color: var(--muted); font-family: var(--display); font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase; font-size: .78rem;
   padding: .5rem .8rem; border-radius: 0;
+  transition: color .2s var(--ease-out), border-color .2s var(--ease-out), transform .1s var(--ease-out);
 }
 .tabs button:hover:not(:disabled) { color: var(--gold-lit); box-shadow: none; filter: none; }
+.tabs button:active:not(:disabled) { transform: scale(.96); filter: none; box-shadow: none; }
 .tabs button.on { color: var(--gold); border-bottom-color: var(--gold); }
 
 .admin { display: grid; gap: 1.5rem; }
 .card {
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: linear-gradient(180deg, rgba(27, 22, 16, .78), rgba(20, 17, 12, .82));
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
   border: 1px solid var(--line);
+  border-top-color: var(--line-lit);
   border-radius: 5px;
   padding: 1.1rem 1.2rem;
 }
@@ -691,13 +791,19 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /* ---- admin board overview ---- */
 
 .legend {
-  display: flex; align-items: center; justify-content: center; gap: .4rem 1rem; flex-wrap: wrap;
-  margin-top: 1rem; color: var(--muted); font-size: .8rem;
+  display: flex; align-items: center; justify-content: center; gap: .4rem 1.1rem; flex-wrap: wrap;
+  margin-top: 1rem; padding: .5rem .8rem;
+  color: var(--muted); font-size: .8rem;
+  border-radius: 6px;
+  background: rgba(20, 17, 12, .5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .legend .key {
-  width: .85rem; height: .85rem; border-radius: 2px;
-  display: inline-block; vertical-align: -2px; margin-right: .3rem;
+  width: .8rem; height: .8rem; border-radius: 3px;
+  display: inline-block; vertical-align: -1px; margin-right: .35rem;
   border: 1px solid var(--line);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
 }
 .legend .key.ship      { background: var(--ship);   border-color: var(--ship-lit); }
 .legend .key.hit       { background: var(--hit);    border-color: var(--hit-lit); }
@@ -743,6 +849,15 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   object-fit: contain;
   pointer-events: none;
   -webkit-user-drag: none;
+  /* The icon element is freshly mounted the moment a tile is locked in (see
+     TileIcon's key), so this plays exactly once, right then — a claim landing
+     with a little weight behind it rather than a coordinate silently swapping
+     for a picture. */
+  animation: claim-in .35s var(--ease-bounce);
+}
+@keyframes claim-in {
+  from { opacity: 0; transform: scale(.5); }
+  to   { opacity: 1; transform: none; }
 }
 .tile-cell .tile-icon {
   width: 22px; height: 22px;
@@ -764,7 +879,8 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 .cell.active.ready { border-color: var(--gold); box-shadow: var(--glow-md); }
 .cell.active.ready .tile-progress { color: var(--gold-lit); }
 button.cell.clickable { cursor: pointer; }
-button.cell.clickable:hover { border-color: var(--gold); }
+button.cell.clickable:hover { border-color: var(--gold); transform: scale(1.04); position: relative; z-index: 1; }
+button.cell.clickable:active { transform: scale(.94); }
 /* A hit or a miss keeps its own colour on hover and when picked: the result is
    the thing being read, and repainting it grey to say "you are pointing at it"
    loses more than it gains. */
@@ -898,6 +1014,16 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   }
 }
 
+/* Blur-over-black is unreadable for anyone who has asked the OS to reduce
+   transparency, so the same cards fall back to a solid fill instead. */
+@media (prefers-reduced-transparency: reduce) {
+  .card, .slot, .confirm, .legend {
+    background: var(--panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 /* ---- fire effect ----
  *
  * The cannon flourish for a resolved shot (ActiveTiles "Complete & fire", or
@@ -916,11 +1042,13 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
 .fire-effect img {
   width: min(60vw, 320px);
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .6));
-  animation: fire-effect-pop .35s ease-out;
+  /* A cannon shot has momentum, so this is the one place the flourish is
+     allowed to overshoot before it settles. */
+  animation: fire-effect-pop .4s var(--ease-bounce);
 }
 @keyframes fire-effect-pop {
-  0%   { opacity: 0; transform: scale(.7); }
-  40%  { opacity: 1; }
+  0%   { opacity: 0; transform: scale(.6); }
+  60%  { opacity: 1; }
   100% { opacity: 1; transform: scale(1); }
 }
 
@@ -940,9 +1068,14 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(4, 3, 6, .72);
+  background: rgba(4, 3, 6, .6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: confirm-scrim-in .2s var(--ease-out);
 }
 
+/* A sheet arriving is a material forming, not a box fading in — blur and
+   scale settle together so it reads as something condensing into place. */
 .confirm {
   width: min(30rem, 100%);
   max-height: 100%;
@@ -950,8 +1083,20 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   padding: 1.1rem 1.2rem 1rem;
   border: 1px solid var(--line-lit);
   border-radius: 6px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: linear-gradient(180deg, rgba(27, 22, 16, .92), rgba(20, 17, 12, .95));
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
   box-shadow: var(--glow-lg), 0 18px 50px rgba(0, 0, 0, .6);
+  animation: confirm-in .28s var(--ease-out);
+}
+
+@keyframes confirm-scrim-in { from { opacity: 0; } }
+@keyframes confirm-in {
+  from { opacity: 0; transform: scale(.94) translateY(6px); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirm-backdrop, .confirm { animation: none; }
 }
 
 .confirm h3 {

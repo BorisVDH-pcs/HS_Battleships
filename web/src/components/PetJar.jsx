@@ -81,7 +81,7 @@ export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
 
   return (
     <section className="pet-jar">
-      <h2>Pet jar <span className="pet-jar-count">{count}</span></h2>
+      <h2>Pet or Jar Submission <span className="pet-jar-count">{count}</span></h2>
 
       {staged ? (
         <div className="evidence-staged">
