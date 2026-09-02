@@ -6,8 +6,13 @@ import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board
  * `myShipCells` comes straight from the database — RLS guarantees the opponent
  * cannot run this same query against your team.
  */
-export default function MyFleet({ myShipCells, enemyShots, tiles }) {
+export default function MyFleet({ myShipCells, enemyShots, myFleet, tiles }) {
   const ships = new Set(myShipCells.map((c) => cellKey(c.row, c.col)));
+
+  // Which ship occupies each cell, so a hit can be traced back to whether
+  // that ship — not just that square — has gone down.
+  const shipAt = new Map(myShipCells.map((c) => [cellKey(c.row, c.col), c.ship_id]));
+  const sunkShips = new Set((myFleet ?? []).filter((s) => s.sunk).map((s) => s.ship_id));
 
   // Enemy shots reference tile ids; resolve them to coordinates via the tile list.
   const tilePos = new Map(tiles.map((t) => [t.id, t.position]));
@@ -36,6 +41,7 @@ export default function MyFleet({ myShipCells, enemyShots, tiles }) {
               const key = cellKey(row, col);
               const isShip = ships.has(key);
               const shot = shots.get(key);
+              const sunk = shot === 'hit' && sunkShips.has(shipAt.get(key));
 
               const cls = [
                 'cell',
@@ -44,13 +50,15 @@ export default function MyFleet({ myShipCells, enemyShots, tiles }) {
                 // red is the one place it should mean exactly that.
                 shot === 'hit' ? 'hit' : '',
                 shot === 'miss' ? 'miss' : '',
+                // A deader red once the whole ship is down, not just the square.
+                sunk ? 'sunk' : '',
               ].filter(Boolean).join(' ');
 
               return (
                 // Labelled like the enemy board, so the two grids sitting
                 // side by side read the same way.
                 <div key={key} className={cls} title={coordLabel(row, col)}>
-                  {shot === 'hit' ? <span className="mark">✸</span>
+                  {shot === 'hit' ? <span className="mark">{sunk ? '☠' : '✸'}</span>
                     : shot === 'miss' ? <span className="mark">○</span>
                     : <span className="coord-label">{coordLabel(row, col)}</span>}
                 </div>

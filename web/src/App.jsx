@@ -308,6 +308,7 @@ export default function App() {
                     <MyFleet
                       myShipCells={myShipCells}
                       enemyShots={enemyShots}
+                      myFleet={myFleet}
                       tiles={tiles}
                     />
                     <BoardLegend view="fleet" />

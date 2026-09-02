@@ -47,6 +47,10 @@
 
   --hit:        #b8321f;   /* damage taken - your own fleet only */
   --hit-lit:    #ff7a5c;
+  /* A ship, not just a square, gone under - darker and duller than --hit so a
+     sunk hull reads as spent rather than still burning. */
+  --dead:       #3a0f0c;
+  --dead-lit:   #6e2b23;
   /* Damage dealt - the board you shoot at. Green because it is your good
      news, and brighter than --ship so a struck hull stays distinct from one
      still afloat where the organiser's boards draw both. */
@@ -241,6 +245,15 @@ button.cell:disabled { cursor: default; }
   background: var(--strike); border-color: var(--strike-lit);
   box-shadow: 0 0 10px rgba(123, 240, 165, .45);
 }
+/* Once every cell of the ship is hit, the square stops burning and just goes
+   dark — no glow, no strike animation, because there's nothing left to react
+   to here. */
+.cell.hit.sunk {
+  background: var(--dead); color: #c99; border-color: var(--dead-lit);
+  box-shadow: none; animation: none;
+}
+.cell.hit.sunk .tile-icon { opacity: .35; }
+.cell.hit.sunk .mark { color: #b06a60; }
 .cell.miss   {
   background: var(--miss); color: var(--miss-ink); border-color: var(--miss-lit);
 }
@@ -807,6 +820,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 }
 .legend .key.ship      { background: var(--ship);   border-color: var(--ship-lit); }
 .legend .key.hit       { background: var(--hit);    border-color: var(--hit-lit); }
+.legend .key.hit.sunk  { background: var(--dead);   border-color: var(--dead-lit); }
 .legend .key.hit.dealt { background: var(--strike); border-color: var(--strike-lit); }
 .legend .key.miss      { background: var(--miss);   border-color: var(--miss-lit); }
 .legend .key.active    { background: var(--panel);  border-color: var(--gold); }
@@ -1040,7 +1054,7 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   pointer-events: none;
 }
 .fire-effect img {
-  width: min(60vw, 320px);
+  width: min(96vw, 512px);
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .6));
   /* A cannon shot has momentum, so this is the one place the flourish is
      allowed to overshoot before it settles. */
