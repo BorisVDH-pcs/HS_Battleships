@@ -6,16 +6,6 @@ on:
     paths:
       - "supabase/migrations/**"
   workflow_dispatch:
-    inputs:
-      run_repair:
-        description: >-
-          One-off. 'diagnose' dumps the real remote schema and migration
-          history (read-only). 'fix-0033' reverts just 0033's falsely-applied
-          tracked status (confirmed via diagnose: evidence_submitted enum
-          value doesn't actually exist) then pushes 0033 and 0035-0040 for
-          real. Remove this input and both one-off jobs once done.
-        required: false
-        default: "no"
 
 # A bad migration mutates production data, so only ever run migrations
 # forward (never `supabase db reset`), and never let two pushes race.
@@ -25,7 +15,6 @@ concurrency:
 
 jobs:
   push:
-    if: github.event.inputs.run_repair != 'diagnose' && github.event.inputs.run_repair != 'fix-0033'
     runs-on: ubuntu-latest
     # Configure this environment under Settings -> Environments with a
     # required reviewer if you want a human approval gate before migrations
@@ -51,78 +40,3 @@ jobs:
 
       - name: Push migrations
         run: supabase db push
-
-  diagnose:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'diagnose'
-    runs-on: ubuntu-latest
-    environment: supabase-production
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-
-      - name: Migration history (local vs remote, per tracking table)
-        run: supabase migration list
-
-      - name: Actual remote schema (ground truth, read-only)
-        run: |
-          supabase db dump --linked --schema public -f schema.sql
-
-          echo "=== event_type enum literals present (count per value) ==="
-          for v in fleet_placed game_started tile_claimed shot_fired ship_sunk game_won \
-                   score_adjusted game_reset team_renamed claim_released \
-                   evidence_submitted slot_freed pet_jar_submitted pet_jar_spent; do
-            n=$(grep -c "'$v'" schema.sql || true)
-            echo "  $v: $n"
-          done
-
-          echo "=== table/column existence (count per marker) ==="
-          for t in pet_jar_submissions pet_jar_previews pet_jar_count discord_relay_log public_url; do
-            n=$(grep -c "$t" schema.sql || true)
-            echo "  $t: $n"
-          done
-
-          echo "=== discord_webhooks full definition ==="
-          sed -n '/CREATE TABLE "public"\."discord_webhooks"/,/);/p' schema.sql
-
-          echo "=== tile_evidence full definition ==="
-          sed -n '/CREATE TABLE "public"\."tile_evidence"/,/);/p' schema.sql
-
-  fix-0033:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_repair == 'fix-0033'
-    runs-on: ubuntu-latest
-    environment: supabase-production
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-
-      - name: Mark 0033 as not yet applied
-        run: supabase migration repair --status reverted 0033
-
-      - name: Preview migrations to apply
-        # 0033 now sits before the already-applied 0034, so it needs
-        # --include-all to be considered instead of being skipped as
-        # out-of-order.
-        run: supabase db push --include-all --dry-run
-
-      - name: Push migrations for real
-        run: supabase db push --include-all
