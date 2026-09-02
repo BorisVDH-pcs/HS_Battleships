@@ -8,7 +8,10 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * Three ways in, because people submit screenshots three ways: drag onto the
  * card, pick a file, or paste. Paste matters most — a fresh screenshot is on
  * the clipboard already, and asking someone to save it to disk first is asking
- * them not to bother.
+ * them not to bother. Clicking the zone (without hitting "choose a file")
+ * just focuses it — that focus is what makes it the paste target, so on a
+ * board with two active tiles a Ctrl+V goes to whichever slot was clicked
+ * last, not whichever the browser happens to have focused.
  *
  * Dropping a file STAGES it; a second press submits it. That is what makes a
  * remove button possible at all: submitted evidence is immutable by design
@@ -134,9 +137,15 @@ export default function EvidenceUploader({
             setDragging(false);
             stage(e.dataTransfer.files);
           }}
-          onClick={() => inputRef.current?.click()}
         >
-          Drop a screenshot, paste, or click to choose
+          Drop a screenshot, paste, or{' '}
+          <button
+            type="button"
+            className="link"
+            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+          >
+            choose a file
+          </button>
           <input
             ref={inputRef}
             type="file"

@@ -11,3 +11,6 @@ dist/
 # ~100 KB each; only the 4 KB downscaled results in web/public/icons/
 # belong in the repo.
 tools/icon-src/
+
+# Claude Code's locally-installed skills. Per-machine cache, not project config.
+.claude/skills/

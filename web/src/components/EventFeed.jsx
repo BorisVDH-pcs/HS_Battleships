@@ -1,9 +1,12 @@
 import { fromPosition, coordLabel } from '../lib/board.js';
 
 /**
- * The live feed. Note it never names a tile: `game_events` deliberately carries
- * only `tile_id` and `position`, because the feed is readable by both teams and
- * the tile grid is shared. Your own tiles get their names from `tiles_for_me`.
+ * The live feed. Most event types never name a tile: `game_events` is readable
+ * by both teams, and the tile grid is shared, so those payloads deliberately
+ * carry only `tile_id`/`position`. `evidence_submitted` and `slot_freed` are the
+ * exception — the database RLS policy on `game_events` only lets a team read
+ * its own rows of those two types (see migration 0035), so by the time one
+ * reaches this component it is safe to show the tile name.
  */
 export default function EventFeed({ events, teams, myTeamId }) {
   const teamName = (id) => teams.find((t) => t.id === id)?.name ?? 'Someone';
@@ -47,6 +50,12 @@ export default function EventFeed({ events, teams, myTeamId }) {
         if (e.payload?.reverted) return `An adjustment to ${who} was reverted.`;
         return `${who} ${d >= 0 ? 'gained' : 'lost'} ${points}.`;
       }
+      case 'evidence_submitted':
+        return `${e.payload?.uploaded_by_name ?? who} submitted proof for ` +
+          `${e.payload?.tile_name ?? 'a tile'} (${e.payload?.evidence_count}/${e.payload?.required_evidence}) — ` +
+          `${e.payload?.tiles_left_to_fire} tile(s) left to fire.`;
+      case 'slot_freed':
+        return 'A slot is free to claim.';
       default:
         return e.type;
     }

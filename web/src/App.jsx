@@ -15,6 +15,8 @@ import TeamNameEditor from './components/TeamNameEditor.jsx';
 import Wordmark from './components/Wordmark.jsx';
 import EvidencePanel from './components/EvidencePanel.jsx';
 import BoardLegend from './components/BoardLegend.jsx';
+import PetJar from './components/PetJar.jsx';
+import StatsPanel from './components/StatsPanel.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { statusLabel } from './lib/status.js';
 
@@ -208,11 +210,11 @@ export default function App() {
             </section>
           )}
 
-          {/* The score and the two slots are what a player checks most
-              often mid-game, so they sit above the boards rather than below
-              them — on a phone the grids are tall enough to push anything
-              underneath them off the screen entirely. */}
-          <Scoreboard scores={scores} myTeamId={myTeamId} />
+          {/* During preparation there is no board layout to sit beside, so
+              the score gets its own full-width row same as always. Once the
+              boards appear it moves into the side column below, alongside
+              the active tiles. */}
+          {isPreparation && <Scoreboard scores={scores} myTeamId={myTeamId} />}
 
           {isPreparation && myTeamId && (
             <CaptainPlacement
@@ -225,6 +227,10 @@ export default function App() {
             />
           )}
 
+          {/* No board layout to sit beside yet, so full width same as always.
+              Once the boards appear the feed moves into the left column. */}
+          {isPreparation && <EventFeed events={events} teams={teams} myTeamId={myTeamId} />}
+
           {/* Nothing here means anything until the game starts: there is no
               enemy to shoot at, your own fleet is the thing you are still
               arranging above, and no tile can be locked in yet. Showing all
@@ -233,101 +239,126 @@ export default function App() {
               the one thing a captain has to do off the top. */}
           {!isPreparation && (
           <section className="boards">
-            {/* The same tab strip the admin console uses, so this reads as part
-                of the app rather than a second idea about tabs. */}
-            <div className="tabs board-tabs">
-              <button
-                className={boardTab === 'enemy' ? 'on' : ''}
-                onClick={() => setBoardTab('enemy')}
-              >
-                Enemy waters
-              </button>
-              <button
-                className={boardTab === 'fleet' ? 'on' : ''}
-                onClick={() => setBoardTab('fleet')}
-              >
-                Your fleet
-              </button>
-              {boardTab === 'fleet' && (
-                <span className="fleet-status">
-                  {myFleet.length - sunkCount} afloat, {sunkCount} sunk
-                </span>
-              )}
-            </div>
+            <div className="board-layout">
+              {/* The activity feed sits to the left of the board rather than
+                  below everything, and is height-capped with its own scroll
+                  so a long game doesn't grow the page underneath it. */}
+              <div className="feed-col">
+                <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
+              </div>
 
-            {/* Sits with the board rather than up by the score: what the team
-                is holding and where it can shoot belong together, and this
-                keeps it below the preparation card during prep.
+              <div className="board-col">
+                {/* The same tab strip the admin console uses, so this reads as
+                    part of the app rather than a second idea about tabs. */}
+                <div className="tabs board-tabs">
+                  <button
+                    className={boardTab === 'enemy' ? 'on' : ''}
+                    onClick={() => setBoardTab('enemy')}
+                  >
+                    Enemy waters
+                  </button>
+                  <button
+                    className={boardTab === 'fleet' ? 'on' : ''}
+                    onClick={() => setBoardTab('fleet')}
+                  >
+                    Your fleet
+                  </button>
+                  {boardTab === 'fleet' && (
+                    <span className="fleet-status">
+                      {myFleet.length - sunkCount} afloat, {sunkCount} sunk
+                    </span>
+                  )}
+                </div>
 
-                Hidden once the game is finished. The slots carry working upload
-                controls, and a submit that completes a tile fires the shot — so
-                leaving them on screen after a result invited a team to finish a
-                tile it was still working on and fire into a match that was
-                already decided. 0027 refuses that server-side; this stops the
-                page offering it in the first place. */}
-            {!isFinished && (
-              <ActiveTiles
-                tiles={tiles}
-                maxActive={maxActive}
-                gameId={gameId}
-                teamId={myTeamId}
-                evidence={evidence}
-                onRefresh={() => game.refresh()}
-                onFired={(tile, result) => {
-                  setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-                  setShot({ nonce: Date.now(), result });
-                  game.refresh();
-                }}
-              />
-            )}
-
-            {boardTab === 'enemy' ? (
-              <>
-                <EnemyGrid
-                  tiles={tiles}
-                  onClaim={onClaim}
-                  onInspect={(tile) =>
-                    setOpenTileId((id) => (id === tile.id ? null : tile.id))}
-                  openTileId={openTileId}
-                  canClaim={canClaim}
-                  busyTileId={busyTileId}
-                />
-                <BoardLegend view="enemy" />
-                {isActive && !canClaim && myTeamId && (
-                  <p className="muted">Both slots are full — fire one before locking in another.</p>
-                )}
-                {openTile && (
-                  <EvidencePanel
-                    title={openTile.name}
-                    coord={coordLabel(
-                      fromPosition(openTile.position).row,
-                      fromPosition(openTile.position).col
+                {boardTab === 'enemy' ? (
+                  <>
+                    <EnemyGrid
+                      tiles={tiles}
+                      onClaim={onClaim}
+                      onInspect={(tile) =>
+                        setOpenTileId((id) => (id === tile.id ? null : tile.id))}
+                      openTileId={openTileId}
+                      canClaim={canClaim}
+                      busyTileId={busyTileId}
+                    />
+                    <BoardLegend view="enemy" />
+                    {isActive && !canClaim && myTeamId && (
+                      <p className="muted">Both slots are full — fire one before locking in another.</p>
                     )}
-                    meta={
-                      `${openTile.evidence_count} of ${openTile.required_evidence} submitted` +
-                      (openTile.claim_status === 'fired'
-                        ? ` · fired, ${openTile.claim_result}`
-                        : ' · not yet fired')
-                    }
-                    items={evidence.filter((e) => e.claim_id === openTile.claim_id)}
-                    onClose={() => setOpenTileId(null)}
+                    {openTile && (
+                      <EvidencePanel
+                        title={openTile.name}
+                        coord={coordLabel(
+                          fromPosition(openTile.position).row,
+                          fromPosition(openTile.position).col
+                        )}
+                        meta={
+                          `${openTile.evidence_count} of ${openTile.required_evidence} submitted` +
+                          (openTile.claim_status === 'fired'
+                            ? ` · fired, ${openTile.claim_result}`
+                            : ' · not yet fired')
+                        }
+                        items={evidence.filter((e) => e.claim_id === openTile.claim_id)}
+                        onClose={() => setOpenTileId(null)}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <MyFleet
+                      myShipCells={myShipCells}
+                      enemyShots={enemyShots}
+                      tiles={tiles}
+                    />
+                    <BoardLegend view="fleet" />
+                  </>
+                )}
+              </div>
+
+              {/* The score and the two slots are what a player checks most
+                  often mid-game, so they sit beside the board rather than
+                  above or below it. */}
+              <div className="side-col">
+                <Scoreboard scores={scores} myTeamId={myTeamId} />
+
+                <StatsPanel gameId={gameId} teams={teams} myTeamId={myTeamId} />
+
+                {/* Hidden once the game is finished. The slots carry working
+                    upload controls, and a submit that completes a tile fires
+                    the shot — so leaving them on screen after a result
+                    invited a team to finish a tile it was still working on
+                    and fire into a match that was already decided. 0027
+                    refuses that server-side; this stops the page offering it
+                    in the first place. */}
+                {!isFinished && (
+                  <ActiveTiles
+                    tiles={tiles}
+                    maxActive={maxActive}
+                    gameId={gameId}
+                    teamId={myTeamId}
+                    evidence={evidence}
+                    onRefresh={() => game.refresh()}
+                    onFired={(tile, result) => {
+                      setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                      setShot({ nonce: Date.now(), result });
+                      game.refresh();
+                    }}
                   />
                 )}
-              </>
-            ) : (
-              <>
-                <MyFleet
-                  myShipCells={myShipCells}
-                  enemyShots={enemyShots}
-                  tiles={tiles}
-                />
-                <BoardLegend view="fleet" />
-              </>
-            )}
+
+                {!isFinished && myTeamId && (
+                  <PetJar
+                    gameId={gameId}
+                    teamId={myTeamId}
+                    count={myTeam?.pet_jar_count ?? 0}
+                    tiles={tiles}
+                    onRefresh={() => game.refresh()}
+                  />
+                )}
+              </div>
+            </div>
           </section>
           )}
-
-          <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
         </>
       )}
       </>}

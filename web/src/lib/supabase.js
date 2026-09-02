@@ -64,6 +64,18 @@ export async function completeTileEarly(claimId) {
   return data;
 }
 
+/**
+ * Spend one pet jar preview on a tile this team could still claim. Returns
+ * `{ name, icon, pet_jar_count }` — never claim_result or anything ship-
+ * related, and refuses server-side if the counter is at 0, the tile is
+ * already claimed by this team, or already previewed (0039).
+ */
+export async function spendPetJar(tileId) {
+  const { data, error } = await supabase.rpc('spend_pet_jar', { p_tile_id: tileId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ---- Admin API -----------------------------------------------------------
 // Every one of these re-checks is_admin() server-side, so hiding the admin tab
 // in the UI is a convenience, never the control.

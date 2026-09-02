@@ -84,7 +84,7 @@ body {
   min-height: 100vh;
 }
 
-.app { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+.app { max-width: 1320px; margin: 0 auto; padding: 1.5rem; }
 
 /* ---- headings ---- */
 
@@ -284,6 +284,26 @@ button.cell:disabled { cursor: default; }
 .board-tabs .fleet-status { margin-left: auto; }
 .fleet-status { color: var(--muted); font-size: .85rem; margin: 0; }
 
+/* Board centered, activity feed to its left, score + active tiles to its
+   right. The side columns are fixed-ish widths so the board keeps the most
+   room; below 1100px there isn't space for three columns at all, so it drops
+   to a single stack with the board first. */
+.board-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.board-layout .feed-col,
+.board-layout .board-col,
+.board-layout .side-col { min-width: 0; }
+@media (max-width: 1100px) {
+  .board-layout { grid-template-columns: 1fr; }
+  .board-layout .board-col { order: 1; }
+  .board-layout .side-col { order: 2; }
+  .board-layout .feed-col { order: 3; }
+}
+
 /* Capped rather than full-bleed. Across 1100px the cells reach ~105px and the
    64px tile art is being upscaled; at this width they land near 72px, which is
    about the size the icons were drawn for. */
@@ -292,6 +312,45 @@ button.cell:disabled { cursor: default; }
 /* ---- active tiles ---- */
 
 .active-tiles { margin: 1.25rem 0; }
+.side-col .scoreboard,
+.side-col .active-tiles,
+.side-col .pet-jar,
+.side-col .stats-panel { margin: 0; }
+.side-col { display: grid; gap: 1.25rem; }
+
+/* ---- stats panel ---- */
+
+.stats-panel { display: grid; gap: .5rem; }
+.stats-panel h2 { display: flex; align-items: baseline; justify-content: space-between; }
+.stats-toggle { font-size: .75rem; }
+.stats-settings { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; font-size: .8rem; }
+.stats-settings label { display: flex; align-items: center; gap: .4rem; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.stats-table th, .stats-table td { text-align: left; padding: .2rem .3rem; }
+.stats-table th:not(:first-child), .stats-table td:not(:first-child) { text-align: right; }
+.stats-table thead th.mine, .stats-table td.mine { color: var(--gold-lit); }
+.stats-table tbody tr:nth-child(odd) { background: var(--panel-2); }
+.stats-list h3 { font-size: .8rem; margin: .3rem 0 .15rem; color: var(--muted); }
+.stats-list ol { margin: 0; padding-left: 1.2rem; font-size: .8rem; }
+
+/* ---- pet jar ---- */
+
+.pet-jar { display: grid; gap: .5rem; }
+.pet-jar h2 { display: flex; align-items: baseline; gap: .5rem; }
+.pet-jar-count {
+  font-family: var(--display); color: var(--gold-lit); text-shadow: var(--glow-sm);
+  font-size: .95rem;
+}
+.pet-jar-spend { display: flex; gap: .4rem; }
+.pet-jar-spend select { flex: 1 1 auto; min-width: 0; }
+.pet-jar-preview {
+  display: flex; align-items: center; gap: .5rem; margin: 0;
+  font-size: .85rem;
+}
+.pet-jar-preview .tile-icon { width: 32px; height: 32px; }
+.pet-jar-previewed { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.pet-jar-previewed li { display: flex; align-items: center; gap: .5rem; font-size: .8rem; }
+.pet-jar-previewed .tile-icon { width: 28px; height: 28px; }
 
 /* Capped, not full-bleed: stretched across 1100px these two cards read as
    banners rather than tiles, and the pair is easier to take in when it sits
@@ -381,11 +440,23 @@ button.cell:disabled { cursor: default; }
   transition: border-color .12s, color .12s, background .12s;
 }
 .evidence-drop:hover,
+.evidence-drop:focus,
 .evidence-drop:focus-visible { color: var(--gold-dim); border-color: var(--gold-deep); }
+.evidence-drop:focus {
+  outline: none;
+  border-style: solid;
+  box-shadow: var(--glow-sm);
+}
 .evidence-drop.over {
   border-color: var(--gold); color: var(--gold-lit);
   background: var(--panel-2); box-shadow: var(--glow-sm);
 }
+.evidence-drop .link {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; color: var(--gold-dim); text-decoration: underline;
+  cursor: pointer;
+}
+.evidence-drop .link:hover { color: var(--gold-lit); }
 .evidence .error { font-size: .75rem; margin: 0; }
 
 /* The organiser's review: bigger thumbnails than the player's card, because
@@ -412,6 +483,11 @@ button.cell:disabled { cursor: default; }
 /* ---- feed ---- */
 
 .feed { margin-top: 1.5rem; }
+/* Inside the board layout the feed sits in its own column rather than below
+   everything, and is height-capped with its own scroll so a long game does
+   not keep growing the page underneath it. */
+.feed-col .feed { margin-top: 0; }
+.feed-col .feed ul { max-height: 640px; overflow-y: auto; }
 .feed ul { list-style: none; padding: 0; margin: 0; }
 .feed li {
   display: flex; gap: .75rem;
@@ -615,7 +691,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /* ---- admin board overview ---- */
 
 .legend {
-  display: flex; align-items: center; gap: .4rem 1rem; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: center; gap: .4rem 1rem; flex-wrap: wrap;
   margin-top: 1rem; color: var(--muted); font-size: .8rem;
 }
 .legend .key {
