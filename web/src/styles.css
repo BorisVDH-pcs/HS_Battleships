@@ -822,6 +822,32 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   }
 }
 
+/* ---- fire effect ----
+ *
+ * The cannon flourish for a resolved shot (ActiveTiles "Complete & fire", or
+ * the evidence submit that fires in the same transaction). Centred and
+ * click-through: it is a flourish, not a dialog, so it must never eat the tap
+ * that was already headed for the next button.
+ */
+.fire-effect {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.fire-effect img {
+  width: min(60vw, 320px);
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .6));
+  animation: fire-effect-pop .35s ease-out;
+}
+@keyframes fire-effect-pop {
+  0%   { opacity: 0; transform: scale(.7); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 /* ---- confirmation dialog ----
  *
  * Replaces window.confirm/prompt, which a WebView host may decline to draw at

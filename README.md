@@ -119,6 +119,78 @@ without a commit, but none are needed for a working deploy.
 > Actions"**, not "Deploy from a branch" — `dist/` is gitignored, so branch mode
 > would serve the README instead of the app.
 
+## TODO
+
+- **CI for the backend.** `deploy.yml` only builds and publishes `web/` — a new
+  file in `supabase/migrations/` still has to be applied by hand in the SQL
+  Editor (see Setup). Add a workflow that runs `supabase db push` (Supabase
+  CLI, linked via `SUPABASE_ACCESS_TOKEN` + `SUPABASE_DB_PASSWORD` repo
+  secrets) whenever a push to `main` touches `supabase/migrations/**`, so a
+  merged migration reaches the live project without a manual step. Needs care:
+  unlike the frontend build, a bad migration mutates production data, so this
+  should probably run migrations only (never `db reset`), and might warrant a
+  dry-run/diff check or a required review before the push step runs.
+
+- **Paste-to-target evidence upload.** Clicking an active tile's evidence slot
+  should highlight it as the paste target, so a `Ctrl+V` of a copied
+  screenshot uploads straight into that slot instead of requiring the file
+  picker. Touches `ActiveTiles.jsx` / `EvidenceUploader.jsx` — needs a
+  "selected slot" bit of state and a `paste` listener that reads
+  `clipboardData.files`/`items`.
+
+- **Discord ping on evidence submission.** *(Checked: does not exist yet.)*
+  `add_evidence()` (0023) never writes to `game_events`, and `discord_line()`
+  (0032) has no case for it — only `fleet_placed`, `game_started`,
+  `team_renamed`, `tile_claimed`, `claim_released`, `shot_fired`, `ship_sunk`,
+  `game_won`, `game_reset`, `score_adjusted` are handled. Want: on each
+  submission, notify with something like *"`<player>` submitted proof for
+  `<tile_name>` (`<evidence_count>`/`<required_evidence>`) — `<n>` tile(s) left
+  to fire"*, and a distinct message once the last slot opens up ("a slot is
+  free to claim"). Two things to design around:
+  - This has to go to the **team's own** channel, not the shared/general one
+    `shot_fired` etc. use — `discord_webhooks` currently only keys webhooks by
+    `game_id` (or global), not by team, so it needs a `team_id` column (or a
+    second table) plus a lookup change in `relay_pending()`.
+  - Naming the tile is only safe in that team-private channel — never in
+    anything the opposing team could read. `discord_line()`'s payload-only
+    rule exists specifically so the general relay can't leak secret #2 (see
+    architecture.md); a team-scoped message is exempt only because the team
+    already knows its own claimed tile's name.
+
+- **Layout: score + active tiles on the right, board centered.** Currently
+  `Scoreboard` and `ActiveTiles` stack full-width above the board in
+  `App.jsx`'s `.boards` section. Move them into a right-hand panel alongside
+  the board, keeping their existing card styling/pattern, so the grid reads as
+  the visual center of the page.
+
+- **Center the tile-color legend under the board, not the activity feed.**
+  `BoardLegend` should stay aligned under `EnemyGrid`/`MyFleet` once the
+  activity feed moves beside the board (see next item), not span whatever is
+  next to it.
+
+- **Move the activity feed to the left of the board, and cap its height.**
+  `EventFeed` currently renders every loaded event as one long list below
+  everything else. Move it to a left-hand column next to the board, show a
+  limited number of rows, and make the rest reachable by scrolling inside the
+  panel (`max-height` + `overflow-y: auto`) rather than growing the page.
+
+- **Statistics panel on the right side.** A per-game/per-player stats card
+  (shots fired, hits, accuracy, tiles claimed, ships sunk, etc. — see
+  `game_events` and `tile_claims.claimed_by`/`fired_by` for the raw per-player
+  data) alongside the `Scoreboard`/`ActiveTiles` right-hand panel above. Make
+  the set of stats shown configurable — a settings toggle to pick which rows
+  appear, rather than a fixed list — since not every stat is meaningful (or
+  wanted) for every event.
+  - `useGame.js`'s `game_events` query is capped at `limit(50)` and every
+    Realtime insert re-triggers the whole `load()` (see comment at
+    `useGame.js:114-126`); full-game stats need the complete event history,
+    not the last 50 rows, so this needs its own fetch, separate from the
+    board-state one.
+    Be a good citizen about it: derive the stats query/computation once and
+    cache the result (e.g. `useMemo` keyed on game id + latest event id, or a
+    module-level cache), and only recompute/refetch on an actual new event —
+    not on every render or every unrelated Realtime tick.
+
 ## Sign-in: username only, no email
 
 Players sign in with a **username and password**. There is no email anywhere in

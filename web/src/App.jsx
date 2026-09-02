@@ -6,6 +6,7 @@ import Login from './components/Login.jsx';
 import EnemyGrid from './components/EnemyGrid.jsx';
 import MyFleet from './components/MyFleet.jsx';
 import ActiveTiles from './components/ActiveTiles.jsx';
+import FireEffect from './components/FireEffect.jsx';
 import EventFeed from './components/EventFeed.jsx';
 import Scoreboard from './components/Scoreboard.jsx';
 import CaptainPlacement from './components/CaptainPlacement.jsx';
@@ -22,6 +23,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [gameId, setGameId] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [shot, setShot] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   // Which board is on screen. The two used to sit side by side, which cost
@@ -165,6 +167,7 @@ export default function App() {
       {loading && <p>Loading game…</p>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="error">{notice}</p>}
+      <FireEffect shot={shot} />
 
       {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
 
@@ -272,6 +275,7 @@ export default function App() {
                 onRefresh={() => game.refresh()}
                 onFired={(tile, result) => {
                   setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                  setShot({ nonce: Date.now(), result });
                   game.refresh();
                 }}
               />
