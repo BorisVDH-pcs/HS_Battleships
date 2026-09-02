@@ -157,6 +157,42 @@ without a commit, but none are needed for a working deploy.
     architecture.md); a team-scoped message is exempt only because the team
     already knows its own claimed tile's name.
 
+- **Pet Jar mechanic.** A second, smaller submission flow alongside proof
+  evidence, adding a "task preview" power: peek at a tile's task image without
+  learning whether it hides a ship.
+  - **Submission.** A separate, smaller window (not `ActiveTiles`/the evidence
+    uploader) where a team submits a pet or a jar. Needs its own upload path —
+    likely a sibling of `tile_evidence`/the `evidence` bucket rather than a
+    reuse of it, since a pet/jar submission isn't proof against a claimed tile,
+    it's the resource that earns the preview currency.
+  - **Counter.** Every team starts at **0**. Each accepted pet or jar
+    submission increments it by one — a new `teams` column (or its own table,
+    if submissions need their own audit trail the way `tile_evidence` is one
+    for proof) plus an RPC to submit and credit it, mirroring `add_evidence()`'s
+    shape: validate the submitting player's team, insert the record, bump the
+    counter, all inside one `security definer` function so a team can't credit
+    itself without a real submission.
+  - **Spending.** Using one previews a tile: shows the task's name/icon for a
+    tile the team picks, same as a claim currently reveals `name`/`icon` in
+    `tiles_for_me`, but **without** ever exposing `claim_result` or anything
+    ship-related for that tile — this must stay true even if the tile is later
+    claimed and fired. Needs an RPC (`spend_pet_jar`-ish) that decrements the
+    counter and returns just the task fields, guarded the same way
+    `tiles_for_me` redacts unclaimed tiles, and it should only ever run when
+    the counter is > 0 (checked server-side, not just disabled in the UI).
+  - **Open questions:** can a preview target any unclaimed tile on the enemy
+    board, or only ones the team could otherwise claim? Is a preview one-time
+    per tile (so a team can't re-spend to re-check) or does spending just cost
+    a counter point regardless? Does the counter cap, or can it stack
+    indefinitely?
+  - **Discord.** Needs two new `discord_line()` cases, following the design
+    constraints of the evidence item above: a team-channel-only message on
+    submission (so the pet/jar count change is visible to the team) and one
+    when a preview is spent — the latter is especially sensitive, since it
+    must never name the tile or task anywhere the opposing team's webhook
+    could see it. Likely needs the same `discord_webhooks` team-scoping change
+    called out there, since both features land in the same PR-shaped gap.
+
 - **Layout: score + active tiles on the right, board centered.** Currently
   `Scoreboard` and `ActiveTiles` stack full-width above the board in
   `App.jsx`'s `.boards` section. Move them into a right-hand panel alongside
