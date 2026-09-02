@@ -600,6 +600,7 @@ button.cell:disabled { cursor: default; }
 .feed time { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 .feed li.mine span { color: var(--text); }
 .feed li.theirs span { color: var(--muted); }
+.feed .tag { flex: none; font-size: .75rem; font-weight: 600; color: var(--muted); }
 
 /* ---- scoreboard ---- */
 

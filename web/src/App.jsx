@@ -295,7 +295,8 @@ export default function App() {
                         meta={
                           `${openTile.evidence_count} of ${openTile.required_evidence} submitted` +
                           (openTile.claim_status === 'fired'
-                            ? ` · fired, ${openTile.claim_result}`
+                            ? ` · fired, ${openTile.claim_result}` +
+                              (openTile.ship_sunk ? ' — ship sunk!' : '')
                             : ' · not yet fired')
                         }
                         items={evidence.filter((e) => e.claim_id === openTile.claim_id)}

@@ -8,6 +8,16 @@ import { fromPosition, coordLabel } from '../lib/board.js';
  * its own rows of those two types (see migration 0035), so by the time one
  * reaches this component it is safe to show the tile name.
  */
+// Mirrors is_team_private_event() in migration 0039 — these are the only
+// types the events_read RLS policy scopes to the submitting team; everything
+// else is readable by both teams.
+const TEAM_PRIVATE_TYPES = new Set([
+  'evidence_submitted',
+  'slot_freed',
+  'pet_jar_submitted',
+  'pet_jar_spent',
+]);
+
 export default function EventFeed({ events, teams, myTeamId }) {
   const teamName = (id) => teams.find((t) => t.id === id)?.name ?? 'Someone';
 
@@ -68,6 +78,7 @@ export default function EventFeed({ events, teams, myTeamId }) {
         {events.map((e) => (
           <li key={e.id} className={e.team_id === myTeamId ? 'mine' : 'theirs'}>
             <time>{new Date(e.created_at).toLocaleTimeString()}</time>
+            <span className="tag">{TEAM_PRIVATE_TYPES.has(e.type) ? '[TEAM]' : '[GLOBAL]'}</span>
             <span>{describe(e)}</span>
           </li>
         ))}

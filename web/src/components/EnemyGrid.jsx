@@ -46,6 +46,9 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                 // 'dealt' colours it as the shooter's news, not the fleet
                 // owner's: this is the board the team is firing at.
                 fired ? (tile.claim_result === 'hit' ? 'hit dealt' : 'miss') : '',
+                // Once the whole hull under a hit is down, it stops burning
+                // and goes dark, same as MyFleet's own sunk squares.
+                fired && tile.ship_sunk ? 'sunk' : '',
                 active ? 'active' : '',
                 !tile.revealed && canClaim ? 'claimable' : '',
                 tile.revealed ? 'clickable' : '',
@@ -75,7 +78,9 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                   />
                   {fired && (
                     <span className="mark">
-                      {tile.claim_result === 'hit' ? '✸' : '○'}
+                      {tile.claim_result === 'hit'
+                        ? (tile.ship_sunk ? '☠' : '✸')
+                        : '○'}
                     </span>
                   )}
                 </button>
