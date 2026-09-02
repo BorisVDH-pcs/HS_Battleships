@@ -9,6 +9,7 @@
 
 import { supabase } from './supabase.js';
 import { downscale } from './evidence.js';
+import { uploadToImgbb } from './imgbb.js';
 
 export const BUCKET = 'pet-jar';
 
@@ -29,9 +30,14 @@ export async function uploadPetJar({ gameId, teamId, file }) {
     .upload(path, blob, { contentType: blob.type, upsert: false });
   if (upErr) throw new Error(upErr.message);
 
+  // Best-effort: a public mirror for the Discord message to embed. Never
+  // blocks the submission — see lib/imgbb.js.
+  const publicUrl = await uploadToImgbb(blob);
+
   const { data, error } = await supabase.rpc('submit_pet_jar', {
     p_game_id: gameId,
     p_storage_path: path,
+    p_public_url: publicUrl,
   });
   if (error) throw new Error(error.message);
   return data;

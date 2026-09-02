@@ -43,12 +43,19 @@ jobs:
         env:
           SECRET_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SECRET_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SECRET_IMGBB_API_KEY: ${{ secrets.IMGBB_API }}
         run: |
           if [ -n "$SECRET_SUPABASE_URL" ]; then
             export VITE_SUPABASE_URL="$SECRET_SUPABASE_URL"
           fi
           if [ -n "$SECRET_SUPABASE_ANON_KEY" ]; then
             export VITE_SUPABASE_ANON_KEY="$SECRET_SUPABASE_ANON_KEY"
+          fi
+          # Optional: mirrors evidence/pet-jar screenshots to imgbb so Discord
+          # can embed them (0040). Unset is fine — submissions still work,
+          # they just post to Discord as text only.
+          if [ -n "$SECRET_IMGBB_API_KEY" ]; then
+            export VITE_IMGBB_API_KEY="$SECRET_IMGBB_API_KEY"
           fi
 
           # Refuse to ship a service_role / secret key. Vite inlines this value

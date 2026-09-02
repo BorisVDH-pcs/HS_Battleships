@@ -138,3 +138,19 @@ export const adminResetGame = (gameId, clearFleets = true) =>
  */
 export const adminReleaseClaim = (claimId) =>
   rpc('admin_release_claim', { p_claim_id: claimId });
+
+/**
+ * Discord webhook config (0040). `teamId` null means the shared/general
+ * channel; a team id scopes it to that team's own private channel (evidence
+ * and pet-jar submissions route there, never to general — see 0036/0039).
+ */
+export const adminListWebhooks = (gameId) =>
+  rpc('admin_list_webhooks', { p_game_id: gameId });
+
+export const adminSetWebhook = (gameId, teamId, url, enabled = true) =>
+  rpc('admin_set_webhook', {
+    p_game_id: gameId, p_team_id: teamId, p_url: url, p_enabled: enabled,
+  });
+
+export const adminDeleteWebhook = (id) =>
+  rpc('admin_delete_webhook', { p_id: id });

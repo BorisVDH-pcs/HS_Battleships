@@ -8,6 +8,7 @@ import AdminOverview from './AdminOverview.jsx';
 import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
+import DiscordWebhooks from './DiscordWebhooks.jsx';
 import TileBoard from './TileBoard.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { statusLabel } from '../lib/status.js';
@@ -271,6 +272,8 @@ export default function Admin() {
             <h2>Score</h2>
             <Scoreboard scores={scores} myTeamId={null} />
           </section>
+
+          <DiscordWebhooks gameId={game.id} gameTeams={gameTeams} />
 
           <section className="card">
             <h2>Evidence</h2>

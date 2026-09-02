@@ -10,6 +10,7 @@
 // See supabase/migrations/0021_evidence.sql.
 
 import { supabase } from './supabase.js';
+import { uploadToImgbb } from './imgbb.js';
 
 export const BUCKET = 'evidence';
 
@@ -66,9 +67,14 @@ export async function uploadEvidence({ gameId, teamId, claimId, file }) {
     .upload(path, blob, { contentType: blob.type, upsert: false });
   if (upErr) throw new Error(upErr.message);
 
+  // Best-effort: a public mirror for the Discord message to embed. Never
+  // blocks the submission — see lib/imgbb.js.
+  const publicUrl = await uploadToImgbb(blob);
+
   const { data, error } = await supabase.rpc('add_evidence', {
     p_claim_id: claimId,
     p_storage_path: path,
+    p_public_url: publicUrl,
   });
   if (error) throw new Error(error.message);
   return data;
