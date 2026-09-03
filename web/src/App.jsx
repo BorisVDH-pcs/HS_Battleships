@@ -8,7 +8,6 @@ import MyFleet from './components/MyFleet.jsx';
 import ActiveTiles from './components/ActiveTiles.jsx';
 import FireEffect from './components/FireEffect.jsx';
 import EventFeed from './components/EventFeed.jsx';
-import Scoreboard from './components/Scoreboard.jsx';
 import CaptainPlacement from './components/CaptainPlacement.jsx';
 import Admin from './components/Admin.jsx';
 import TeamNameEditor from './components/TeamNameEditor.jsx';
@@ -134,7 +133,7 @@ export default function App() {
     }
   }
 
-  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, scores, evidence } = game;
+  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, evidence } = game;
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
@@ -209,12 +208,6 @@ export default function App() {
               <TeamNameEditor team={myTeam} onRenamed={() => game.refresh()} />
             </section>
           )}
-
-          {/* During preparation there is no board layout to sit beside, so
-              the score gets its own full-width row same as always. Once the
-              boards appear it moves into the side column below, alongside
-              the active tiles. */}
-          {isPreparation && <Scoreboard scores={scores} myTeamId={myTeamId} />}
 
           {isPreparation && myTeamId && (
             <CaptainPlacement
@@ -345,11 +338,6 @@ export default function App() {
                     }}
                   />
                 )}
-
-                {/* Below the active tiles rather than above: the two slots are
-                    the thing a player checks and acts on constantly, the
-                    score is read-only context they check less often. */}
-                <Scoreboard scores={scores} myTeamId={myTeamId} />
 
                 {!isFinished && myTeamId && (
                   <PetJar

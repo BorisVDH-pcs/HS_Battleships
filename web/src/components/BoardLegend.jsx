@@ -16,20 +16,20 @@ export default function BoardLegend({ view }) {
   if (view === 'fleet') {
     return (
       <p className="legend">
-        <span className="key ship" /> your ship
-        <span className="key hit" /> hull hit
-        <span className="key hit sunk" /> ship sunk
-        <span className="key miss" /> they missed
+        <span className="legend-item"><span className="key ship" />your ship</span>
+        <span className="legend-item"><span className="key hit" />hull hit</span>
+        <span className="legend-item"><span className="key hit sunk" />ship sunk</span>
+        <span className="legend-item"><span className="key miss" />they missed</span>
       </p>
     );
   }
 
   return (
     <p className="legend">
-      <span className="key active" /> locked in, not yet fired
-      <span className="key hit dealt" /> your hit
-      <span className="key hit dealt sunk" /> ship sunk
-      <span className="key miss" /> your miss
+      <span className="legend-item"><span className="key active" />locked in, not yet fired</span>
+      <span className="legend-item"><span className="key hit dealt" />your hit</span>
+      <span className="legend-item"><span className="key hit dealt sunk" />ship sunk</span>
+      <span className="legend-item"><span className="key miss" />your miss</span>
     </p>
   );
 }

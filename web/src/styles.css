@@ -388,7 +388,6 @@ button.cell:disabled { cursor: default; }
    floating loose against the page — the same card vocabulary the admin
    console already uses, just with a little less padding since these sit in a
    narrower column. */
-.side-col .scoreboard,
 .side-col .active-tiles,
 .side-col .pet-jar,
 .feed-col .stats-panel {
@@ -400,7 +399,6 @@ button.cell:disabled { cursor: default; }
   background: linear-gradient(180deg, rgba(27, 22, 16, .55), rgba(20, 17, 12, .6));
 }
 @media (prefers-reduced-transparency: reduce) {
-  .side-col .scoreboard,
   .side-col .active-tiles,
   .side-col .pet-jar,
   .feed-col .stats-panel { background: var(--panel); }
@@ -412,11 +410,17 @@ button.cell:disabled { cursor: default; }
 .stats-panel h2 { display: flex; align-items: baseline; justify-content: space-between; }
 .stats-toggle { font-size: .75rem; }
 .stats-settings { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; font-size: .8rem; }
-/* Label text on the left, checkbox pinned to the right — with every row the
-   same width, the checkboxes line up in a single column instead of trailing
-   each label at whatever width its text happens to be. */
-.stats-settings label { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
-.stats-settings input[type="checkbox"] { flex: none; }
+/* Label text on the left, checkbox in its own column pinned to the box's
+   right edge — a shared two-column grid (rather than flex space-between,
+   which only pushes the checkbox to the edge of that row's own text) is what
+   actually keeps every checkbox in one straight line regardless of how long
+   its label is. */
+.stats-settings label {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: .6rem;
+}
+.stats-settings label span { min-width: 0; }
+.stats-settings input[type="checkbox"] { flex: none; justify-self: end; margin: 0; }
 .stats-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .stats-table th, .stats-table td { text-align: left; padding: .2rem .3rem; }
 .stats-table th:not(:first-child), .stats-table td:not(:first-child) { text-align: right; }
@@ -820,7 +824,7 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
 /* ---- admin board overview ---- */
 
 .legend {
-  display: flex; align-items: center; justify-content: center; gap: .4rem 1.1rem; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap;
   margin-top: 1rem; padding: .5rem .8rem;
   color: var(--muted); font-size: .8rem;
   border-radius: 6px;
@@ -828,9 +832,19 @@ label { display: grid; gap: .3rem; font-size: .8rem; color: var(--gold-dim); let
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+/* Each swatch and its label are one unit, spaced close together; a rule
+   between units is what actually separates one meaning from the next,
+   instead of one uniform gap doing both jobs at once. */
+.legend-item {
+  display: flex; align-items: center; gap: .35rem;
+  padding: 0 .9rem;
+}
+.legend-item:first-child { padding-left: 0; }
+.legend-item:last-child { padding-right: 0; }
+.legend-item + .legend-item { border-left: 1px solid var(--line); }
 .legend .key {
   width: .8rem; height: .8rem; border-radius: 3px;
-  display: inline-block; vertical-align: -1px; margin-right: .35rem;
+  flex: none;
   border: 1px solid var(--line);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
 }
