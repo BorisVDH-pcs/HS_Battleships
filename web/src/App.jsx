@@ -240,10 +240,12 @@ export default function App() {
           {!isPreparation && (
           <section className="boards">
             <div className="board-layout">
-              {/* The activity feed sits to the left of the board rather than
-                  below everything, and is height-capped with its own scroll
-                  so a long game doesn't grow the page underneath it. */}
+              {/* Stats sit above the activity feed in the same left-hand
+                  column: read-only context first, then the scrolling log
+                  underneath it, height-capped so a long game doesn't grow
+                  the page underneath it. */}
               <div className="feed-col">
+                <StatsPanel gameId={gameId} teams={teams} myTeamId={myTeamId} />
                 <EventFeed events={events} teams={teams} myTeamId={myTeamId} />
               </div>
 
@@ -317,12 +319,10 @@ export default function App() {
                 )}
               </div>
 
-              {/* The score and the two slots are what a player checks most
-                  often mid-game, so they sit beside the board rather than
-                  above or below it. */}
+              {/* The two slots are what a player checks and acts on most
+                  often mid-game, so they sit at the very top of the column
+                  beside the board rather than under the score. */}
               <div className="side-col">
-                <Scoreboard scores={scores} myTeamId={myTeamId} />
-
                 {/* Hidden once the game is finished. The slots carry working
                     upload controls, and a submit that completes a tile fires
                     the shot — so leaving them on screen after a result
@@ -347,9 +347,9 @@ export default function App() {
                 )}
 
                 {/* Below the active tiles rather than above: the two slots are
-                    the thing a player checks and acts on constantly, this is
-                    read-only context they check less often. */}
-                <StatsPanel gameId={gameId} teams={teams} myTeamId={myTeamId} />
+                    the thing a player checks and acts on constantly, the
+                    score is read-only context they check less often. */}
+                <Scoreboard scores={scores} myTeamId={myTeamId} />
 
                 {!isFinished && myTeamId && (
                   <PetJar

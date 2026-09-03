@@ -62,12 +62,12 @@ export default function StatsPanel({ gameId, teams, myTeamId }) {
           {STAT_DEFS.map((d) => (
             <li key={d.id}>
               <label>
+                <span>{d.label}</span>
                 <input
                   type="checkbox"
                   checked={shown.has(d.id)}
                   onChange={() => toggle(d.id)}
                 />
-                {d.label}
               </label>
             </li>
           ))}
