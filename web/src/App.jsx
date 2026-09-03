@@ -80,6 +80,26 @@ export default function App() {
 
   const game = useGame(gameId, session);
 
+  // A cannon fire is not a private event — every `shot_fired` row is
+  // world-readable (see 0039's `events_read` policy), so anyone with the
+  // page open, admins and teamless spectators included, should hear it the
+  // moment it lands rather than only the team that pulled the trigger.
+  useEffect(() => {
+    if (!supabase || !gameId) return undefined;
+    const channel = supabase
+      .channel(`shots:${gameId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
+        ({ new: row }) => {
+          if (row.type !== 'shot_fired') return;
+          setShot({ nonce: Date.now(), result: row.payload?.result });
+        }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [gameId]);
+
   // Signed up, but no captain has picked them yet. Showing the board here would
   // be a game they cannot touch, with the reason buried in a grey clause — so
   // they get a waiting room instead.
@@ -179,11 +199,15 @@ export default function App() {
           console instead, which carries its own both-boards overview. */}
       {isAdmin && <Admin />}
 
+      {/* Outside the admin/player split on purpose: an admin has no team but
+          still has the page open, and should hear a shot land same as
+          anyone else. */}
+      <FireEffect shot={shot} />
+
       {!isAdmin && <>
       {loading && <p>Loading game…</p>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="error">{notice}</p>}
-      <FireEffect shot={shot} />
 
       {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
 
@@ -348,7 +372,9 @@ export default function App() {
                     onRefresh={() => game.refresh()}
                     onFired={(tile, result) => {
                       setNotice(`${tile.name} — ${result.toUpperCase()}!`);
-                      setShot({ nonce: Date.now(), result });
+                      // Sound/animation come from the realtime subscription
+                      // above, not from here — that's the one path every
+                      // client (including this one) hears the shot through.
                       game.refresh();
                     }}
                   />
