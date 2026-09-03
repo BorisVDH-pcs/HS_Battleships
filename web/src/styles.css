@@ -472,6 +472,13 @@ button.cell:disabled { cursor: default; }
 }
 .slot:not(.empty):hover { transform: translateY(-2px); border-color: var(--line-lit); box-shadow: var(--glow-sm); }
 
+/* The card selected as the paste target — click anywhere on it to select. */
+.slot.filled.selected {
+  border-color: var(--gold);
+  box-shadow: var(--glow-sm);
+}
+.slot.filled { cursor: pointer; }
+
 /* An empty slot keeps the filled card's shape so the row does not resize as
    tiles are claimed and fired. */
 .slot.empty { color: var(--muted); border-style: dashed; background: none; }

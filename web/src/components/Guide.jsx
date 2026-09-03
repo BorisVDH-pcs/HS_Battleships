@@ -49,13 +49,14 @@ const TOUR_STEPS = [
       + 'task is hidden until your team claims it — picking is blind, there is no '
       + 'question to weigh first.<br><br>'
       + 'Click any unclaimed tile to <strong>lock it in</strong>. That reveals the task to your '
-      + 'team only, and takes one of your two active slots.',
+      + 'team only, and takes one of your active slots.',
   },
   {
     targetId: 'active-tiles-section',
-    title: '🗂️ Active Tiles — Your Two Slots',
-    body: 'A team can hold at most <strong>two</strong> claimed tiles at once. No third tile '
-      + 'can be claimed until one of these two is fired.<br><br>'
+    title: '🗂️ Active Tiles — Your Slots',
+    body: 'A team can hold at most a set number of claimed tiles at once (currently '
+      + '<strong>three</strong>). No new tile can be claimed until one of the current ones '
+      + 'is fired.<br><br>'
       + 'Each card shows the task for a tile you have locked in. An empty slot '
       + 'means you are free to claim another tile on the enemy board.',
   },
@@ -64,6 +65,9 @@ const TOUR_STEPS = [
     title: '📸 Firing — Submit Proof to Shoot',
     body: 'Complete the tile\'s in-game task, then attach a screenshot — drop a file, '
       + 'paste from your clipboard, or choose one from disk.<br><br>'
+      + 'Click anywhere on a tile\'s card to <strong>select it</strong> (it lights up) — '
+      + 'that is where the next <strong>Ctrl+V</strong> lands, so this matters when you '
+      + 'have more than one active tile.<br><br>'
       + 'The submission that meets the required count <strong>is</strong> the shot: '
       + 'there is no separate "mark complete" button. HIT or MISS resolves immediately '
       + 'against the enemy\'s hidden placement, and the slot frees up.',

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
 import { useConfirm } from './ConfirmDialog.jsx';
 
@@ -8,10 +8,12 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * Three ways in, because people submit screenshots three ways: drag onto the
  * card, pick a file, or paste. Paste matters most — a fresh screenshot is on
  * the clipboard already, and asking someone to save it to disk first is asking
- * them not to bother. Clicking the zone (without hitting "choose a file")
- * just focuses it — that focus is what makes it the paste target, so on a
- * board with two active tiles a Ctrl+V goes to whichever slot was clicked
- * last, not whichever the browser happens to have focused.
+ * them not to bother. Which tile a Ctrl+V lands on is decided by which card
+ * was clicked last — anywhere on the card, not just this zone — tracked by
+ * ActiveTiles and shown with a highlight, since a plain focus ring on a small
+ * inner box was easy to miss on a board with several active tiles. This
+ * component exposes `stageFiles` via ref so the parent can hand it a pasted
+ * clipboard image.
  *
  * Dropping a file STAGES it; a second press submits it. That is what makes a
  * remove button possible at all: submitted evidence is immutable by design
@@ -28,15 +30,14 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * the card nearly twice as tall for something a player has already seen; the
  * organiser's review screen is where the images actually need looking at.
  */
-export default function EvidenceUploader({
+const EvidenceUploader = forwardRef(function EvidenceUploader({
   claimId, gameId, teamId, required, evidence, onUploaded, tileName,
-}) {
+}, ref) {
   const [staged, setStaged] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
-  const zoneRef = useRef(null);
   const [confirm, confirmDialog] = useConfirm();
 
   const have = evidence.length;
@@ -51,6 +52,8 @@ export default function EvidenceUploader({
     setError(null);
     setStaged((s) => [...s, ...images]);
   }
+
+  useImperativeHandle(ref, () => ({ stageFiles: stage }));
 
   // Computed from what is staged, not from `evidence`, which does not update
   // until the refetch after upload.
@@ -87,18 +90,6 @@ export default function EvidenceUploader({
     }
   }
 
-  // Paste while the card's zone has focus.
-  useEffect(() => {
-    const el = zoneRef.current;
-    if (!el) return;
-    function onPaste(e) {
-      const files = [...(e.clipboardData?.files ?? [])];
-      if (files.length) { e.preventDefault(); stage(files); }
-    }
-    el.addEventListener('paste', onPaste);
-    return () => el.removeEventListener('paste', onPaste);
-  });
-
   return (
     <div className="evidence">
       <p className="evidence-count">
@@ -127,9 +118,7 @@ export default function EvidenceUploader({
         </div>
       ) : (
         <div
-          ref={zoneRef}
           className={`evidence-drop${dragging ? ' over' : ''}`}
-          tabIndex={0}
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => {
@@ -142,7 +131,7 @@ export default function EvidenceUploader({
           <button
             type="button"
             className="link"
-            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+            onClick={(e) => { inputRef.current?.click(); }}
           >
             choose a file
           </button>
@@ -161,4 +150,6 @@ export default function EvidenceUploader({
       {confirmDialog}
     </div>
   );
-}
+});
+
+export default EvidenceUploader;

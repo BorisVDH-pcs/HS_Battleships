@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fireTile, completeTileEarly } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
 import TileIcon from './TileIcon.jsx';
@@ -17,13 +17,32 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * list, so they get the tile's own artwork at a size you can read across a
  * room, and an empty slot holds the same shape so the row does not jump as
  * tiles are locked in and fired.
+ *
+ * Which tile a paste lands on is a click anywhere on its card, not just its
+ * evidence zone — the whole card is the target, and `selected` shows which
+ * one it is, since a plain focus ring on the small inner box was easy to
+ * miss with several cards on screen.
  */
 export default function ActiveTiles({
   tiles, maxActive, onFired, onRefresh, emptyHint, gameId, teamId, evidence = [],
 }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedClaimId, setSelectedClaimId] = useState(null);
+  const uploaderRefs = useRef(new Map());
   const [confirm, confirmDialog] = useConfirm();
+
+  useEffect(() => {
+    function onPaste(e) {
+      if (!selectedClaimId) return;
+      const files = [...(e.clipboardData?.files ?? [])];
+      if (!files.length) return;
+      const uploader = uploaderRefs.current.get(selectedClaimId);
+      if (uploader) { e.preventDefault(); uploader.stageFiles(files); }
+    }
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [selectedClaimId]);
 
   const active = tiles.filter((t) => t.claim_status === 'active');
 
@@ -99,7 +118,11 @@ export default function ActiveTiles({
           const ready = mine.length >= required;
 
           return (
-            <article key={tile.id} className="slot filled">
+            <article
+              key={tile.id}
+              className={`slot filled${selectedClaimId === tile.claim_id ? ' selected' : ''}`}
+              onClick={() => setSelectedClaimId(tile.claim_id)}
+            >
               {/* A locked-in tile always has its name; the artwork is optional,
                   so an undrawn tile borrows the stand-in, exactly as it does on
                   the board itself. */}
@@ -117,6 +140,10 @@ export default function ActiveTiles({
               </div>
 
               <EvidenceUploader
+                ref={(inst) => {
+                  if (inst) uploaderRefs.current.set(tile.claim_id, inst);
+                  else uploaderRefs.current.delete(tile.claim_id);
+                }}
                 claimId={tile.claim_id}
                 gameId={gameId}
                 teamId={teamId}
