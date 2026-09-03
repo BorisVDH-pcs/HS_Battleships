@@ -76,7 +76,7 @@ export default function ActiveTiles({
   }
 
   return (
-    <section className="active-tiles">
+    <section className="active-tiles" id="active-tiles-section">
       <h2>Active tiles ({active.length}/{maxActive})</h2>
 
       <div className="slots">

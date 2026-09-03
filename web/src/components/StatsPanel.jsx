@@ -49,7 +49,7 @@ export default function StatsPanel({ gameId, teams, myTeamId }) {
     (a.teamId === myTeamId ? -1 : 0) - (b.teamId === myTeamId ? -1 : 0));
 
   return (
-    <section className="stats-panel">
+    <section className="stats-panel" id="stats-panel-section">
       <h2>
         Stats
         <button className="link stats-toggle" onClick={() => setSettingsOpen((s) => !s)}>

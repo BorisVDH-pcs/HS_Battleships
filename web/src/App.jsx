@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Guide from './components/Guide.jsx';
 import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
 import { coordLabel, fromPosition } from './lib/board.js';
@@ -37,6 +38,7 @@ export default function App() {
   // Above the early returns below, with the rest of the hooks — useConfirm
   // holds state of its own.
   const [confirm, confirmDialog] = useConfirm();
+  const guideRef = useRef(null);
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -151,13 +153,26 @@ export default function App() {
 
   return (
     <main className="app">
-      <header className="top">
+      <header className="top" id="app-header">
         <Wordmark />
         <div className="who">
           <span className="name">{displayName || 'Signed in'}</span>
+          {!isAdmin && (
+            <button className="link" onClick={() => guideRef.current?.openWelcome()}>
+              📖 How to Play
+            </button>
+          )}
           <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>
+
+      {!isAdmin && (
+        <Guide
+          ref={guideRef}
+          autoShow={!loading && Boolean(game.game) && !waitingForTeam}
+          onTabNeed={setBoardTab}
+        />
+      )}
 
       {/* An admin has no team, so the player view would show them an empty
           board and a lock-in button that cannot work. They get the organiser's
@@ -245,7 +260,7 @@ export default function App() {
               <div className="board-col">
                 {/* The same tab strip the admin console uses, so this reads as
                     part of the app rather than a second idea about tabs. */}
-                <div className="tabs board-tabs">
+                <div className="tabs board-tabs" id="board-tabs-row">
                   <button
                     className={boardTab === 'enemy' ? 'on' : ''}
                     onClick={() => setBoardTab('enemy')}
@@ -266,7 +281,7 @@ export default function App() {
                 </div>
 
                 {boardTab === 'enemy' ? (
-                  <>
+                  <div id="enemy-board-section">
                     <EnemyGrid
                       tiles={tiles}
                       onClaim={onClaim}
@@ -298,9 +313,9 @@ export default function App() {
                         onClose={() => setOpenTileId(null)}
                       />
                     )}
-                  </>
+                  </div>
                 ) : (
-                  <>
+                  <div id="fleet-board-section">
                     <MyFleet
                       myShipCells={myShipCells}
                       enemyShots={enemyShots}
@@ -308,7 +323,7 @@ export default function App() {
                       tiles={tiles}
                     />
                     <BoardLegend view="fleet" />
-                  </>
+                  </div>
                 )}
               </div>
 

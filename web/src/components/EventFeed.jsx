@@ -72,7 +72,7 @@ export default function EventFeed({ events, teams, myTeamId }) {
   }
 
   return (
-    <section className="feed">
+    <section className="feed" id="event-feed-section">
       <h2>Activity</h2>
       <ul>
         {events.map((e) => (

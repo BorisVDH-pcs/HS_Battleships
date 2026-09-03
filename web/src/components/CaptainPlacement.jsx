@@ -26,7 +26,7 @@ export default function CaptainPlacement({
 
   if (!isCaptain) {
     return (
-      <section className="card">
+      <section className="card" id="fleet-placer-section">
         <h2>Fleet preparation</h2>
         <p className="muted">
           {done
@@ -38,7 +38,7 @@ export default function CaptainPlacement({
   }
 
   return (
-    <section className="card">
+    <section className="card" id="fleet-placer-section">
       <h2>Place your fleet</h2>
 
       {done && !repositioning ? (
