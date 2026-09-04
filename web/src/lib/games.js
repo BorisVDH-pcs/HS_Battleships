@@ -19,7 +19,12 @@ export async function listMyGames(uid) {
 
   const { data, error } = await supabase
     .from('team_members')
-    .select('teams!inner(id, name, game_id, games!inner(id, name, status, created_at))')
+    // `games!teams_game_id_fkey` and not plain `games`: there are two foreign
+    // keys between these tables -- teams.game_id -> games.id, and the
+    // games.winner_team_id -> teams.id added after teams existed (0001) -- so
+    // an unqualified embed is ambiguous and PostgREST rejects the whole query
+    // with PGRST201. Verified against the live schema, not assumed.
+    .select('teams!inner(id, name, game_id, games!teams_game_id_fkey!inner(id, name, status, created_at))')
     .eq('profile_id', uid);
 
   if (error) throw new Error(error.message);
