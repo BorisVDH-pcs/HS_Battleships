@@ -1388,3 +1388,51 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   .guide-card { max-height: 92vh; }
   .guide-tour-card { left: .6rem; right: .6rem; bottom: .6rem; width: auto; }
 }
+
+/* The game switcher, inline in the status line. Wears the title's own type so
+   it reads as the heading it replaces rather than as a form control -- the
+   chevron is the only hint that it is pressable, which is the intent. */
+.status .game-pick {
+  appearance: none; -webkit-appearance: none;
+  /* The global `input, select, textarea` rule above sets width:100%, which
+     would break this out of the sentence and onto a line of its own. */
+  width: auto;
+  max-width: 100%;
+  vertical-align: baseline;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: .05rem 1.25rem .05rem .3rem;
+  margin-left: -.3rem;
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
+  /* Chevron drawn in, since appearance:none takes the native one away. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--gold) 50%),
+                    linear-gradient(135deg, var(--gold) 50%, transparent 50%);
+  background-position: right .55rem center, right .3rem center;
+  background-size: .25rem .25rem, .25rem .25rem;
+  background-repeat: no-repeat;
+}
+.status .game-pick:hover { border-color: var(--gold-deep); }
+.status .game-pick:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+/* Safari on iOS zooms the whole page when a control smaller than 16px takes
+   focus, and the body type here is 15px. One pixel nobody will notice buys a
+   board that does not jump on a phone -- which is where this gets used. */
+@media (pointer: coarse) {
+  .status .game-pick { font-size: 16px; }
+}
+
+/* The popup list is drawn by the OS and inherits none of the above, so it
+   needs colours and type that stand on their own. */
+.status .game-pick option {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--body);
+  font-weight: 400;
+  letter-spacing: normal;
+}

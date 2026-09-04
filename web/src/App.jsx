@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Guide from './components/Guide.jsx';
 import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
@@ -18,6 +18,8 @@ import BoardLegend from './components/BoardLegend.jsx';
 import PetJar from './components/PetJar.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
+import GamePicker from './components/GamePicker.jsx';
+import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
 import { statusLabel } from './lib/status.js';
 import { REVEAL_DELAY_MS } from './lib/fireEffect.js';
 
@@ -25,6 +27,9 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [ready, setReady] = useState(false);
   const [gameId, setGameId] = useState(null);
+  // Every game this player is rostered into. Empty for an admin, and for a
+  // signup no captain has picked yet -- both fall back below.
+  const [myGames, setMyGames] = useState([]);
   const [notice, setNotice] = useState(null);
   const [shot, setShot] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
@@ -56,16 +61,98 @@ export default function App() {
   // set at sign-up, and by the admin snippet — so no extra query is needed.
   const displayName = session?.user?.user_metadata?.display_name ?? '';
 
-  // Pick the most recent game the player can see.
-  useEffect(() => {
-    if (!supabase || !session) return;
-    supabase
+  const uid = session?.user?.id ?? null;
+
+  // The chosen game, mirrored so the roster refresh can read it without taking
+  // it as a dependency -- which would rebuild the refresh on every switch.
+  const gameIdRef = useRef(null);
+  gameIdRef.current = gameId;
+  // Bumped per roster read, so an alt-tab storm cannot let a slow earlier reply
+  // land on top of a newer one.
+  const gamesSeq = useRef(0);
+  // Returning to the tab fires `focus` and `visibilitychange` together, and
+  // both need to stay: only `visibilitychange` covers a phone unlocking, only
+  // `focus` covers a desktop alt-tab, where the page never became hidden.
+  // Collapsing the overlap here is cheaper than dropping either one.
+  const gamesAt = useRef(0);
+
+  // Which game to show.
+  //
+  // Rostered players get their own games, newest first, with their last pick
+  // restored. Everyone else keeps the original behaviour -- newest game that
+  // exists, membership or not -- and that fallback is load-bearing twice over:
+  //
+  //   * an admin has no team, and `gameId` also drives the shot-sound channel
+  //     below, which sits outside the isAdmin split on purpose so the organiser
+  //     hears cannons land. Filtering it to "my games" would silence them;
+  //   * `waitingForTeam` needs a game to be loaded before it will show the
+  //     waiting room. With no gameId a fresh signup gets "No game yet. An admin
+  //     needs to create one." instead -- true of nobody, and alarming.
+  const loadGames = useCallback(async ({ throttle = false } = {}) => {
+    if (!supabase || !uid) return;
+    if (throttle && Date.now() - gamesAt.current < 1500) return;
+    gamesAt.current = Date.now();
+    const seq = ++gamesSeq.current;
+
+    let mine = [];
+    try {
+      mine = await listMyGames(uid);
+    } catch {
+      // A failed roster read should not black out the board. Fall through to
+      // the newest-game query, which is what this page did before the picker.
+      mine = [];
+    }
+    if (seq !== gamesSeq.current) return;
+    setMyGames(mine);
+
+    if (mine.length > 0) {
+      // Re-runs must not move a player who is already somewhere valid. This is
+      // the guard that makes the refresh below safe to fire on every alt-tab,
+      // and it is what keeps a player put when localStorage is unavailable --
+      // in a private window `readGamePick` always returns null, so without it
+      // every refresh would snap them back to the newest game mid-match.
+      if (mine.some((g) => g.gameId === gameIdRef.current)) return;
+
+      // A stored pick can name a game since deleted from the admin console, so
+      // it is only honoured if it is still in the list.
+      const saved = readGamePick(uid);
+      const pick = mine.some((g) => g.gameId === saved) ? saved : mine[0].gameId;
+      writeGamePick(uid, pick);
+      setGameId(pick);
+      return;
+    }
+
+    const { data } = await supabase
       .from('games')
       .select('id')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .then(({ data }) => setGameId(data?.[0]?.id ?? null));
-  }, [session]);
+      .limit(1);
+    if (seq !== gamesSeq.current) return;
+    setGameId(data?.[0]?.id ?? null);
+  }, [uid]);
+
+  useEffect(() => {
+    // Signed out, or swapped for another player on a shared phone: drop the
+    // previous roster rather than briefly offering it to whoever is next.
+    if (!uid) { setMyGames([]); setGameId(null); return; }
+    loadGames();
+  }, [uid, loadGames]);
+
+  // Nothing writes a game_event when a captain adds a player, renames a game or
+  // deletes one, so the Realtime subscription never hears about any of it. A
+  // player coming back to the tab is the cheap moment to re-check: it catches
+  // the game they were just added to, and moves them off one that has been
+  // deleted under them.
+  useEffect(() => {
+    if (!uid) return undefined;
+    const recheck = () => { if (!document.hidden) loadGames({ throttle: true }); };
+    window.addEventListener('focus', recheck);
+    document.addEventListener('visibilitychange', recheck);
+    return () => {
+      window.removeEventListener('focus', recheck);
+      document.removeEventListener('visibilitychange', recheck);
+    };
+  }, [uid, loadGames]);
 
   // Whether to offer the admin tab. Cosmetic only — every admin RPC re-checks
   // is_admin() server-side, so faking this flag buys nothing.
@@ -111,13 +198,21 @@ export default function App() {
   // never fires for it. Poll while waiting so the page lets them in by itself
   // rather than needing to be told to refresh. Must sit above the early returns
   // below — a hook after a conditional return is a hook that sometimes vanishes.
+  //
+  // The roster read goes with it: a captain may well add this player to an
+  // older game rather than the newest one on screen, and refreshing only the
+  // game being watched would leave them in the waiting room staring at a game
+  // they were never going to be in.
   const refreshRef = useRef(game.refresh);
   refreshRef.current = game.refresh;
   useEffect(() => {
-    if (!waitingForTeam) return;
-    const id = setInterval(() => refreshRef.current?.(), 10000);
+    if (!waitingForTeam) return undefined;
+    const id = setInterval(() => {
+      refreshRef.current?.();
+      loadGames();
+    }, 10000);
     return () => clearInterval(id);
-  }, [waitingForTeam]);
+  }, [waitingForTeam, loadGames]);
 
   if (!isSupabaseConfigured) {
     return (
@@ -154,6 +249,28 @@ export default function App() {
     } finally {
       setBusyTileId(null);
     }
+  }
+
+  // Moving to another game. Four pieces of state below are keyed to the board
+  // being left, and none of them survive the move meaningfully:
+  //
+  //   shot        -- would fire a cannon and a hit sound for the other game;
+  //   openTileId  -- a tile id from the old board, so the evidence panel would
+  //                  open on a square that is not there;
+  //   busyTileId  -- leaves a square spinning forever, nothing will clear it;
+  //   notice      -- an error about a game no longer on screen.
+  //
+  // useGame needs no help: `load` is keyed on gameId and the channel cleanup
+  // clears its pending reveal timers.
+  function switchGame(nextId) {
+    if (!nextId || nextId === gameId) return;
+    setShot(null);
+    setOpenTileId(null);
+    setBusyTileId(null);
+    setNotice(null);
+    setBoardTab('enemy');
+    writeGamePick(uid, nextId);
+    setGameId(nextId);
   }
 
   const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, evidence } = game;
@@ -228,7 +345,13 @@ export default function App() {
       {game.game && !waitingForTeam && (
         <>
           <p className="status">
-            <strong>{game.game.name}</strong> — {statusLabel(game.game.status)}
+            <GamePicker
+              games={myGames}
+              gameId={gameId}
+              onPick={switchGame}
+              fallbackName={game.game.name}
+            />{' '}
+            — {statusLabel(game.game.status)}
             {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
           </p>
 

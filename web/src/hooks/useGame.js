@@ -2,6 +2,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { REVEAL_DELAY_MS } from '../lib/fireEffect.js';
 
+const BLANK = {
+  loading: true,
+  error: null,
+  game: null,
+  teams: [],
+  myTeamId: null,
+  myRole: null,     // 'captain' lets this player place the team's fleet
+  tiles: [],        // tiles_for_me: name is null until my team claims it
+  myShipCells: [],  // my own placement (RLS hides the enemy's)
+  myFleet: [],      // ship_status for my fleet only
+  enemyShots: [],   // fired claims by the other team, onto my board
+  events: [],
+  scores: [],       // team_scores: derived totals for BOTH teams, no free text
+  evidence: [],     // my_evidence: my team's uploads, keyed to claims
+};
+
 /**
  * Loads everything the board needs for one game and keeps it live.
  *
@@ -10,24 +26,26 @@ import { REVEAL_DELAY_MS } from '../lib/fireEffect.js';
  * whole game. That replaces the Apps Script's 120-second polling loop.
  */
 export function useGame(gameId, session) {
-  const [state, setState] = useState({
-    loading: true,
-    error: null,
-    game: null,
-    teams: [],
-    myTeamId: null,
-    myRole: null,     // 'captain' lets this player place the team's fleet
-    tiles: [],        // tiles_for_me: name is null until my team claims it
-    myShipCells: [],  // my own placement (RLS hides the enemy's)
-    myFleet: [],      // ship_status for my fleet only
-    enemyShots: [],   // fired claims by the other team, onto my board
-    events: [],
-    scores: [],       // team_scores: derived totals for BOTH teams, no free text
-    evidence: [],     // my_evidence: my team's uploads, keyed to claims
-  });
+  const [state, setState] = useState(BLANK);
+
+  // Bumped on every load. A switch fires a second load while the first is still
+  // in flight, and the two can come back in either order -- on a phone on event
+  // wifi, routinely the wrong one. Without this, a slow reply for the game just
+  // left repaints its tiles over the game now on screen, and `loading` goes
+  // false, so it looks settled and correct.
+  const loadSeq = useRef(0);
+  // The game currently being shown, as opposed to the one a given `load` call
+  // closed over. `refresh` is handed out to callers -- onClaim awaits it after
+  // claimTile resolves -- so a call started before a switch can still be in
+  // flight after it, holding the previous gameId. The sequence number alone
+  // does not catch that: the stale call bumps it too, then passes its own
+  // check and paints the game just left over the one now on screen.
+  const shownId = useRef(gameId);
+  shownId.current = gameId;
 
   const load = useCallback(async () => {
     if (!supabase || !gameId || !session) return;
+    const seq = ++loadSeq.current;
     try {
       const uid = session.user.id;
 
@@ -88,6 +106,7 @@ export function useGame(gameId, session) {
         enemyShots = data ?? [];
       }
 
+      if (seq !== loadSeq.current || gameId !== shownId.current) return;
       setState({
         loading: false,
         error: null,
@@ -104,9 +123,26 @@ export function useGame(gameId, session) {
         evidence: evidence ?? [],
       });
     } catch (err) {
+      if (seq !== loadSeq.current || gameId !== shownId.current) return;
       setState((s) => ({ ...s, loading: false, error: err.message }));
     }
   }, [gameId, session]);
+
+  // Clear the board the moment the game changes, ahead of the refetch.
+  //
+  // `load` is async and only calls setState when it returns, so without this
+  // the previous game's tiles stay on screen -- with `loading` false -- under
+  // the new game's name. That is not just untidy: the squares are live, and a
+  // click landing in that window would call claimTile() with a tile id from
+  // the game the player just left, spending an active slot over there.
+  //
+  // Keyed on gameId alone, so `refresh` after a claim still updates in place
+  // rather than flashing the board empty on every action.
+  const firstLoad = useRef(true);
+  useEffect(() => {
+    if (firstLoad.current) { firstLoad.current = false; return; }
+    setState(BLANK);
+  }, [gameId]);
 
   useEffect(() => {
     load();
