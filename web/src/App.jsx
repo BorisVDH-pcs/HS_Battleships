@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Guide from './components/Guide.jsx';
 import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
-import { coordLabel, fromPosition } from './lib/board.js';
+import { coordLabel, fromPosition, sunkShipIds } from './lib/board.js';
 import Login from './components/Login.jsx';
 import EnemyGrid from './components/EnemyGrid.jsx';
 import MyFleet from './components/MyFleet.jsx';
@@ -284,7 +284,11 @@ export default function App() {
   const isFinished = game.game?.status === 'finished';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
-  const sunkCount = myFleet.filter((s) => s.sunk).length;
+  // ship_status.sunk is always false when a player reads it, so this counted
+  // an intact fleet however much of it was on the bottom - see sunkShipIds.
+  // myFleet is still the source of how many hulls there are; only its damage
+  // columns are unreadable from here.
+  const sunkCount = sunkShipIds(myShipCells, enemyShots, tiles).size;
   // Re-read from `tiles` so the panel's counts follow a refresh rather than
   // freezing at whatever they were when the square was pressed.
   const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
@@ -467,7 +471,6 @@ export default function App() {
                     <MyFleet
                       myShipCells={myShipCells}
                       enemyShots={enemyShots}
-                      myFleet={myFleet}
                       tiles={tiles}
                     />
                     <BoardLegend view="fleet" />

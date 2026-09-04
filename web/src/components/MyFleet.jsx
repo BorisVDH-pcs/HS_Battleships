@@ -1,18 +1,20 @@
 import { Fragment } from 'react';
-import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board.js';
+import { GRID, colLetter, coordLabel, cellKey, fromPosition, sunkShipIds } from '../lib/board.js';
 
 /**
  * Your own board: where your ships sit, and where the enemy has shot.
  * `myShipCells` comes straight from the database — RLS guarantees the opponent
  * cannot run this same query against your team.
  */
-export default function MyFleet({ myShipCells, enemyShots, myFleet, tiles }) {
+export default function MyFleet({ myShipCells, enemyShots, tiles }) {
   const ships = new Set(myShipCells.map((c) => cellKey(c.row, c.col)));
 
   // Which ship occupies each cell, so a hit can be traced back to whether
   // that ship — not just that square — has gone down.
   const shipAt = new Map(myShipCells.map((c) => [cellKey(c.row, c.col), c.ship_id]));
-  const sunkShips = new Set((myFleet ?? []).filter((s) => s.sunk).map((s) => s.ship_id));
+  // Derived here rather than read off ship_status.sunk, which is always false
+  // for a player - see sunkShipIds for why.
+  const sunkShips = sunkShipIds(myShipCells, enemyShots, tiles);
 
   // Enemy shots reference tile ids; resolve them to coordinates via the tile list.
   const tilePos = new Map(tiles.map((t) => [t.id, t.position]));

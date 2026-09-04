@@ -183,10 +183,14 @@ export default function AdminOverview({ gameId, teams }) {
 
           return (
             <section key={team.id}>
+              {/* Whose board this is, then whose fleet is under it. "X's shots ·
+                  Y's ships" gave both halves equal weight and read as two
+                  separate things; the board belongs to one team, and the other
+                  team's fleet is a detail about it. */}
               <h3>
                 {enemy
-                  ? `${team.name}’s shots · ${enemy.name}’s ships`
-                  : team.name}
+                  ? `${team.name}’s board (with ${enemy.name}’s ships)`
+                  : `${team.name}’s board`}
               </h3>
               <p className="muted">
                 {shipIds.size === 0
@@ -263,12 +267,16 @@ export default function AdminOverview({ gameId, teams }) {
         })}
       </div>
 
+      {/* Each swatch and its label are one unit, wrapped in .legend-item — the
+          same markup BoardLegend uses. Without the wrapper the swatches sat
+          flush against their own labels and the labels ran straight into the
+          next swatch, so five entries read as one unbroken line of text. */}
       <p className="legend">
-        <span className="key ship" /> enemy ship afloat
-        <span className="key hit dealt" /> hit
-        <span className="key hit dealt sunk" /> ship sunk
-        <span className="key miss" /> miss
-        <span className="key active" /> locked in, not yet fired
+        <span className="legend-item"><span className="key ship" />enemy ship afloat</span>
+        <span className="legend-item"><span className="key hit dealt" />hit</span>
+        <span className="legend-item"><span className="key hit dealt sunk" />ship sunk</span>
+        <span className="legend-item"><span className="key miss" />miss</span>
+        <span className="legend-item"><span className="key active" />locked in, not yet fired</span>
       </p>
 
       {selected && (

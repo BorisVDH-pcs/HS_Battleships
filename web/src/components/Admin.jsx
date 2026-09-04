@@ -6,7 +6,6 @@ import {
   adminListShipCells, adminListWebhooks,
 } from '../lib/supabase.js';
 import AdminOverview from './AdminOverview.jsx';
-import Scoreboard from './Scoreboard.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
 import DiscordWebhooks from './DiscordWebhooks.jsx';
@@ -36,10 +35,12 @@ export default function Admin() {
   const [profiles, setProfiles] = useState([]);
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
-  const [scores, setScores] = useState([]);
   const [shipCells, setShipCells] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [gameId, setGameId] = useState(null);
+  // Which section is on screen. The console used to be one long scroll of eight
+  // cards, so finding Roster meant paging past the whole board overview.
+  const [pane, setPane] = useState('games');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -51,7 +52,14 @@ export default function Admin() {
   const loadGames = useCallback(async () => {
     const [{ data: g }, { data: t }, { data: p }, { data: m }] = await Promise.all([
       supabase.from('games').select('*').order('created_at', { ascending: false }),
-      supabase.from('teams').select('*'),
+      // Creation slot: team one (the first name typed into New game) is always
+      // the left board, team two always the right, and a rename never moves
+      // either. See 0044 for why neither created_at nor id could answer this -
+      // both teams are inserted in one statement and share a timestamp, so
+      // ordering by it was ordering by a tie. This query had no order at all
+      // before, which left the boards, the roster columns and the "A vs B"
+      // line to whatever Postgres happened to return.
+      supabase.from('teams').select('*').order('slot'),
       supabase.from('profiles').select('id, display_name, is_admin').order('display_name'),
       supabase.from('team_members').select('team_id, profile_id, role'),
     ]);
@@ -62,19 +70,17 @@ export default function Admin() {
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
-    if (!id) { setTiles([]); setScores([]); setShipCells([]); setWebhooks([]); return; }
+    if (!id) { setTiles([]); setShipCells([]); setWebhooks([]); return; }
     try {
       // Fleets and webhooks are fetched here, not left to the panels that show
       // them, because the checklist has to answer "is this ready to start"
       // before the organiser has scrolled as far as either panel.
-      const [t, { data: sc }, ships, hooks] = await Promise.all([
+      const [t, ships, hooks] = await Promise.all([
         adminListTiles(id),
-        supabase.rpc('team_scores', { p_game_id: id }),
         adminListShipCells(id),
         adminListWebhooks(id),
       ]);
       setTiles(t ?? []);
-      setScores(sc ?? []);
       setShipCells(ships ?? []);
       setWebhooks(hooks ?? []);
     } catch (err) {
@@ -220,14 +226,74 @@ export default function Admin() {
     return 'Still needed: ' + missing.map((c) => c.label.toLowerCase()).join(', ');
   }
 
+  // Configure is where every fixable requirement is fixed — tiles, captains and
+  // players all live in that pane — so the count of what is still blocking goes
+  // on it. Fleets are the captains' job and Teams is fixed at creation, so
+  // neither is something this console can badge a way to.
+  const configureBadge = blocking.filter(
+    (c) => c.key === 'tiles' || c.key === 'captains' || c.key === 'roster'
+  ).length;
+
+  // Configure and Track are both about a chosen game, so with none chosen there
+  // is nothing for them to show. Derived rather than corrected in an effect, so
+  // deleting the open game cannot leave the console pointing at a blank pane.
+  const activePane = !game && pane !== 'games' ? 'games' : pane;
+
+  const sections = [
+    {
+      key: 'games', label: 'Games', badge: 0, enabled: true,
+      hint: 'Create one, or pick one to work on',
+    },
+    {
+      key: 'configure', label: 'Configure', badge: configureBadge, enabled: Boolean(game),
+      hint: game ? 'Tiles, teams, roster, Discord' : 'Pick a game first',
+    },
+    {
+      key: 'track', label: 'Track', badge: 0, enabled: Boolean(game),
+      hint: game ? 'Boards and evidence' : 'Pick a game first',
+    },
+  ];
+
   return (
-    <div className="admin">
+    <div className="admin-split">
+      {/* Which section is on screen, and — once a game is open — which game every
+          section is talking about. Sticky, so that answer travels with you down
+          a long pane instead of scrolling off the top. */}
+      <nav className="admin-nav" aria-label="Admin sections">
+        {game && (
+          <div className="admin-nav-game">
+            <span className="admin-nav-game-name">{game.name}</span>
+            <span className={`pill ${game.status}`}>{statusLabel(game.status)}</span>
+          </div>
+        )}
+        <ul>
+          {sections.map((s) => (
+            <li key={s.key}>
+              <button
+                className={`admin-nav-item${activePane === s.key ? ' on' : ''}`}
+                aria-current={activePane === s.key ? 'page' : undefined}
+                disabled={!s.enabled}
+                onClick={() => setPane(s.key)}
+              >
+                <span className="admin-nav-label">
+                  {s.label}
+                  {s.badge > 0 && <span className="admin-nav-badge">{s.badge}</span>}
+                </span>
+                <span className="admin-nav-hint">{s.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className="admin">
       {error && <p className="error">{error}</p>}
       {notice && <p className="muted">{notice}</p>}
 
+      {activePane === 'games' && <>
       <NewGame busy={busy} onCreate={(...args) =>
         run(() => adminCreateGame(...args), 'Game created. Add its tiles next.')
-          .then((id) => { if (id) setGameId(id); })
+          .then((id) => { if (id) { setGameId(id); setPane('configure'); } })
       } />
 
       <section className="card">
@@ -244,7 +310,16 @@ export default function Admin() {
                   <div className="meta">{names.join(' vs ') || 'no teams'}</div>
                 </div>
                 <div className="row">
-                  <button className="ghost" onClick={() => setGameId(g.id === gameId ? null : g.id)}>
+                  {/* Managing a game is the same gesture as opening it, so it
+                      lands you in Configure rather than leaving you to find the
+                      sidebar entry that just became available. */}
+                  <button
+                    className="ghost"
+                    onClick={() => {
+                      if (g.id === gameId) { setGameId(null); setPane('games'); }
+                      else { setGameId(g.id); setPane('configure'); }
+                    }}
+                  >
                     {g.id === gameId ? 'Close' : 'Manage'}
                   </button>
                   <button
@@ -265,7 +340,7 @@ export default function Admin() {
                         }
                       ))) return;
                       await run(() => adminDeleteGame(g.id), 'Game deleted.');
-                      if (gameId === g.id) setGameId(null);
+                      if (gameId === g.id) { setGameId(null); setPane('games'); }
                     }}
                   >
                     Delete
@@ -276,8 +351,9 @@ export default function Admin() {
           })}
         </ul>
       </section>
+      </>}
 
-      {game && (
+      {activePane === 'configure' && game && (
         <>
           <section className="card">
             <h2>{game.name} — {statusLabel(game.status)}</h2>
@@ -395,7 +471,14 @@ export default function Admin() {
             gameTeams={gameTeams}
             onChanged={() => loadGameDetail(game.id)}
           />
+        </>
+      )}
 
+      {/* Watching a game that is already set up. Both of these fetch on mount,
+          so keeping them in their own pane also means a game you only came in to
+          configure no longer loads every board and every screenshot first. */}
+      {activePane === 'track' && game && (
+        <>
           <section className="card">
             <h2>Boards</h2>
             <p className="muted">
@@ -405,12 +488,6 @@ export default function Admin() {
               mid-task — and clicking one opens what they have submitted for it.
             </p>
             <AdminOverview gameId={game.id} teams={gameTeams} />
-          </section>
-
-          {/* No heading here: Scoreboard renders its own <h2>Score</h2>, and
-              wrapping it in a section with a second one printed the word twice. */}
-          <section className="card">
-            <Scoreboard scores={scores} myTeamId={null} />
           </section>
 
           <section className="card">
@@ -426,6 +503,7 @@ export default function Admin() {
       )}
 
       {confirmDialog}
+      </div>
     </div>
   );
 }
