@@ -100,6 +100,24 @@ export default function Admin() {
     return () => supabase.removeChannel(channel);
   }, [gameId, loadGames, loadGameDetail]);
 
+  // The subscription above only hears game_events. Roster changes and tile
+  // edits write none, so a second organiser working in another browser leaves
+  // this checklist showing a game that is more ready than it looks. Re-reading
+  // when the tab comes back covers it, the same way the player board does.
+  useEffect(() => {
+    const recheck = () => {
+      if (document.hidden) return;
+      loadGames();
+      loadGameDetail(gameId);
+    };
+    window.addEventListener('focus', recheck);
+    document.addEventListener('visibilitychange', recheck);
+    return () => {
+      window.removeEventListener('focus', recheck);
+      document.removeEventListener('visibilitychange', recheck);
+    };
+  }, [gameId, loadGames, loadGameDetail]);
+
   async function run(fn, okMessage) {
     setBusy(true); setError(null); setNotice(null);
     try {
@@ -372,7 +390,11 @@ export default function Admin() {
               than between Score and Evidence, where it sat before. Since 0042 a
               game with no webhook posts nothing, so this is now a step someone
               has to actively decide to skip, not one they can fail to notice. */}
-          <DiscordWebhooks gameId={game.id} gameTeams={gameTeams} />
+          <DiscordWebhooks
+            gameId={game.id}
+            gameTeams={gameTeams}
+            onChanged={() => loadGameDetail(game.id)}
+          />
 
           <section className="card">
             <h2>Boards</h2>

@@ -6,8 +6,14 @@ import { adminListWebhooks, adminSetWebhook, adminDeleteWebhook } from '../lib/s
  * game_won, etc. — see is_team_private_event in 0036/0039) plus one row per
  * team (evidence_submitted and pet_jar_submitted route only there, images
  * included when imgbb is configured — see 0040).
+ *
+ * `onChanged` fires after a webhook is saved or deleted. This panel owns its own
+ * rows and reloads them itself, which was self-contained until the setup
+ * checklist started reporting whether a game has a webhook at all. That count
+ * lives in Admin, so a save here has to say so — otherwise the checklist keeps
+ * claiming "none" until the page is reloaded.
  */
-export default function DiscordWebhooks({ gameId, gameTeams }) {
+export default function DiscordWebhooks({ gameId, gameTeams, onChanged }) {
   const [rows, setRows] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
@@ -23,6 +29,13 @@ export default function DiscordWebhooks({ gameId, gameTeams }) {
       setLoaded(true);
     }
   }, [gameId]);
+
+  // Reload this panel, then tell the parent. Wrapped once so every save and
+  // delete below goes through the same path and none can forget the second half.
+  const refresh = useCallback(async () => {
+    await load();
+    onChanged?.();
+  }, [load, onChanged]);
 
   useEffect(() => { setLoaded(false); load(); }, [load]);
 
@@ -46,8 +59,8 @@ export default function DiscordWebhooks({ gameId, gameTeams }) {
           <WebhookRow
             title="General (both teams)"
             row={general}
-            onSave={(url, enabled) => adminSetWebhook(gameId, null, url, enabled).then(load)}
-            onDelete={general ? () => adminDeleteWebhook(general.id).then(load) : null}
+            onSave={(url, enabled) => adminSetWebhook(gameId, null, url, enabled).then(refresh)}
+            onDelete={general ? () => adminDeleteWebhook(general.id).then(refresh) : null}
           />
           {gameTeams.map((team) => {
             const row = byTeam.get(team.id) ?? null;
@@ -56,8 +69,8 @@ export default function DiscordWebhooks({ gameId, gameTeams }) {
                 key={team.id}
                 title={team.name}
                 row={row}
-                onSave={(url, enabled) => adminSetWebhook(gameId, team.id, url, enabled).then(load)}
-                onDelete={row ? () => adminDeleteWebhook(row.id).then(load) : null}
+                onSave={(url, enabled) => adminSetWebhook(gameId, team.id, url, enabled).then(refresh)}
+                onDelete={row ? () => adminDeleteWebhook(row.id).then(refresh) : null}
               />
             );
           })}
