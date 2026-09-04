@@ -1436,3 +1436,40 @@ button.cell.picked:not(.hit):not(.miss) { background: var(--panel-2); }
   font-weight: 400;
   letter-spacing: normal;
 }
+
+/* Setup checklist on the organiser's game card. The people running a game are
+   not the people who built it and there is no written runbook, so this is the
+   runbook: every requirement on screen at once, each unmet one naming the panel
+   that satisfies it. Deliberately plain — a status list, not a dashboard. */
+.checklist { margin: .2rem 0 .9rem; }
+.checklist ul { list-style: none; margin: 0 0 .5rem; padding: 0; }
+.checklist li {
+  display: grid;
+  grid-template-columns: 1.1rem 9.5rem auto;
+  gap: .1rem .6rem;
+  align-items: baseline;
+  padding: .22rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.checklist li:last-child { border-bottom: 0; }
+.checklist .tick { font-weight: 700; text-align: center; }
+.checklist li.ok       .tick { color: var(--gold); }
+.checklist li.todo     .tick { color: #e8907f; }
+.checklist li.optional .tick { color: var(--muted); }
+.checklist .what   { color: var(--text); }
+.checklist .detail { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The fix drops to its own line under the label, so a long one does not squeeze
+   the columns and the eye still runs straight down the ticks. */
+.checklist .fix {
+  grid-column: 2 / -1;
+  color: #e8c98f;
+  font-size: .85rem;
+  line-height: 1.35;
+}
+.checklist li.optional .fix { color: var(--muted); }
+
+@media (max-width: 34rem) {
+  .checklist li { grid-template-columns: 1.1rem auto; }
+  .checklist .detail { grid-column: 2 / -1; }
+  .checklist .fix    { grid-column: 2 / -1; }
+}

@@ -3,6 +3,7 @@ import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
+  adminListShipCells, adminListWebhooks,
 } from '../lib/supabase.js';
 import AdminOverview from './AdminOverview.jsx';
 import Scoreboard from './Scoreboard.jsx';
@@ -13,9 +14,13 @@ import TileBoard from './TileBoard.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { statusLabel } from '../lib/status.js';
 
+// What to do next, in the order the checklist below lists it. The `setup` line
+// used to say only "add the 100 tiles", which is why games reached Start Game
+// with no roster: the hint was the whole instruction manual, and it named one
+// of the four things that have to happen.
 const STEP_HINT = {
-  setup:     'Add the 100 tiles, then open preparation.',
-  placement: 'Place both fleets, then start the game.',   // status value is still `placement`
+  setup:     'Add the tiles and the roster, give each team a captain, then open preparation.',
+  placement: 'Captains place their fleets — or place them yourself from Boards — then start.',
   active:    'The game is running.',
   finished:  'This game is over.',
 };
@@ -27,6 +32,8 @@ export default function Admin() {
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
   const [scores, setScores] = useState([]);
+  const [shipCells, setShipCells] = useState([]);
+  const [webhooks, setWebhooks] = useState([]);
   const [gameId, setGameId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -50,14 +57,21 @@ export default function Admin() {
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
-    if (!id) { setTiles([]); setScores([]); return; }
+    if (!id) { setTiles([]); setScores([]); setShipCells([]); setWebhooks([]); return; }
     try {
-      const [t, { data: sc }] = await Promise.all([
+      // Fleets and webhooks are fetched here, not left to the panels that show
+      // them, because the checklist has to answer "is this ready to start"
+      // before the organiser has scrolled as far as either panel.
+      const [t, { data: sc }, ships, hooks] = await Promise.all([
         adminListTiles(id),
         supabase.rpc('team_scores', { p_game_id: id }),
+        adminListShipCells(id),
+        adminListWebhooks(id),
       ]);
       setTiles(t ?? []);
       setScores(sc ?? []);
+      setShipCells(ships ?? []);
+      setWebhooks(hooks ?? []);
     } catch (err) {
       setError(err.message);
     }
@@ -94,6 +108,92 @@ export default function Admin() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // What still has to happen before this game can run.
+  //
+  // Every `required` row here restates a guard that start_game already enforces
+  // in the database (0026, and captains in 0043). The duplication is the point:
+  // the database refuses a broken game, but it refuses it at the last click,
+  // in the words of a Postgres exception. This says the same thing up front,
+  // while there is still something obvious to do about it.
+  const needTiles = game ? game.grid_size * game.grid_size : 0;
+  const fleetSize = game?.fleet?.length ?? 0;
+  const teamsWithoutCaptain = gameTeams.filter(
+    (t) => !members.some((m) => m.team_id === t.id && m.role === 'captain')
+  );
+  const teamsWithoutFleet = gameTeams.filter(
+    (t) => new Set(shipCells.filter((c) => c.team_id === t.id).map((c) => c.ship_id)).size !== fleetSize
+  );
+  const rosterCount = members.filter((m) => gameTeams.some((t) => t.id === m.team_id)).length;
+
+  const checks = game ? [
+    {
+      key: 'tiles', label: 'Tiles', required: true,
+      ok: tiles.length === needTiles,
+      detail: `${tiles.length} of ${needTiles}`,
+      fix: tiles.length === 0
+        ? 'Paste the task list into Tiles below.'
+        : `${needTiles - tiles.length} still missing — see Tiles below.`,
+    },
+    {
+      key: 'teams', label: 'Teams', required: true,
+      ok: gameTeams.length === 2,
+      detail: `${gameTeams.length} of 2`,
+      fix: 'A game needs exactly two teams. Create it again if this is wrong.',
+    },
+    {
+      key: 'captains', label: 'Captains', required: true,
+      ok: gameTeams.length === 2 && teamsWithoutCaptain.length === 0,
+      detail: `${gameTeams.length - teamsWithoutCaptain.length} of ${gameTeams.length || 2}`,
+      // The one that used to fail silently: no captain means no player can
+      // place that team's fleet, and nothing anywhere said so.
+      fix: teamsWithoutCaptain.length
+        ? `${teamsWithoutCaptain.map((t) => t.name).join(' and ')} — set a captain in Roster below, `
+          + 'or nobody on that team can place its fleet.'
+        : '',
+    },
+    {
+      // Membership only. Captaincy is the row above, and failing both for one
+      // missing captain would read as two separate problems.
+      key: 'roster', label: 'Players', required: true,
+      ok: gameTeams.length === 2 && gameTeams.every((t) => members.some((m) => m.team_id === t.id)),
+      detail: `${rosterCount} assigned`,
+      fix: `Both teams need at least one player — ${
+        gameTeams.filter((t) => !members.some((m) => m.team_id === t.id)).map((t) => t.name).join(' and ')
+        || 'add them'
+      } in Roster below.`,
+    },
+    {
+      key: 'fleets', label: 'Fleets placed', required: true,
+      ok: gameTeams.length === 2 && teamsWithoutFleet.length === 0,
+      detail: `${gameTeams.length - teamsWithoutFleet.length} of ${gameTeams.length || 2}`,
+      fix: game.status === 'setup'
+        ? 'Captains do this once preparation is open.'
+        : `Waiting on ${teamsWithoutFleet.map((t) => t.name).join(' and ') || 'the captains'}.`,
+    },
+    {
+      key: 'discord', label: 'Discord', required: false,
+      ok: webhooks.length > 0,
+      detail: webhooks.length ? `${webhooks.length} configured` : 'none',
+      // Optional, and worth saying so loudly: since 0042 a game with no webhook
+      // posts nothing at all, and silence is easy to mistake for a fault.
+      fix: 'Optional. With none set, this game posts nothing to Discord.',
+    },
+  ] : [];
+
+  const blocking = checks.filter((c) => c.required && !c.ok);
+  const canOpenPreparation = checks.every((c) => c.key !== 'tiles' || c.ok)
+    && teamsWithoutCaptain.length === 0 && gameTeams.length === 2 && rosterCount > 0;
+  const canStart = blocking.length === 0;
+
+  function blockedReason(forStatus) {
+    if (!game || game.status !== forStatus) return undefined;
+    const missing = forStatus === 'setup'
+      ? blocking.filter((c) => c.key !== 'fleets')
+      : blocking;
+    if (missing.length === 0) return undefined;
+    return 'Still needed: ' + missing.map((c) => c.label.toLowerCase()).join(', ');
   }
 
   return (
@@ -158,15 +258,20 @@ export default function Admin() {
           <section className="card">
             <h2>{game.name} — {statusLabel(game.status)}</h2>
             <p className="muted">{STEP_HINT[game.status]}</p>
+
+            <SetupChecklist checks={checks} status={game.status} />
+
             <div className="row">
               <button
-                disabled={busy || game.status !== 'setup'}
+                disabled={busy || game.status !== 'setup' || !canOpenPreparation}
+                title={blockedReason('setup')}
                 onClick={() => run(() => adminOpenPlacement(game.id), 'Preparation is open.')}
               >
                 Open preparation
               </button>
               <button
-                disabled={busy || game.status !== 'placement'}
+                disabled={busy || game.status !== 'placement' || !canStart}
+                title={blockedReason('placement')}
                 onClick={() => run(() => startGame(game.id), 'Game started — fleets are now frozen.')}
               >
                 Start game
@@ -257,6 +362,12 @@ export default function Admin() {
             }
           />
 
+          {/* Setting up, not running: it belongs with Tiles and Roster rather
+              than between Score and Evidence, where it sat before. Since 0042 a
+              game with no webhook posts nothing, so this is now a step someone
+              has to actively decide to skip, not one they can fail to notice. */}
+          <DiscordWebhooks gameId={game.id} gameTeams={gameTeams} />
+
           <section className="card">
             <h2>Boards</h2>
             <p className="muted">
@@ -273,8 +384,6 @@ export default function Admin() {
             <Scoreboard scores={scores} myTeamId={null} />
           </section>
 
-          <DiscordWebhooks gameId={game.id} gameTeams={gameTeams} />
-
           <section className="card">
             <h2>Evidence</h2>
             <p className="muted">
@@ -288,6 +397,46 @@ export default function Admin() {
       )}
 
       {confirmDialog}
+    </div>
+  );
+}
+
+/**
+ * What still has to happen before this game can run.
+ *
+ * There is no written runbook, and the people setting up a game will not be the
+ * people who built this. So the panel has to be the runbook: every requirement
+ * visible at once, each with the screen that satisfies it named in the fix, and
+ * nothing discovered only by pressing a button and reading an error.
+ *
+ * Rows in `setup` and `placement` only. Once a game is running the list has
+ * served its purpose and would just be six ticks taking up the top of the page.
+ */
+function SetupChecklist({ checks, status }) {
+  if (status !== 'setup' && status !== 'placement') return null;
+
+  const outstanding = checks.filter((c) => c.required && !c.ok);
+
+  return (
+    <div className="checklist">
+      <ul>
+        {checks.map((c) => (
+          <li key={c.key} className={c.ok ? 'ok' : (c.required ? 'todo' : 'optional')}>
+            <span className="tick" aria-hidden="true">{c.ok ? '✓' : (c.required ? '✗' : '–')}</span>
+            <span className="what">
+              {c.label}
+              {!c.required && <span className="muted"> (optional)</span>}
+            </span>
+            <span className="detail">{c.detail}</span>
+            {!c.ok && c.fix && <span className="fix">{c.fix}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="muted">
+        {outstanding.length === 0
+          ? 'Everything needed is in place.'
+          : `${outstanding.length} thing${outstanding.length === 1 ? '' : 's'} still to do before this game can start.`}
+      </p>
     </div>
   );
 }
