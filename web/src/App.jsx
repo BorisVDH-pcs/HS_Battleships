@@ -19,6 +19,7 @@ import PetJar from './components/PetJar.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { statusLabel } from './lib/status.js';
+import { REVEAL_DELAY_MS } from './lib/fireEffect.js';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -371,11 +372,16 @@ export default function App() {
                     evidence={evidence}
                     onRefresh={() => game.refresh()}
                     onFired={(tile, result) => {
-                      setNotice(`${tile.name} — ${result.toUpperCase()}!`);
                       // Sound/animation come from the realtime subscription
-                      // above, not from here — that's the one path every
-                      // client (including this one) hears the shot through.
-                      game.refresh();
+                      // above, not from here — but this client already knows
+                      // the result, so an un-delayed refresh would color the
+                      // tile and post the notice before its own gif/sound had
+                      // even started. Wait out the same beat everyone else's
+                      // realtime-triggered reveal does.
+                      setTimeout(() => {
+                        setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                        game.refresh();
+                      }, REVEAL_DELAY_MS);
                     }}
                   />
                 )}
