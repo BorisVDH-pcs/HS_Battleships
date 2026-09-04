@@ -20,7 +20,12 @@ import { statusLabel } from '../lib/status.js';
 // of the four things that have to happen.
 const STEP_HINT = {
   setup:     'Add the tiles and the roster, give each team a captain, then open preparation.',
-  placement: 'Captains place their fleets — or place them yourself from Boards — then start.',
+  // Only a captain can place a fleet from the UI. place_fleet still accepts an
+  // admin (0006), but the screen that used it — AdminBoards — is gone, and
+  // AdminOverview is read-only. So the way past an absent captain is to hand
+  // the role to someone who is there, not to do it for them.
+  placement: 'Each team’s captain places their fleet, then start the game. '
+           + 'If a captain is unavailable, pass the role to another player in Roster.',
   active:    'The game is running.',
   finished:  'This game is over.',
 };
@@ -169,8 +174,9 @@ export default function Admin() {
       ok: gameTeams.length === 2 && teamsWithoutFleet.length === 0,
       detail: `${gameTeams.length - teamsWithoutFleet.length} of ${gameTeams.length || 2}`,
       fix: game.status === 'setup'
-        ? 'Captains do this once preparation is open.'
-        : `Waiting on ${teamsWithoutFleet.map((t) => t.name).join(' and ') || 'the captains'}.`,
+        ? 'Captains do this themselves once preparation is open.'
+        : `Waiting on ${teamsWithoutFleet.map((t) => t.name).join(' and ') || 'the captains'}. `
+          + 'Only a captain can place a fleet — if theirs is away, pass the role on in Roster.',
     },
     {
       key: 'discord', label: 'Discord', required: false,
