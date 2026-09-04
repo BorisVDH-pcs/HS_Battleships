@@ -379,8 +379,9 @@ export default function Admin() {
             <AdminOverview gameId={game.id} teams={gameTeams} />
           </section>
 
+          {/* No heading here: Scoreboard renders its own <h2>Score</h2>, and
+              wrapping it in a section with a second one printed the word twice. */}
           <section className="card">
-            <h2>Score</h2>
             <Scoreboard scores={scores} myTeamId={null} />
           </section>
 
