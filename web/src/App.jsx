@@ -444,9 +444,6 @@ export default function App() {
                       busyTileId={busyTileId}
                     />
                     <BoardLegend view="enemy" />
-                    {isActive && !canClaim && myTeamId && (
-                      <p className="muted">Both slots are full — fire one before locking in another.</p>
-                    )}
                     {openTile && (
                       <EvidencePanel
                         title={openTile.name}
