@@ -17,6 +17,16 @@ import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board
  * locked-in tiles and shots are the marks on it. So Team Alpha's board carries Bravo's
  * ships and Alpha's hits — read it and you are reading Alpha's game.
  *
+ * That grouping is right, but the heading used to be the team name alone, sitting
+ * directly above the OTHER team's fleet -- so it read as "this team's ships". It
+ * cost a real debugging session: a captain placed his own fleet, saw it appear
+ * under the opponent's heading, and reported that he had overwritten them. The
+ * subtitle did say "Shooting at X's fleet", and it was not enough.
+ *
+ * So the heading now names both halves -- "<A>'s shots · <B>'s ships" -- and the
+ * subtitle drops the line that duplicated it. No bare team name is left next to a
+ * fleet it does not own, which is the shape that caused the misreading.
+ *
  * Locked-in squares are buttons. Clicking one opens the evidence submitted for it.
  *
  * Every row here pairs a tile's name, or an enemy hull, with a team — precisely
@@ -173,9 +183,12 @@ export default function AdminOverview({ gameId, teams }) {
 
           return (
             <section key={team.id}>
-              <h3>{team.name}</h3>
+              <h3>
+                {enemy
+                  ? `${team.name}’s shots · ${enemy.name}’s ships`
+                  : team.name}
+              </h3>
               <p className="muted">
-                {enemy ? `Shooting at ${enemy.name}’s fleet. ` : ''}
                 {shipIds.size === 0
                   ? 'No fleet to shoot at yet.'
                   : `${sunk.length} of ${shipIds.size} sunk · ${hits.length} hits`}
