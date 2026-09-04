@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { GIF_DURATION_MS } from '../lib/fireEffect.js';
 
 /**
  * Loads everything the board needs for one game and keeps it live.
@@ -112,6 +113,13 @@ export function useGame(gameId, session) {
   }, [load]);
 
   // One subscription for the whole game.
+  //
+  // `shot_fired` is held back by GIF_DURATION_MS so the tile flip and the
+  // activity-log line land at the same instant FireEffect.jsx starts the
+  // hit/miss sound, rather than while the cannon gif is still playing.
+  // Every other event type (claims, sinkings, wins…) has no animation to
+  // wait on, so it refetches immediately.
+  const pendingTimers = useRef([]);
   useEffect(() => {
     if (!supabase || !gameId) return;
     const channel = supabase
@@ -119,10 +127,20 @@ export function useGame(gameId, session) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
-        () => load()
+        ({ new: row }) => {
+          if (row?.type === 'shot_fired') {
+            pendingTimers.current.push(setTimeout(load, GIF_DURATION_MS));
+          } else {
+            load();
+          }
+        }
       )
       .subscribe();
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+      pendingTimers.current.forEach(clearTimeout);
+      pendingTimers.current = [];
+    };
   }, [gameId, load]);
 
   return { ...state, refresh: load };
