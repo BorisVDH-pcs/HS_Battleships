@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
-import { GIF_DURATION_MS } from '../lib/fireEffect.js';
+import { REVEAL_DELAY_MS } from '../lib/fireEffect.js';
 
 /**
  * Loads everything the board needs for one game and keeps it live.
@@ -114,9 +114,10 @@ export function useGame(gameId, session) {
 
   // One subscription for the whole game.
   //
-  // `shot_fired` is held back by GIF_DURATION_MS so the tile flip and the
+  // `shot_fired` is held back by REVEAL_DELAY_MS so the tile flip and the
   // activity-log line land at the same instant FireEffect.jsx starts the
-  // hit/miss sound, rather than while the cannon gif is still playing.
+  // hit/miss sound — after the cannon gif finishes and its post-gif pause,
+  // not while the gif is still playing.
   // Every other event type (claims, sinkings, wins…) has no animation to
   // wait on, so it refetches immediately.
   const pendingTimers = useRef([]);
@@ -129,7 +130,7 @@ export function useGame(gameId, session) {
         { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
         ({ new: row }) => {
           if (row?.type === 'shot_fired') {
-            pendingTimers.current.push(setTimeout(load, GIF_DURATION_MS));
+            pendingTimers.current.push(setTimeout(load, REVEAL_DELAY_MS));
           } else {
             load();
           }

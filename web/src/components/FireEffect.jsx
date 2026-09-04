@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GIF_DURATION_MS } from '../lib/fireEffect.js';
+import { GIF_DURATION_MS, REVEAL_DELAY_MS } from '../lib/fireEffect.js';
 
 // BASE_URL, not a leading slash: the site is served from /HS_Battleships/.
 const CANNON_GIF = `${import.meta.env.BASE_URL}audio/boom-cannon.gif`;
@@ -18,10 +18,10 @@ const SOUND_BY_RESULT = {
  *   1. The gif plays one round (GIF_DURATION_MS, measured off its own 29
  *      frames) with the cannon-fire sound under it. Nothing else happens.
  *   2. The gif disappears.
- *   3. The tile flips to its hit/miss color and the hit/miss sound plays,
- *      both at that same instant.
+ *   3. A short beat of empty board (POST_GIF_PAUSE_MS), then the tile flips
+ *      to its hit/miss color and the hit/miss sound plays, both together.
  * Step 3's board flip isn't driven from here — useGame.js delays its
- * tile-reveal refetch by the same GIF_DURATION_MS, so it lands in sync with
+ * tile-reveal refetch by the same REVEAL_DELAY_MS, so it lands in sync with
  * the sound below without the two components needing to talk to each other.
  */
 export default function FireEffect({ shot }) {
@@ -34,14 +34,15 @@ export default function FireEffect({ shot }) {
     const cannon = new Audio(CANNON_SOUND);
     cannon.play().catch(() => {});
 
-    const timer = setTimeout(() => {
-      setVisible(false);
+    const hideTimer = setTimeout(() => setVisible(false), GIF_DURATION_MS);
+    const soundTimer = setTimeout(() => {
       const sound = SOUND_BY_RESULT[shot.result];
       if (sound) new Audio(sound).play().catch(() => {});
-    }, GIF_DURATION_MS);
+    }, REVEAL_DELAY_MS);
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(hideTimer);
+      clearTimeout(soundTimer);
       cannon.pause();
     };
   }, [shot]);
