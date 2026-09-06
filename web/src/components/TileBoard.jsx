@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { GRID, colLetter, coordLabel } from '../lib/board.js';
-import TileIcon from './TileIcon.jsx';
+import { GRID, coordLabel } from '../lib/board.js';
 
 /**
  * The organiser's view of the tile content: all 100 squares with their real
@@ -12,12 +11,19 @@ import TileIcon from './TileIcon.jsx';
  * `tiles_for_me()` instead, which nulls `name` and `icon` until a tile is
  * locked in — so nothing here may ever be rendered on a player's page.
  *
- * Two layouts, because they answer different questions. The grid answers
- * "what is at G7"; the list answers "did all 100 import correctly", which is
- * a proofreading job and wants one tile per line in board order.
+ * One layout, not two. This used to offer a grid as well -- "what is at G7"
+ * -- but the board builder draws that same grid on the way in, and goes on
+ * drawing it once the game is running and the tiles are locked ("below is the
+ * board that is running"). A second copy behind a button was one more place to
+ * look for something already on the screen.
+ *
+ * The list is a different question and stays. "Did all 100 import correctly" is
+ * a proofreading job: it wants one tile per line in board order, with the icon
+ * slug and the point values spelled out -- none of which a square on a grid has
+ * room for.
  */
 export default function TileBoard({ tiles, canEdit = false, editOpen = false, onToggleEdit }) {
-  const [view, setView] = useState(null);   // null | 'grid' | 'list'
+  const [listOpen, setListOpen] = useState(false);
 
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
   const missing = [];
@@ -25,22 +31,11 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
     if (!byPosition.has(p)) missing.push(p);
   }
 
-  const full = (t) => (t.icon ? `${t.name}  [${t.icon}]` : t.name);
-
   return (
     <>
       <div className="tile-actions">
-        <button
-          className="ghost"
-          onClick={() => setView(view === 'grid' ? null : 'grid')}
-        >
-          {view === 'grid' ? 'Hide board' : 'Show board'}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => setView(view === 'list' ? null : 'list')}
-        >
-          {view === 'list' ? 'Hide list' : 'Show as list'}
+        <button className="ghost" onClick={() => setListOpen(!listOpen)}>
+          {listOpen ? 'Hide list' : 'Show as list'}
         </button>
         {canEdit && (
           <button className="ghost" onClick={onToggleEdit}>
@@ -49,13 +44,13 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
         )}
       </div>
 
-      {view && (
+      {listOpen && (
         <p className="muted" style={{ marginTop: '.6rem' }}>
           Admin only — these names are hidden from players until they lock a square in.
         </p>
       )}
 
-      {view && missing.length > 0 && (
+      {listOpen && missing.length > 0 && (
         <p className="error" style={{ marginTop: '.6rem' }}>
           {missing.length} square(s) have no tile:{' '}
           {missing.slice(0, 12).map((p) => coordLabel(
@@ -65,44 +60,7 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
         </p>
       )}
 
-      {view === 'grid' && (
-        <div className="tile-board-wrap">
-          <div className="tile-board">
-            <div className="corner" />
-            {Array.from({ length: GRID }, (_, i) => (
-              <div key={`h${i}`} className="axis">{colLetter(i + 1)}</div>
-            ))}
-            {Array.from({ length: GRID }, (_, r) => {
-              const row = r + 1;
-              return [
-                <div key={`a${row}`} className="axis">{row}</div>,
-                ...Array.from({ length: GRID }, (_, c) => {
-                  const col = c + 1;
-                  const t = byPosition.get((row - 1) * GRID + col);
-                  if (!t) {
-                    return (
-                      <div key={`${row}-${col}`} className="tile-cell empty">
-                        {coordLabel(row, col)}
-                      </div>
-                    );
-                  }
-                  return (
-                    // title carries the untruncated text: a 55-character tile
-                    // name does not fit in a tenth of the page.
-                    <div key={t.id} className="tile-cell" title={full(t)}>
-                      <b>{coordLabel(row, col)}</b>
-                      {t.icon && <TileIcon slug={t.icon} fallback={null} />}
-                      <span>{t.name}</span>
-                    </div>
-                  );
-                }),
-              ];
-            })}
-          </div>
-        </div>
-      )}
-
-      {view === 'list' && (
+      {listOpen && (
         <ol className="tile-list">
           {Array.from({ length: GRID * GRID }, (_, i) => {
             const p = i + 1;
