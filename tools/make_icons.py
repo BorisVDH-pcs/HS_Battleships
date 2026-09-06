@@ -41,6 +41,14 @@ def slugify(filename):
     name = KEEP.sub('', filename)
     name = re.sub(r'^\d+px-', '', name)                      # 1024px-Foo -> Foo
     name = re.sub(r'[_ -]*(detail|animated)$', '', name, flags=re.I)
+    # Apostrophes vanish rather than becoming a separator, which is what the
+    # icons already in public/icons do: kreearra, kril_tsutsaroth,
+    # tumekens_warden. Left to the rule below each would gain an underscore --
+    # kree_arra -- so a file named the way the wiki names it would land beside
+    # the icon it was meant to be, under a slug one character different from
+    # the one every board already refers to. Both characters, because the wiki
+    # writes these with a typographic quote.
+    name = name.replace("'", '').replace(u'\u2019', '')
     name = re.sub(r'[^A-Za-z0-9]+', '_', name).strip('_').lower()
     return name or 'icon'
 
