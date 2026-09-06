@@ -336,8 +336,10 @@ export default function BoardBuilder({
                       onClick={() => place(entry)}
                     >
                       <TileIcon slug={entry.icon} fallback={null} />
-                      <span className="library-name">{entry.name}</span>
-                      <span className="library-rule muted">{ruleSummary(entry)}</span>
+                      <span className="library-text">
+                        <span className="library-name">{entry.name}</span>
+                        <span className="library-rule muted">{ruleSummary(entry)}</span>
+                      </span>
                     </button>
                     <button
                       className="ghost library-edit"
@@ -410,10 +412,13 @@ export default function BoardBuilder({
                           })}
                         >
                           <TileIcon slug={entry.icon} fallback={null} />
-                          <span className="library-name">{entry.name}</span>
-                          <span className="library-rule muted">
-                            {ruleSummary(entry)}
-                            {entry.times_used > 0 && ` · used ${entry.times_used}×`}
+                          <span className="library-text">
+                            <span className="library-name">{entry.name}</span>
+                            {/* The use count used to sit here. It is the least
+                                useful thing on the row and it was taking its
+                                width from the name, which is the whole reason
+                                you are reading the row at all. */}
+                            <span className="library-rule muted">{ruleSummary(entry)}</span>
                           </span>
                         </button>
                         <button

@@ -2570,12 +2570,33 @@ button.builder-cell.empty:hover { border-style: solid; }
   filter: none;
 }
 .library-pick .tile-icon { width: 24px; height: 24px; object-fit: contain; flex: none; }
-.library-name {
+/* Name over rule, not name beside rule.
+ *
+ * Side by side, the rule was `flex: none` and the name was the only thing that
+ * could give -- so in a list four columns wide the name, which is the entire
+ * reason you are reading the row, was the first thing to be cut to an ellipsis
+ * while "5 screenshots" sat beside it at full length. Stacked, the name gets
+ * the whole width of the row and the rule costs a line instead of a name. */
+.library-text {
   flex: 1 1 auto; min-width: 0;
+  display: grid; gap: .05rem;
+  text-align: left;
+}
+/* Wraps rather than truncates. An ellipsis is the right answer for a label you
+   recognise and a wrong one for a label you read, and these are sentences --
+   "1 Collection Log item from 20 different bosses" cut at 231px is every tile
+   in the catalogue that starts with a 1. The cost is an uneven row height in a
+   list that was never a table. */
+.library-name {
+  min-width: 0;
   font-size: .875rem;
+  overflow-wrap: anywhere;
+}
+.library-rule {
+  min-width: 0;
+  font-size: .75rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.library-rule { flex: none; font-size: .75rem; }
 .library-edit { flex: none; padding: .45rem .6rem; font-size: .75rem; }
 /* A ghost button that destroys something stays quiet until it is reached for.
    `button.danger` paints a red fill, which is right for the one Reset button on
