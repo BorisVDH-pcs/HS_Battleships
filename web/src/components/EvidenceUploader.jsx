@@ -149,7 +149,10 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
             <ul className="evidence-staged-list">
               {staged.map((item, i) => (
                 <li key={i}>
-                  <span className="evidence-staged-name">{item.file.name || `Screenshot ${i + 1}`}</span>
+                  {/* No filename here on purpose. It is squeezed to a character
+                      or two by the card width, tells the player nothing they
+                      did not just do, and the drop picker is the only part of
+                      this row anyone acts on. */}
                   <select
                     value={item.optionId ?? ''}
                     disabled={busy}

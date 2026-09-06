@@ -835,9 +835,10 @@ button.cell:disabled { cursor: default; }
    has to stay reachable on a phone, so the name is what gets truncated. */
 .evidence-staged-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
 .evidence-staged-list li { display: flex; align-items: center; gap: .35rem; }
-.evidence-staged-list .evidence-staged-name { flex: 1 1 0; min-width: 0; }
+/* The picker takes the row. Nothing else on it competes for the width now
+   that the filename is gone. */
 .evidence-staged-list select {
-  flex: 0 1 11rem; min-width: 0;
+  flex: 1 1 auto; min-width: 0;
   padding: .25rem .35rem; font-size: .75rem;
 }
 .evidence-staged-list button { flex: 0 0 auto; padding: .2rem .45rem; }
