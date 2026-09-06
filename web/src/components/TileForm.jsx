@@ -17,9 +17,14 @@ import IconPicker from './IconPicker.jsx';
 export default function TileForm({
   draft, onChange, at = 'This tile', showTags = false,
   busy = false, saveLabel = 'Save', onSave, onCancel, extraActions = null,
+  extraErrors = [],
 }) {
   const set = (patch) => onChange({ ...draft, ...patch });
-  const errors = validateDraft(draft, at);
+  // `extraErrors` is for what only the caller can know — a catalogue name
+  // already in use, say. It blocks the save exactly like a rule error, because
+  // the alternative is a round trip that comes back with the same answer in
+  // the words of a Postgres exception.
+  const errors = [...validateDraft(draft, at), ...extraErrors];
   const rule = draft.rule ?? 'points';
   const priced = rule === 'points' && draft.options.length > 0;
 

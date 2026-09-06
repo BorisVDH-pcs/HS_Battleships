@@ -513,9 +513,14 @@ export default function Admin() {
             onClearTile={(row, col) =>
               run(() => adminClearTile(game.id, row, col), 'Square cleared.').then(worked)
             }
+            // Resolves to the entry's id, or null if the save was refused. The
+            // builder needs the id rather than just a yes: after saving it puts
+            // the tile on the square you were filling, and the square records
+            // which catalogue entry it came from.
             onSaveLibraryTile={(id, tile) =>
               run(() => adminSaveLibraryTile(id, tile),
-                  id ? 'Catalogue tile updated.' : 'Added to the catalogue.').then(worked)
+                  id ? 'Catalogue tile updated.' : 'Added to the catalogue.')
+                .then((result) => (worked(result) ? result : null))
             }
             onDeleteLibraryTile={(entry) =>
               confirm(

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { GRID, colLetter, coordLabel, toPosition, fromPosition } from '../lib/board.js';
 import {
-  newDraft, draftFromRow, payloadFromDraft, payloadFromRow, ruleSummary,
+  newDraft, draftFromRow, payloadFromDraft, payloadFromRow, ruleSummary, nameKey,
 } from '../lib/tileDraft.js';
 import TileIcon from './TileIcon.jsx';
 import TileForm from './TileForm.jsx';
@@ -32,7 +32,10 @@ export default function BoardBuilder({
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
-  const [editing, setEditing] = useState(null); // null | { what, id, draft }
+  // null | { what: 'square' | 'library', id, from, draft }
+  //   id   — the catalogue entry the save writes to, null to insert a new one.
+  //   from — the entry the draft was seeded from, for the copy this becomes.
+  const [editing, setEditing] = useState(null);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
   const need = game.grid_size * game.grid_size;
@@ -67,6 +70,32 @@ export default function BoardBuilder({
   }, [library, query, tag]);
 
   /**
+   * The catalogue entry this draft would collide with, if any.
+   *
+   * Names are the catalogue's identity — the unique index is on them — so a
+   * copy saved under its original name is refused. That is the right answer,
+   * but it arrives after a round trip and reads like a fault. Said here, while
+   * the name field is still under the cursor, it reads as the instruction it
+   * actually is: give the new one a name of its own.
+   */
+  const clash = useMemo(() => {
+    if (!editing || editing.what !== 'library') return null;
+    const key = nameKey(editing.draft.name);
+    if (!key) return null;
+    return library.find((e) => e.id !== editing.id && nameKey(e.name) === key) ?? null;
+  }, [editing, library]);
+
+  // Two different problems wearing the same error. Clashing with the tile you
+  // started from means you have not renamed the copy yet, and the way out is
+  // right there in the form; clashing with some third tile means the name is
+  // simply spoken for.
+  const clashMessage = !clash ? null
+    : clash.id === editing?.from?.id
+      ? `This is still called "${clash.name}". Give the new tile a name of its own, `
+        + `or use "Update ${clash.name} instead" to change that entry.`
+      : `The catalogue already has a different tile called "${clash.name}". Pick another name.`;
+
+  /**
    * The next square with nothing on it, so filling a board is one click per
    * square rather than two. Starts after the square just filled and wraps;
    * returns null once the board is full, which is what stops the selection
@@ -85,12 +114,17 @@ export default function BoardBuilder({
   // still closed the form and advanced the selection is indistinguishable from
   // a successful one — which is exactly how a tile goes missing.
 
-  async function place(entry) {
-    if (!at) return;
+  /** Put one tile on the selected square and move to the next empty one. */
+  async function placePayload(payload) {
+    if (!at) return false;
     const position = toPosition(at.row, at.col);
-    const ok = await onSetTile(at.row, at.col, payloadFromRow(entry, { libraryId: entry.id }));
+    const ok = await onSetTile(at.row, at.col, payload);
     if (ok) setAt(nextEmptyAfter(position));
+    return ok;
   }
+
+  const place = (entry) =>
+    placePayload(payloadFromRow(entry, { libraryId: entry.id }));
 
   async function saveSquare() {
     // The catalogue id rides along only when the square still came from that
@@ -102,11 +136,30 @@ export default function BoardBuilder({
     if (await onSetTile(at.row, at.col, payload)) setEditing(null);
   }
 
-  async function saveLibrary() {
+  /**
+   * Write the catalogue entry, then put it on the square you came from.
+   *
+   * `targetId` is null for the normal path, which is what makes editing an
+   * entry produce a second one: the list hands the form a copy of a tile rather
+   * than the tile, so "this task but five screenshots" stops being a choice
+   * between the old wording and the new one. Passing the original's id is the
+   * deliberate exception, for fixing a typo or adding tags.
+   *
+   * Placing afterwards is the other half. Editing an entry from the list almost
+   * always starts with a square in mind — that is why the square was selected —
+   * and having to find the new tile in a catalogue of a hundred and click it
+   * again was a step that knew the answer already.
+   */
+  async function saveLibrary(targetId = editing.id ?? null) {
     const payload = payloadFromDraft(editing.draft, {
       tags: editing.draft.tags.split(',').map((t) => t.trim()).filter(Boolean),
     });
-    if (await onSaveLibraryTile(editing.id ?? null, payload)) setEditing(null);
+    const id = await onSaveLibraryTile(targetId, payload);
+    if (!id) return;
+    setEditing(null);
+    // Tags belong to the catalogue, not to a board, so the square gets the
+    // entry without them — and the id, so the square knows where it came from.
+    if (at) await placePayload(payloadFromDraft(editing.draft, { libraryId: id }));
   }
 
   if (locked) {
@@ -161,7 +214,7 @@ export default function BoardBuilder({
               <h3>
                 {editing.what === 'square'
                   ? `${coordLabel(at.row, at.col)} — ${current ? 'edit this square' : 'a one-off tile'}`
-                  : editing.id ? 'Edit catalogue tile' : 'New catalogue tile'}
+                  : editing.from ? `New tile, based on ${editing.from.name}` : 'New catalogue tile'}
               </h3>
               {/* Three different situations, and the difference matters: a tile
                   placed from the catalogue can be tweaked without touching the
@@ -176,15 +229,29 @@ export default function BoardBuilder({
                         it is worth having on a future board.</>}
                 </p>
               )}
+              {editing.what === 'library' && (
+                <p className="muted">
+                  {editing.from
+                    ? <>Saving adds a second entry — <b>{editing.from.name}</b> stays
+                        exactly as it is.</>
+                    : <>A new entry in the catalogue.</>}
+                  {at && <> It goes onto <b>{coordLabel(at.row, at.col)}</b> as well.</>}
+                </p>
+              )}
               <TileForm
                 draft={editing.draft}
                 onChange={(draft) => setEditing({ ...editing, draft })}
                 at={editing.what === 'square' ? coordLabel(at.row, at.col) : 'This tile'}
                 showTags={editing.what === 'library'}
                 busy={busy}
-                saveLabel={editing.what === 'square' ? 'Save square' : 'Save to catalogue'}
-                onSave={editing.what === 'square' ? saveSquare : saveLibrary}
+                saveLabel={
+                  editing.what === 'square' ? 'Save square'
+                    : at ? `Save and place on ${coordLabel(at.row, at.col)}`
+                      : 'Save to catalogue'
+                }
+                onSave={editing.what === 'square' ? saveSquare : () => saveLibrary()}
                 onCancel={() => setEditing(null)}
+                extraErrors={clashMessage ? [clashMessage] : []}
                 extraActions={editing.what === 'square' ? (
                   <button
                     className="ghost"
@@ -194,6 +261,18 @@ export default function BoardBuilder({
                     )}
                   >
                     Save to catalogue
+                  </button>
+                ) : editing.from ? (
+                  // The way back to editing in place. Kept because the entries
+                  // imported from old boards carry no tags and some carry the
+                  // wording of a hurried spreadsheet, and a catalogue you can
+                  // only ever add to is one that fills up with near-duplicates.
+                  <button
+                    className="ghost"
+                    disabled={busy}
+                    onClick={() => saveLibrary(editing.from.id)}
+                  >
+                    Update {editing.from.name} instead
                   </button>
                 ) : null}
               />
@@ -263,7 +342,7 @@ export default function BoardBuilder({
                     <button
                       className="ghost library-edit"
                       onClick={() => setEditing({
-                        what: 'library', id: entry.id, draft: draftFromRow(entry),
+                        what: 'library', id: null, from: entry, draft: draftFromRow(entry),
                       })}
                       aria-label={`Edit ${entry.name}`}
                     >
@@ -327,7 +406,7 @@ export default function BoardBuilder({
                         <button
                           className="library-pick"
                           onClick={() => setEditing({
-                            what: 'library', id: entry.id, draft: draftFromRow(entry),
+                            what: 'library', id: null, from: entry, draft: draftFromRow(entry),
                           })}
                         >
                           <TileIcon slug={entry.icon} fallback={null} />

@@ -46,6 +46,17 @@ export const EMPTY_DRAFT = Object.freeze({
  */
 export const newDraft = () => ({ ...EMPTY_DRAFT, options: [] });
 
+/**
+ * The identity of a tile name, as the catalogue sees it.
+ *
+ * A mirror of the `tile_name_key()` the unique index is built on, so the form
+ * can tell you a name is taken while you are still typing it rather than after
+ * a refused insert. The database stays the authority — this only ever agrees
+ * with it earlier, and a drift between the two costs a clumsy error message,
+ * never a duplicate.
+ */
+export const nameKey = (name) => (name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 /** A database row (board tile or library entry) as something the form can edit. */
 export function draftFromRow(row) {
   if (!row) return { ...EMPTY_DRAFT };

@@ -188,6 +188,16 @@ body {
 
 .app { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
 
+/* The admin console is the one screen here that is a layout rather than a
+   document: a sticky nav beside a column of panels, and inside the board
+   builder a hundred-square grid beside the picker that fills it. The 1440px cap
+   exists to stop prose running to an unreadable line length, and there is no
+   prose on this screen -- what the cap was actually doing was taking the
+   board's last three columns away and calling it a horizontal scrollbar. */
+@media (min-width: 1500px) {
+  .app:has(.admin-split) { max-width: 1800px; }
+}
+
 /* ---- headings ----
  *
  * Tracking is size-specific, always. Large type reads as over-spaced unless it
@@ -2412,14 +2422,27 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
  * it does in the proofreading view — .builder-cell only adds what a target
  * needs that a label does not.
  */
+/* Board and picker, side by side only where both actually fit.
+ *
+ * The picker used to take its 24rem out of the same row at any width over
+ * 1180px, and the board simply lost whatever was left over -- on a 1600px
+ * screen that was three of its ten columns, permanently behind a scrollbar,
+ * which is a strange thing to do to the one element the whole panel exists to
+ * fill in. So the two-column arrangement now starts at the width where a whole
+ * board and the picker both have room, and below that the picker goes under a
+ * board that gets the full width of the card.
+ *
+ * 1580px is not a round number, it is the sum: ten squares and their gutters,
+ * the picker at its narrowest, the card's padding, the admin nav beside it and
+ * the page margin. Change any of those and this has to move with them.
+ */
 .builder {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  grid-template-columns: 1fr;
   gap: 1.2rem;
   align-items: start;
   margin-top: .8rem;
 }
-@media (max-width: 1400px) { .builder { grid-template-columns: 1fr; } }
 
 .builder-panel {
   display: grid;
@@ -2429,14 +2452,31 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   background: var(--fill-3);
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
-  /* Follows you down the board rather than scrolling away from it: the list is
-     what you are reaching for while the grid is what you are looking at. */
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
 }
-@media (max-width: 1400px) { .builder-panel { position: static; max-height: none; } }
+
+@media (min-width: 1580px) {
+  .builder { grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); }
+
+  /* Follows you down the board rather than scrolling away from it: the list is
+     what you are reaching for while the grid is what you are looking at. Only
+     worth doing beside the board -- stuck to the top of a column that sits
+     underneath it, it would follow you away from the thing it is about. */
+  .builder-panel {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+
+  /* A builder square is a target, not something to read: the name is truncated
+     at any width, and the picker beside it is where the tile is actually
+     legible. So this one gives up a few pixels a square that TileBoard, which
+     exists to be proofread, quite rightly refuses to. */
+  .builder-board {
+    grid-template-columns: 1.4rem repeat(10, minmax(76px, 1fr));
+    min-width: 0;
+  }
+}
 
 .builder-panel h3 { margin: 0; font-size: 1rem; }
 .builder-head { justify-content: space-between; align-items: center; }
@@ -2495,6 +2535,12 @@ button.builder-cell.empty:hover { border-style: solid; }
 .library-list {
   list-style: none; margin: 0; padding: 0;
   display: grid; gap: .25rem;
+  /* As many columns as the panel can hold, which is one while it is a 24rem
+     column beside the board and four once it is stacked underneath and has the
+     whole card. `auto-fill` works that out from the width it is given, so the
+     list needs no breakpoint of its own -- and cannot land in the gap between
+     one, the way a `max-width: 1559px` did against a 1559.2px viewport. */
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
   /* Capped rather than endless: the search box above it is the way through a
      long catalogue, and a list that pushes the board off screen makes the
      search box the thing you have to scroll back to. */
