@@ -33,9 +33,11 @@ export default function BoardBuilder({
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
-  // null | { what: 'square' | 'library', id, from, draft }
+  // null | { what: 'square' | 'library', id, from, was, draft }
   //   id   — the catalogue entry the save writes to, null to insert a new one.
   //   from — the entry the draft was seeded from, for the copy this becomes.
+  //   was  — square form only: the name the square already had, so that keeping
+  //          it is not read as taking a name the catalogue has spoken for.
   const [editing, setEditing] = useState(null);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
@@ -78,11 +80,29 @@ export default function BoardBuilder({
    * but it arrives after a round trip and reads like a fault. Said here, while
    * the name field is still under the cursor, it reads as the instruction it
    * actually is: give the new one a name of its own.
+   *
+   * Both forms, not just the catalogue one. The square form has no unique index
+   * to run into -- two squares may hold the same tile -- but since a square is
+   * filed in the catalogue as it is saved, a name that is spoken for is a worse
+   * problem there than a refusal. `saveSquare` matches on the name, so a tile
+   * typed under an existing entry's name would be linked to that entry: the
+   * square would claim a provenance it does not have, and the entry's use count
+   * would be bumped for a tile nobody took from it.
+   *
+   * For a square the test is whether the name has been *taken*, not whether it
+   * is shared -- `editing.was` is the name the square already had, and keeping
+   * it is never a clash. Deliberately not `editing.id`, which looks like the
+   * same question and is not: a board pasted in and then added to the catalogue
+   * has every name catalogued and every `library_id` still null, because
+   * neither `admin_set_tiles` nor `admin_import_board_to_library` writes that
+   * link. Keyed on the id, this would have refused to save any square on such a
+   * board.
    */
   const clash = useMemo(() => {
-    if (!editing || editing.what !== 'library') return null;
+    if (!editing) return null;
     const key = nameKey(editing.draft.name);
     if (!key) return null;
+    if (editing.what === 'square' && key === nameKey(editing.was ?? '')) return null;
     return library.find((e) => e.id !== editing.id && nameKey(e.name) === key) ?? null;
   }, [editing, library]);
 
@@ -266,7 +286,7 @@ export default function BoardBuilder({
                   one it has. Said before the press rather than after it,
                   because "and it went in the catalogue" is a surprise worth
                   not having. */}
-              {editing.what === 'square' && (
+              {editing.what === 'square' && !clash && (
                 <p className="muted">
                   {catalogued
                     ? <>Goes on this square. The catalogue already has <b>{catalogued.name}</b>,
@@ -338,6 +358,7 @@ export default function BoardBuilder({
                       onClick={() => setEditing({
                         what: 'square',
                         id: current.library_id,
+                        was: current.name,
                         draft: draftFromRow(current),
                       })}
                     >
@@ -393,7 +414,7 @@ export default function BoardBuilder({
               <button
                 className="ghost"
                 onClick={() => setEditing({
-                  what: 'square', id: null, draft: newDraft(),
+                  what: 'square', id: null, was: '', draft: newDraft(),
                 })}
               >
                 Type a one-off tile instead
