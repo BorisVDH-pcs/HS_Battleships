@@ -135,6 +135,10 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
           optionId: item.optionId,
           amount: isValue ? parseInt(item.amount, 10) : null,
         });
+        // The database fires as soon as this submission completes the rule.
+        // Anything after it belongs to a claim that is now closed and would
+        // fail with "already fired" after the useful work had succeeded.
+        if (last?.fired) break;
       }
       setStaged([]);
       // add_evidence() fires the shot itself once the requirement is met, and

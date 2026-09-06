@@ -22,6 +22,7 @@ import GamePicker from './components/GamePicker.jsx';
 import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
 import { statusLabel } from './lib/status.js';
 import { REVEAL_DELAY_MS } from './lib/fireEffect.js';
+import { tileProgressText } from './lib/tileProgress.js';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -452,7 +453,7 @@ export default function App() {
                           fromPosition(openTile.position).col
                         )}
                         meta={
-                          `${openTile.evidence_count} of ${openTile.required_evidence} submitted` +
+                          tileProgressText(openTile) +
                           (openTile.claim_status === 'fired'
                             ? ` · fired, ${openTile.claim_result}` +
                               (openTile.ship_sunk ? ' — ship sunk!' : '')

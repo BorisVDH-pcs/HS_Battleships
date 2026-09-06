@@ -99,3 +99,21 @@ export function tileProgress(tile, staged = {}) {
     staged: stagedPoints,
   };
 }
+
+/** A compact progress line for places which do not render the full uploader. */
+export function tileProgressText(tile) {
+  const progress = tileProgress(tile);
+  if (progress.rule === 'one_set') {
+    return `${progress.unit} ${progress.have}/${progress.need}`;
+  }
+  if (progress.rule === 'each_set') {
+    return `${progress.have}/${progress.need} sets complete`;
+  }
+  if (progress.rule === 'value') {
+    return `${progress.have}/${progress.need}m`;
+  }
+  if ((tile.options ?? []).length > 0) {
+    return `${progress.have}/${progress.need} pts`;
+  }
+  return `${progress.have}/${progress.need} submitted`;
+}

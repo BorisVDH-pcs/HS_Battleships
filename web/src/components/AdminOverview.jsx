@@ -166,7 +166,6 @@ export default function AdminOverview({ gameId, teams }) {
           const claimed = [...mine.values()].filter((r) => r.claim_id);
           const partial = claimed.filter(
             (r) => r.status === 'active' && r.evidence_count > 0
-              && r.evidence_count < r.required_evidence
           );
           const hitAt = (key) => {
             const { row, col } = keyToRowCol(key);
@@ -233,11 +232,11 @@ export default function AdminOverview({ gameId, teams }) {
                         // the enemy fleet reads as a fleet however much is taken.
                         if (isShip) cls += ' ship';
                         if (cell?.claim_id) {
-                          const met = cell.evidence_count >= cell.required_evidence;
+                          const met = adminProgressMet(cell);
                           cls += met ? ' active ready' : ' active';
                           body = (
                             <span className="tile-progress">
-                              {cell.evidence_count}/{cell.required_evidence}
+                              {adminProgress(cell)}
                             </span>
                           );
                         }
@@ -288,8 +287,7 @@ export default function AdminOverview({ gameId, teams }) {
               fromPosition(selected.position).col
             )}
             meta={
-              `${selected.team_name} · ${selected.evidence_count} of ` +
-              `${selected.required_evidence} submitted` +
+              `${selected.team_name} · ${adminProgress(selected)}` +
               (selected.status === 'fired'
                 ? ` · fired, ${selected.result}`
                 : ' · not yet fired')
@@ -329,4 +327,27 @@ export default function AdminOverview({ gameId, teams }) {
 function keyToRowCol(key) {
   const [row, col] = key.split(':').map(Number);
   return { row, col };
+}
+
+/** The admin RPC deliberately returns summary counts, not the whole option list. */
+function adminProgress(cell) {
+  const rule = cell.completion ?? 'points';
+  if (rule === 'one_set' || rule === 'each_set') {
+    return `${cell.evidence_count} submission${cell.evidence_count === 1 ? '' : 's'}`;
+  }
+  if (rule === 'value') return `${cell.evidence_points}/${cell.required_evidence}m`;
+  if (cell.option_count > 0) return `${cell.evidence_points}/${cell.required_evidence} pts`;
+  return `${cell.evidence_count}/${cell.required_evidence} submitted`;
+}
+
+// Completed uploads normally fire in the same transaction. This only marks a
+// stranded legacy row as ready; set completion cannot be inferred from summary
+// counts and remains for the database to decide.
+function adminProgressMet(cell) {
+  const rule = cell.completion ?? 'points';
+  if (rule === 'one_set' || rule === 'each_set') return false;
+  const have = rule === 'value' || cell.option_count > 0
+    ? cell.evidence_points
+    : cell.evidence_count;
+  return have >= cell.required_evidence;
 }

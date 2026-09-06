@@ -1,7 +1,7 @@
-# V4 tile rules — where this got to
+# V4 tile rules — handover
 
-Written 2026-09-06, mid-task, so the next session does not have to re-derive any
-of it. No tile text here: this repo is public and the tile list is secret #2.
+Updated 2026-09-06. No tile text here: this repo is public and the tile list is
+secret #2.
 
 ## What is done
 
@@ -45,29 +45,26 @@ rows and pushed the drop zone off the bottom of the column.
 **Icons.** 103 in `web/public/icons`. Twelve added from the wiki this session.
 Every named V4 tile has one mapped.
 
+**Admin parser and private generator.** The paste box now reads all four rule
+forms and reports line-numbered errors before it calls the database. The private
+generator imports that same parser and refuses to write an invalid board. All
+100 generated lines validate: 90 points, 3 one-set, 5 each-set and 2 value
+tiles. The ten tiles which needed 0049 have been rewritten.
+
+**Local verification.** `npm run test:tile-rules` exercises the paste grammar,
+all completion calculations and activity-feed wording. The private generator
+validates the entire board with the real parser, and `npm run build` completes.
+The migrations have been reviewed against the calling code but have not been
+executed against a database.
+
 ## What is left
 
-1. **Merge to main.** This branch is pushed but NOT merged. Merging triggers
-   `db-push`, which applies 0048 and 0049 to production. Neither has been run
-   against a database yet — that is the reason it was left unmerged.
-2. **Finish the tile data.** `Project 1/notes/v4-tiles/v4-tiles.mjs` (outside
-   this repo, deliberately) generates the 100 paste lines. It still needs the
-   ten set/value tiles rewritten under the new rules, and the paste-box parser
-   in `Admin.jsx` still needs to *read* those rules — see below.
-3. **`Admin.jsx` parser.** Not yet updated for 0049. Needs `rule` and `perSet`
-   off the amount field and `Group/Label` option syntax. Suggested spelling,
-   which the generator already assumes:
-
-   ```
-   Tile | icon | 6 > Rare:6, Common:2          points (unchanged)
-   Tile | icon | set > Set A/Piece, Set A/Piece, Set B/Piece
-   Tile | icon | each > Boss A, Boss B, Boss C
-   Tile | icon | each 2 > Raid A/Drop, Raid A/Drop, Raid B/Drop
-   Tile | icon | 250m                          typed value, target 250
-   ```
-
-4. **Load the board and test end to end** — claim a tile, submit against each
-   rule, confirm the shot fires only when it should.
+1. **Merge to main.** Merging triggers `db-push`, which applies 0048 and 0049
+   to production. Neither migration has been run against a database.
+2. **Load the generated board** from the private paste file through the admin
+   screen.
+3. **Test in the live game** — claim a tile, submit against each rule, and
+   confirm the shot fires only when it should.
 
 ## Decisions already taken (do not re-ask)
 
@@ -81,6 +78,5 @@ Every named V4 tile has one mapped.
 - A full Barrows set is 4 pieces (weapon + helm + body + legs), 6 sets.
   A full Moons set is 4 (armour + weapon), 3 sets.
 - 16 squares had no tile in the sheet and load as clearly-marked TBD.
-- Revenant emblems: price the artefact tiers as weighted options. The ladder is
-  0.5 / 1 / 2 / 4 / 8 / 16m — the 0.5 needs rounding or excluding, which is the
-  one open question on that tile.
+- Revenant artefacts use integer-million weights 1 / 2 / 4 / 8 / 16. The 0.5m
+  Ancient emblem is excluded rather than rounded.

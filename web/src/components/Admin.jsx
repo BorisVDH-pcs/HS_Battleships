@@ -12,6 +12,7 @@ import DiscordWebhooks from './DiscordWebhooks.jsx';
 import TileBoard from './TileBoard.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { statusLabel } from '../lib/status.js';
+import { parseTileText } from '../lib/tileParser.js';
 
 // What to do next, in the order the checklist below lists it. The `setup` line
 // used to say only "add the 100 tiles", which is why games reached Start Game
@@ -580,118 +581,7 @@ function Tiles({ game, tiles, busy, onSave }) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
 
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  // Three fields at most: name | icon | amount. Splitting on the FIRST pipe and
-  // keeping the remainder as the icon (which this did until now) meant a third
-  // field landed inside the slug, and admin_set_tiles then scrubbed it to
-  // `[A-Za-z0-9_-]` — so `Tile | slayer_helmet | 3` silently became the slug
-  // `slayer_helmet3` and a missing picture, rather than an evidence count.
-  const rows = lines.map((rawLine, i) => {
-    // The explanation (0048) is split off FIRST, on the first `::`, so that
-    // everything below parses the mechanical part of the line and nothing else.
-    // It has to come first because a description is free prose and will contain
-    // the characters the rest of this parser is looking for — the V4 sheet has
-    // one with a `|` in a boss list, several with `:` before a list of drops,
-    // and one with a wise-old-man URL, whose `https:` would otherwise be read
-    // as a drop priced `//wiseoldman.net/…`.
-    //
-    // `::` rather than a fourth pipe, for the same reason: a doubled character
-    // does not occur in prose, and the description is the one field where the
-    // organiser is pasting a sentence somebody else wrote rather than typing a
-    // value. Putting it last also keeps every existing line valid unchanged.
-    const sep = rawLine.indexOf('::');
-    const line = sep === -1 ? rawLine : rawLine.slice(0, sep).trim();
-    const description = sep === -1 ? '' : rawLine.slice(sep + 2).trim();
-
-    // A priced tile (0046) lists its drops after a `>`:
-    // `... | 6 > Rare:6, Common:2`.
-    //
-    // The `>` is looked for only AFTER the first pipe, which settles two cases
-    // that would otherwise be silent. A tile whose name contains one — "kill >
-    // 50 of something" — keeps its name, because the name ends at that pipe.
-    // And a priced line that forgets the amount field, `Tile | icon > Rare:6`,
-    // still has its drops parsed — so it draws the "no target" error below
-    // rather than quietly folding `> Rare:6, Common:2` into the icon slug and
-    // leaving a tile with a broken picture and no prices. (That is the same
-    // trap the `slayer_helmet3` comment above describes, one field along.)
-    //
-    // A drop label may not contain a pipe, for the same reason an icon may not.
-    const firstPipe = line.indexOf('|');
-    const gt = firstPipe === -1 ? -1 : line.indexOf('>', firstPipe);
-    const head = gt === -1 ? line : line.slice(0, gt);
-    const tail = gt === -1 ? '' : line.slice(gt + 1);
-
-    const [name, icon, amount] = head.split('|');
-    const raw = (amount ?? '').trim();
-    // A trailing + marks a tile with more than one route to done: the number is
-    // the worst case, and the team may declare it finished sooner (0025).
-    const early = raw.endsWith('+');
-    const n = parseInt(early ? raw.slice(0, -1) : raw, 10);
-
-    // `Label:points`, comma separated. Split on the LAST colon so a label may
-    // contain one. A missing or unparseable number stays NaN rather than
-    // defaulting to 1, so the checks below can name the line instead of letting
-    // the server quietly clamp it.
-    const options = tail
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const c = part.lastIndexOf(':');
-        return {
-          label: (c === -1 ? part : part.slice(0, c)).trim(),
-          points: c === -1 ? NaN : parseInt(part.slice(c + 1).trim(), 10),
-        };
-      });
-
-    return {
-      row: Math.floor(i / game.grid_size) + 1,
-      col: (i % game.grid_size) + 1,
-      name: (name ?? '').trim(),
-      // Slug only; admin_set_tiles strips anything else server-side.
-      icon: (icon ?? '').trim(),
-      // Omitted rather than defaulted, so the server keeps owning the default.
-      // It clamps to 1..30; this only decides whether to send a number at all.
-      ...(Number.isFinite(n) ? { amount: n } : {}),
-      ...(early ? { early: true } : {}),
-      ...(options.length ? { options } : {}),
-      // Omitted when absent, so a line with no `::` sends no key at all and the
-      // column stays NULL rather than becoming an empty string — the "?" button
-      // keys off that, and '' would give every tile a badge with nothing in it.
-      ...(description ? { description } : {}),
-    };
-  });
-
-  // Worth naming before the save rather than after: the server clamps a silly
-  // amount into range instead of refusing it, so a typo would be stored as a
-  // plausible number and nobody would know which tile it landed on.
-  const badAmounts = rows
-    .map((r, i) => ({ line: i + 1, amount: r.amount }))
-    .filter((r) => r.amount !== undefined && (r.amount < 1 || r.amount > 30));
-  // A bare + with no number reads as "some other route" but sets no worst case,
-  // which would leave the tile at 1 and the marker doing nothing.
-  const earlyWithoutAmount = rows
-    .map((r, i) => ({ line: i + 1, ...r }))
-    .filter((r) => r.early && r.amount === undefined);
-
-  // Same reasoning as badAmounts: the server clamps a silly points value into
-  // range rather than refusing it, and an unlabelled drop is skipped outright.
-  // Either way the paste would look like it had worked.
-  const badOptions = rows
-    .map((r, i) => ({ line: i + 1, options: r.options ?? [] }))
-    .filter(({ options }) => options.some(
-      (o) => !o.label || !Number.isFinite(o.points) || o.points < 1 || o.points > 30
-    ));
-  // A target of 1 on a priced tile means the cheapest drop finishes it single
-  // handed, which is a forgotten amount far more often than a real intent.
-  const optionsWithoutAmount = rows
-    .map((r, i) => ({ line: i + 1, ...r }))
-    .filter((r) => (r.options?.length ?? 0) > 0 && (r.amount ?? 1) <= 1);
-  // 0046 refuses early completion on a priced tile, so a line carrying both
-  // would silently lose its +.
-  const optionsWithEarly = rows
-    .map((r, i) => ({ line: i + 1, ...r }))
-    .filter((r) => (r.options?.length ?? 0) > 0 && r.early);
+  const { lines, rows, errors: tileErrors } = parseTileText(text, game.grid_size);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
 
@@ -754,6 +644,16 @@ function Tiles({ game, tiles, busy, onSave }) {
                 tile is done.
               </p>
               <p className="muted">
+                Set rules use the amount field too. <code>set</code> completes
+                any one whole group, and <code>each</code> collects every listed
+                drop once; add a number for more than one per group. Group a
+                drop with a slash:{' '}
+                <code>Armour | icon | set &gt; Set A/Helm, Set A/Body, Set B/Helm, Set B/Body</code>
+                {' '}or <code>Raids | icon | each 2 &gt; Raid A/Drop 1, Raid A/Drop 2, Raid B/Drop 1, Raid B/Drop 2</code>.
+                A value target such as <code>250m</code> asks the player to enter
+                each submitted drop's value in millions.
+              </p>
+              <p className="muted">
                 Anything after <code>::</code> is the tile's explanation —{' '}
                 <code>Tile | icon | 2 :: Dupes allowed</code>. It shows behind a{' '}
                 <strong>?</strong> on the team's active-tile card, and only for
@@ -767,58 +667,16 @@ function Tiles({ game, tiles, busy, onSave }) {
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\nA task that needs explaining | some_icon | 2 :: Only the ones dropped by the boss count\n…'}
+                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\nA complete set | armour | set > Set A/Helm, Set A/Body, Set B/Helm, Set B/Body\nDrops from every raid | raids | each 2 > Raid A/Drop 1, Raid A/Drop 2, Raid B/Drop 1, Raid B/Drop 2\nA value target | coins | 250m\nA task that needs explaining | some_icon | 2 :: Only the ones dropped by the boss count\n…'}
               />
-              {badAmounts.length > 0 && (
-                <p className="error">
-                  {badAmounts.length === 1
-                    ? `Line ${badAmounts[0].line} asks for ${badAmounts[0].amount} pieces of evidence`
-                    : `${badAmounts.length} lines ask for an amount`}
-                  {' '}outside 1–30. The server would clamp it into range rather
-                  than refuse it, so fix it here.
-                </p>
-              )}
-              {earlyWithoutAmount.length > 0 && (
-                <p className="error">
-                  {earlyWithoutAmount.length === 1
-                    ? `Line ${earlyWithoutAmount[0].line} has a + with no number`
-                    : `${earlyWithoutAmount.length} lines have a + with no number`}
-                  . That tile would need one screenshot anyway, so the marker
-                  would do nothing — give it the worst case, or drop the +.
-                </p>
-              )}
-              {badOptions.length > 0 && (
-                <p className="error">
-                  {badOptions.length === 1
-                    ? `Line ${badOptions[0].line} has a drop with no name, or points outside 1-30`
-                    : `${badOptions.length} lines have a drop with no name, or points outside 1-30`}
-                  . Each one reads <code>Label:points</code>, comma separated.
-                </p>
-              )}
-              {optionsWithoutAmount.length > 0 && (
-                <p className="error">
-                  {optionsWithoutAmount.length === 1
-                    ? `Line ${optionsWithoutAmount[0].line} prices its drops but asks for no total`
-                    : `${optionsWithoutAmount.length} lines price their drops but ask for no total`}
-                  . The cheapest drop would finish the tile on its own — give it
-                  a target, as in <code>| 6 &gt; Rare:6, Common:2</code>.
-                </p>
-              )}
-              {optionsWithEarly.length > 0 && (
-                <p className="error">
-                  {optionsWithEarly.length === 1
-                    ? `Line ${optionsWithEarly[0].line} has both a + and priced drops`
-                    : `${optionsWithEarly.length} lines have both a + and priced drops`}
-                  . A priced tile already says when it is done, and the server
-                  refuses the early completion — drop the +.
-                </p>
+              {tileErrors.length > 0 && (
+                <ul className="error">
+                  {tileErrors.map((message) => <li key={message}>{message}</li>)}
+                </ul>
               )}
               <div className="row" style={{ marginTop: '.6rem' }}>
                 <button
-                  disabled={busy || rows.length !== need
-                            || badAmounts.length > 0 || earlyWithoutAmount.length > 0
-                            || badOptions.length > 0 || optionsWithoutAmount.length > 0
-                            || optionsWithEarly.length > 0}
+                  disabled={busy || rows.length !== need || tileErrors.length > 0}
                   onClick={() => onSave(rows).then(() => { setText(''); setOpen(false); })}
                 >
                   Save {rows.length} tiles

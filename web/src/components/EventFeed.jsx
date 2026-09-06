@@ -1,4 +1,5 @@
 import { fromPosition, coordLabel } from '../lib/board.js';
+import { evidenceEventText } from '../lib/eventText.js';
 
 /**
  * The live feed. Most event types never name a tile: `game_events` is readable
@@ -56,14 +57,7 @@ export default function EventFeed({ events, teams, myTeamId }) {
         // The drop's name is tile content, and safe here only because this
         // event type is one the RLS policy scopes to the submitting team
         // (0035, restated in 0046). It must never reach a global line.
-        const by = e.payload?.uploaded_by_name ?? who;
-        const tile = e.payload?.tile_name ?? 'a tile';
-        const need = e.payload?.required_evidence;
-        if (e.payload?.option_label) {
-          return `${by} submitted ${e.payload.option_label} for ${tile} — ` +
-            `${e.payload.points_awarded} points (${e.payload.points_total}/${need}).`;
-        }
-        return `${by} submitted proof for ${tile} (${e.payload?.evidence_count}/${need}).`;
+        return evidenceEventText(e.payload, who);
       }
       case 'slot_freed':
         return 'An active tile is available now. Lock in another target.';

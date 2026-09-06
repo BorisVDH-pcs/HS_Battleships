@@ -107,6 +107,7 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
           {Array.from({ length: GRID * GRID }, (_, i) => {
             const p = i + 1;
             const t = byPosition.get(p);
+            const rule = t?.completion ?? 'points';
             const label = coordLabel(
               Math.floor((p - 1) / GRID) + 1, ((p - 1) % GRID) + 1
             );
@@ -123,7 +124,20 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
                         what each drop is worth spelled out — checking a hundred
                         pasted lines is the whole reason this view exists, and a
                         bare "x6" would not show whether the prices landed. */}
-                    {t.options?.length > 0 ? (
+                    {rule === 'value' ? (
+                      <em className="tile-amount">{t.required_evidence}m total</em>
+                    ) : rule === 'one_set' || rule === 'each_set' ? (
+                      <>
+                        <em className="tile-amount">
+                          {rule === 'one_set'
+                            ? 'any full set'
+                            : `${t.per_set ?? 1} different from each`}
+                        </em>
+                        <em className="tile-options">
+                          {t.options?.map((o) => o.grp ? `${o.grp}/${o.label}` : o.label).join(' · ')}
+                        </em>
+                      </>
+                    ) : t.options?.length > 0 ? (
                       <>
                         <em className="tile-amount">{t.required_evidence} pts</em>
                         <em className="tile-options">

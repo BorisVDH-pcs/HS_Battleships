@@ -181,8 +181,10 @@ begin
 end;
 $$;
 
-revoke execute on function claim_is_complete(uuid) from public, anon;
-grant  execute on function claim_is_complete(uuid) to authenticated;
+-- Internal authority only. The UI predicts progress with tileProgress.js, and
+-- add_evidence/the firing trigger call this as the function owner. Exposing it
+-- as an RPC would give clients a SECURITY DEFINER read they do not need.
+revoke execute on function claim_is_complete(uuid) from public, anon, authenticated;
 
 -- ============================================================
 -- 4. The guard on the table
