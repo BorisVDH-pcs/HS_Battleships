@@ -1607,6 +1607,9 @@ label {
   outline-offset: 2px;
 }
 .switch input:disabled + .switch-track { opacity: .4; cursor: default; }
+/* The label is the hit area, so it has to drop the pointer cursor too, or a
+   switch that cannot be flipped still advertises itself as clickable. */
+.switch:has(input:disabled) { cursor: default; }
 
 /* The row a switch lives in: what it does on the left, the control pinned to
    the trailing edge, a hairline above it separating it from the field. */

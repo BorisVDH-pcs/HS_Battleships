@@ -100,7 +100,23 @@ function WebhookRow({ title, note, row, onSave, onDelete }) {
     setSaved(false);
   }, [row?.id, row?.url, row?.enabled]);
 
-  const changed = url.trim() !== (row?.url ?? '') || enabled !== (row?.enabled ?? true);
+  // A channel with no URL cannot post anywhere, so the switch has nothing to be
+  // on about: it reads off and is inert until there is a URL to send to. It used
+  // to render on for an unconfigured channel -- `enabled` defaults to true so
+  // that pasting a URL and saving gives you a live webhook -- which invited
+  // "turn this one off", and saving that hit the "a webhook needs a URL" guard
+  // below. There was no way out of it either: with no URL there is nothing to
+  // save and no row to remove, so the switch could not actually be turned off.
+  const hasUrl = url.trim() !== '';
+  const enabledNow = hasUrl && enabled;
+
+  // What is actually stored, to compare the edits against. With no row nothing
+  // is delivered, so the stored state of the switch is off -- comparing against
+  // `?? true` instead made an untouched, unconfigured channel report unsaved
+  // changes it had no way to save.
+  const savedUrl = row?.url ?? '';
+  const savedEnabled = row ? row.enabled : false;
+  const changed = url.trim() !== savedUrl || enabledNow !== savedEnabled;
 
   // The badge reports what is actually stored, not what is typed into the box —
   // an organiser checking whether this game will post anything needs the saved
@@ -109,10 +125,15 @@ function WebhookRow({ title, note, row, onSave, onDelete }) {
   const statusLabel = { none: 'Not set', on: 'On', off: 'Paused' }[status];
 
   async function save() {
-    if (!url.trim()) { setError('A webhook needs a URL.'); return; }
+    if (!hasUrl) {
+      setError(onDelete
+        ? 'A webhook needs a URL. Use Remove to clear this channel.'
+        : 'A webhook needs a URL.');
+      return;
+    }
     setBusy(true); setError(null); setSaved(false);
     try {
-      await onSave(url.trim(), enabled);
+      await onSave(url.trim(), enabledNow);
       setSaved(true);
     } catch (err) {
       setError(err.message);
@@ -159,14 +180,19 @@ function WebhookRow({ title, note, row, onSave, onDelete }) {
         <span className="switch-label">
           Post to this channel
           <span className="muted">
-            {enabled ? 'Events are delivered here.' : 'Nothing is sent while this is off.'}
+            {!hasUrl
+              ? 'Add a URL above first — as it stands this channel is sent nothing.'
+              : enabledNow
+                ? 'Events are delivered here.'
+                : 'Nothing is sent while this is off.'}
           </span>
         </span>
         <label className="switch">
           <input
             type="checkbox"
             role="switch"
-            checked={enabled}
+            checked={enabledNow}
+            disabled={busy || !hasUrl}
             aria-label={`Post ${title} events to Discord`}
             onChange={(e) => { setEnabled(e.target.checked); setSaved(false); }}
           />
