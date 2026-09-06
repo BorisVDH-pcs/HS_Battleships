@@ -44,6 +44,26 @@ const STEP_HINT = {
 const FAILED = Symbol('admin action failed');
 const worked = (result) => result !== FAILED;
 
+/**
+ * What a deal from the catalogue could not do, appended to whatever the caller
+ * says it did.
+ *
+ * Shared by the two deals -- the autofill that fills the gaps and the re-deal
+ * that replaces the board -- because both have the same thing to admit. A
+ * catalogue too small for the board leaves squares empty, and a shuffle that
+ * reports only its successes leaves you to find that out by counting a hundred
+ * squares.
+ */
+function dealShortfall(r) {
+  const short = r.empty - r.filled;
+  return (short > 0
+    ? ` ${short} left empty — the catalogue has ${r.pool} tile${r.pool === 1 ? '' : 's'} this board can still use.`
+    : '')
+    + (r.similar > 0
+      ? ` ${r.similar} of them repeat a task already on the board, which is what it took to fill it.`
+      : '');
+}
+
 export default function Admin() {
   const [games, setGames] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -565,21 +585,59 @@ export default function Admin() {
               run(() => adminImportBoardToLibrary(game.id),
                   (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`)
             }
-            // Says what it could not do as well as what it did. A catalogue too
-            // small for the board leaves squares empty, and a shuffle that
-            // reports only its successes leaves you to find that out by
-            // counting a hundred squares.
             onAutofillBoard={() =>
-              run(() => adminAutofillBoard(game.id), (r) => {
-                const short = r.empty - r.filled;
-                return `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
-                  + (short > 0
-                      ? ` ${short} left empty — the catalogue has ${r.pool} tile${r.pool === 1 ? '' : 's'} this board can still use.`
-                      : '')
-                  + (r.similar > 0
-                      ? ` ${r.similar} of them repeat a task already on the board, which is what it took to fill it.`
-                      : '');
-              })
+              run(() => adminAutofillBoard(game.id),
+                  (r) => `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
+                         + dealShortfall(r))
+            }
+            // Deal a board, read it, dislike it, deal another. The autofill
+            // above cannot do this on its own: it only ever fills empty
+            // squares, so on a board that is already full it is not offered,
+            // and the only way to a different board was the red "remove every
+            // tile" and then a second press.
+            //
+            // It asks first, and it has to. A square does not record whether it
+            // was dealt or chosen -- `library_id` is set either way -- so this
+            // cannot spare the tiles an organiser placed deliberately, and that
+            // is the one thing they would not expect. No type-the-name guard
+            // though: that belongs to "remove every tile", where what makes it
+            // frightening is that nothing comes back. Here a board does.
+            onReshuffleBoard={() =>
+              confirm(
+                `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and dealt `
+                + 'again from the catalogue, so the board comes back different.'
+                + '\n\nSquares placed by hand go with them — a square does not '
+                + 'record whether it was dealt or chosen — and a one-off tile '
+                + 'typed straight onto the board cannot come back, because it '
+                + 'was never in the catalogue.'
+                + '\n\nThis cannot be undone.',
+                {
+                  title: `Deal a different board for "${game.name}"?`,
+                  confirmLabel: 'Deal a different board',
+                  danger: true,
+                }
+              ).then((ok) => ok && run(
+                async () => {
+                  // Two RPCs rather than one that does both, which leaves a
+                  // window where the board is empty. That window is a real
+                  // state of this screen with its own button on it, so the
+                  // honest thing when the deal fails is to name it -- an empty
+                  // board under a bare Postgres message reads as a bug.
+                  const cleared = await adminClearBoard(game.id);
+                  try {
+                    return { cleared, deal: await adminAutofillBoard(game.id) };
+                  } catch (err) {
+                    throw new Error(
+                      `The board was cleared, but dealing the new one failed: ${err.message} `
+                      + 'Nothing was dealt — press "Fill the empty squares at '
+                      + 'random" to deal again.'
+                    );
+                  }
+                },
+                ({ cleared, deal }) =>
+                  `${cleared} square${cleared === 1 ? '' : 's'} cleared, `
+                  + `${deal.filled} dealt afresh.` + dealShortfall(deal)
+              ))
             }
           />
 

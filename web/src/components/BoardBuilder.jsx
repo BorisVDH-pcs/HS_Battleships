@@ -28,7 +28,7 @@ import { statusLabel } from '../lib/status.js';
 export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
   onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile, onImportBoard,
-  onAutofillBoard, onClearBoard,
+  onAutofillBoard, onReshuffleBoard, onClearBoard,
 }) {
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
@@ -388,6 +388,30 @@ export default function BoardBuilder({
                 >
                   Fill the {need - tiles.length} empty square
                   {need - tiles.length === 1 ? '' : 's'} at random
+                </button>
+              )}
+
+              {/* The same feature from the other end: deal a board, read it,
+                  dislike it, deal another. It sits with the autofill because
+                  that is where somebody who has just dealt a board looks, and
+                  because on a full board the autofill is gone and this is the
+                  only thing here that deals at all.
+
+                  It is the one button in this group that takes something away,
+                  so unlike its neighbour it asks first. That is also why it can
+                  sit above the additive row without the separator the clear
+                  button gets below: a stray press costs a dialog, not a
+                  board. */}
+              {tiles.length > 0 && (
+                <button
+                  className="ghost"
+                  disabled={busy || library.length === 0 || Boolean(libraryError)}
+                  onClick={onReshuffleBoard}
+                  title={library.length === 0
+                    ? 'The catalogue has no tiles to deal'
+                    : undefined}
+                >
+                  Deal a different board
                 </button>
               )}
 
