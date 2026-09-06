@@ -52,20 +52,11 @@ export default function EventFeed({ events, teams, myTeamId }) {
         return e.payload?.fleets_cleared
           ? 'The game has been reset — fleets need placing again.'
           : 'The game has been reset. Fleets are unchanged.';
-      case 'score_adjusted': {
-        // The delta only. The admin's reason is deliberately not in the payload:
-        // it is free text and could name a tile on the shared grid.
-        const d = e.payload?.delta ?? 0;
-        const points = `${Math.abs(d)} point${Math.abs(d) === 1 ? '' : 's'}`;
-        if (e.payload?.reverted) return `An adjustment to ${who} was reverted.`;
-        return `${who} ${d >= 0 ? 'gained' : 'lost'} ${points}.`;
-      }
       case 'evidence_submitted':
         return `${e.payload?.uploaded_by_name ?? who} submitted proof for ` +
-          `${e.payload?.tile_name ?? 'a tile'} (${e.payload?.evidence_count}/${e.payload?.required_evidence}) — ` +
-          `${e.payload?.tiles_left_to_fire} tile(s) left to fire.`;
+          `${e.payload?.tile_name ?? 'a tile'} (${e.payload?.evidence_count}/${e.payload?.required_evidence}).`;
       case 'slot_freed':
-        return 'A slot is free to claim.';
+        return 'An active tile is available now. Lock in another target.';
       default:
         return e.type;
     }
