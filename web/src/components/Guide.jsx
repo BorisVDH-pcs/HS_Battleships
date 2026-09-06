@@ -133,11 +133,15 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
   const [phase, setPhase] = useState('closed');
   const [step, setStep] = useState(0);
   const [returnPhase, setReturnPhase] = useState('reference');
+  const [isFirstWelcome, setIsFirstWelcome] = useState(false);
   const spotlightTimer = useRef(null);
   const autoShown = useRef(false);
 
   useImperativeHandle(ref, () => ({
-    openWelcome: () => setPhase('welcome'),
+    openWelcome: () => {
+      setIsFirstWelcome(false);
+      setPhase('welcome');
+    },
     openReference: () => setPhase('reference'),
     openQa: () => setPhase('qa'),
   }));
@@ -145,7 +149,14 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
   useEffect(() => {
     if (!autoShow || autoShown.current) return;
     autoShown.current = true;
-    if (!localStorage.getItem(SEEN_KEY)) setPhase('welcome');
+    if (!localStorage.getItem(SEEN_KEY)) {
+      // Record the automatic welcome immediately. Previously this happened
+      // only after completing every tour step, so dismissing the guide made it
+      // reopen after every refresh.
+      localStorage.setItem(SEEN_KEY, '1');
+      setIsFirstWelcome(true);
+      setPhase('welcome');
+    }
   }, [autoShow]);
 
   useEffect(() => () => clearTimeout(spotlightTimer.current), []);
@@ -257,13 +268,13 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
             <div className="guide-welcome-icon">📖</div>
             <h2>How to Play</h2>
             <p className="muted">
-              {localStorage.getItem(SEEN_KEY)
-                ? 'Welcome back! Take the guided tour again or browse the quick reference.'
-                : 'New here? The guided tour walks through every part of the app with '
-                  + 'live highlights, so you always know exactly where to look.'}
+              {isFirstWelcome
+                ? 'New here? The guided tour walks through every part of the app with '
+                  + 'live highlights, so you always know exactly where to look.'
+                : 'Welcome back! Take the guided tour again or browse the quick reference.'}
             </p>
             <button onClick={startTour}>
-              {localStorage.getItem(SEEN_KEY) ? '▶ Take the Tour Again' : '▶ Start Guided Tour'}
+              {isFirstWelcome ? '▶ Start Guided Tour' : '▶ Take the Tour Again'}
             </button>
             <div className="guide-or">— or —</div>
             <button className="ghost" onClick={() => setPhase('reference')}>Browse Quick Reference →</button>
