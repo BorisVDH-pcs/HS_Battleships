@@ -512,8 +512,9 @@ button.cell:disabled { cursor: default; }
 .cell.result-hit::after { color: var(--strike-lit); }
 .cell.result-miss::after { color: var(--miss-ink); }
 .shot-result {
-  grid-area: 1 / 1;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   z-index: 3;
   display: inline-flex;
   align-items: center;
@@ -527,6 +528,7 @@ button.cell:disabled { cursor: default; }
   font-weight: 800;
   line-height: 1;
   letter-spacing: .055em;
+  white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
   box-shadow: 0 5px 18px rgba(0, 0, 0, .42);
   pointer-events: none;
@@ -538,10 +540,10 @@ button.cell:disabled { cursor: default; }
   color: #d5eaff;
 }
 @keyframes shot-result-badge {
-  0%   { opacity: 0; transform: translateY(5px) scale(.68); }
-  12%  { opacity: 1; transform: translateY(0) scale(1.08); }
-  20%, 82% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(-5px) scale(.96); }
+  0%   { opacity: 0; transform: translate(-50%, -50%) translateY(5px) scale(.68); }
+  12%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  20%, 82% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-5px) scale(.96); }
 }
 @keyframes shot-result-ring {
   0%   { opacity: 0; transform: scale(.72); }
