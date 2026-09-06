@@ -66,6 +66,11 @@
   --fill:    rgba(120, 120, 128, .24);
   --fill-2:  rgba(120, 120, 128, .16);
   --fill-3:  rgba(120, 120, 128, .10);
+  /* The same 10% grey, already flattened against the card material. A <select>
+     needs an opaque fill: the platform draws its popup with the control's own
+     background, and a translucent one composites over the platform's white
+     sheet rather than over the card behind it. */
+  --fill-3-solid: #252526;
 
   /* Hairlines, not borders. Apple's separator is barely there; what actually
      divides regions is the change in material either side of it. */
@@ -1097,6 +1102,31 @@ input:focus, select:focus, textarea:focus {
   box-shadow: var(--glow-md);
 }
 
+/* A <select> is two controls: the box on the page, which the rules above dress,
+   and the popup list, which the platform draws. Chromium paints that popup with
+   the control's own author background and colour — so the translucent `--fill-3`
+   composited over the platform's white sheet, leaving the list white while its
+   labels kept the control's near-white text. That is the unreadable drop picker
+   on a tile card, and it hit every player, not just the organiser. The opaque
+   token is that same grey pre-flattened against the card, so the closed control
+   looks unchanged and the popup has a dark surface to sit on. */
+select { background-color: var(--fill-3-solid); }
+/* Belt and braces for the engines that colour the list from the options rather
+   than from the control (Firefox, and Chromium once a row is re-rendered):
+   every row states its own surface. Weight and tracking are reset because the
+   list inherits the control's type, and a picker set in the tight display face
+   reads wrong as a plain list of choices. */
+option, optgroup {
+  background-color: var(--panel-solid);
+  color: var(--text);
+  font-weight: 400;
+  letter-spacing: normal;
+}
+/* The empty first row ("Which drop?", "Choose…") is a placeholder, so it wears
+   the placeholder label level rather than the platform's grey-on-white. */
+option:disabled, option[value=""] { color: var(--label-3); }
+optgroup { color: var(--label-2); font-style: normal; }
+
 /* Everything else focusable had no visible state at all, so tabbing through the
    page went dark. :focus-visible rather than :focus, so a mouse click on a
    board cell does not leave a ring behind it. A soft halo, the way the system
@@ -1759,6 +1789,7 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
     --fill:   rgba(120, 120, 128, .40);
     --fill-2: rgba(120, 120, 128, .30);
     --fill-3: rgba(120, 120, 128, .22);
+    --fill-3-solid: #303032;
   }
   .card, .board, .scoreboard li, .game-list li, .slot { border-color: var(--hairline); }
 }
@@ -2136,15 +2167,10 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   .status .game-pick { font-size: 16px; }
 }
 
-/* The popup list is drawn by the OS and inherits none of the above, so it
-   needs colours and type that stand on their own. */
-.status .game-pick option {
-  background: var(--panel-solid);
-  color: var(--text);
-  font-family: var(--body);
-  font-weight: 400;
-  letter-spacing: normal;
-}
+/* Colours and weight for the popup list now come from the global `option` rule.
+   What stays local is the type: this control wears the sentence's own face, and
+   the list must not inherit that. */
+.status .game-pick option { font-family: var(--body); }
 
 /* Setup checklist on the organiser's game card. The people running a game are
    not the people who built it and there is no written runbook, so this is the
