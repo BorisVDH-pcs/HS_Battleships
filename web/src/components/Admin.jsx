@@ -590,7 +590,7 @@ export default function Admin() {
                   (r) => `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
                          + dealShortfall(r))
             }
-            // Deal a board, read it, dislike it, deal another. The autofill
+            // Deal a board, read it, dislike it, roll again. The autofill
             // above cannot do this on its own: it only ever fills empty
             // squares, so on a board that is already full it is not offered,
             // and the only way to a different board was the red "remove every
@@ -604,16 +604,16 @@ export default function Admin() {
             // frightening is that nothing comes back. Here a board does.
             onReshuffleBoard={() =>
               confirm(
-                `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and dealt `
-                + 'again from the catalogue, so the board comes back different.'
+                `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and filled `
+                + 'again at random from the catalogue, so the board comes back different.'
                 + '\n\nSquares placed by hand go with them — a square does not '
                 + 'record whether it was dealt or chosen — and a one-off tile '
                 + 'typed straight onto the board cannot come back, because it '
                 + 'was never in the catalogue.'
                 + '\n\nThis cannot be undone.',
                 {
-                  title: `Deal a different board for "${game.name}"?`,
-                  confirmLabel: 'Deal a different board',
+                  title: `Re-randomize the board for "${game.name}"?`,
+                  confirmLabel: 'Re-randomize',
                   danger: true,
                 }
               ).then((ok) => ok && run(
@@ -635,8 +635,8 @@ export default function Admin() {
                   }
                 },
                 ({ cleared, deal }) =>
-                  `${cleared} square${cleared === 1 ? '' : 's'} cleared, `
-                  + `${deal.filled} dealt afresh.` + dealShortfall(deal)
+                  `Board re-randomized — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
+                  + `${deal.filled} filled at random.` + dealShortfall(deal)
               ))
             }
           />

@@ -392,8 +392,8 @@ export default function BoardBuilder({
               )}
 
               {/* The same feature from the other end: deal a board, read it,
-                  dislike it, deal another. It sits with the autofill because
-                  that is where somebody who has just dealt a board looks, and
+                  dislike it, roll again. It sits with the autofill because that
+                  is where somebody who has just dealt a board looks, and
                   because on a full board the autofill is gone and this is the
                   only thing here that deals at all.
 
@@ -411,7 +411,7 @@ export default function BoardBuilder({
                     ? 'The catalogue has no tiles to deal'
                     : undefined}
                 >
-                  Deal a different board
+                  Re-randomize the board
                 </button>
               )}
 
