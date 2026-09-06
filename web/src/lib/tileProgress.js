@@ -114,6 +114,31 @@ export function tileProgress(tile, staged = {}) {
   };
 }
 
+/**
+ * Set options that cannot be selected for another screenshot. Besides exact
+ * duplicates, an each-set group closes as soon as its distinct-item quota is
+ * met; extra drops from that group cannot move the tile forward.
+ */
+export function unavailableSetOptionIds(tile, staged = {}) {
+  const rule = tile.completion ?? 'points';
+  if (rule !== 'one_set' && rule !== 'each_set') return new Set();
+
+  const unavailable = new Set([
+    ...(tile.options ?? []).filter((o) => o.taken).map((o) => o.id),
+    ...(staged.optionIds ?? []),
+  ]);
+
+  if (rule === 'each_set') {
+    for (const group of tileProgress(tile, staged).groups) {
+      if (group.taken >= group.need) {
+        for (const option of group.options) unavailable.add(option.id);
+      }
+    }
+  }
+
+  return unavailable;
+}
+
 /** A compact progress line for places which do not render the full uploader. */
 export function tileProgressText(tile) {
   const progress = tileProgress(tile);

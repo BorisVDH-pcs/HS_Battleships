@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
-import { tileProgress } from '../lib/tileProgress.js';
+import { tileProgress, unavailableSetOptionIds } from '../lib/tileProgress.js';
 import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
@@ -101,12 +101,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   // An option already handed in cannot be picked again on a set tile — the
   // server refuses it, so offering it would only produce an error after the
   // upload had already cost the player a round trip.
-  const spent = new Set(
-    isSet ? [
-      ...options.filter((o) => o.taken).map((o) => o.id),
-      ...pending.optionIds,
-    ] : []
-  );
+  const spent = isSet ? unavailableSetOptionIds(tile, pending) : new Set();
 
   const allAssigned = staged.every((s) => {
     if (isValue) {

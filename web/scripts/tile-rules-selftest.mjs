@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { parseTileText } from '../src/lib/tileParser.js';
-import { tileProgress, tileProgressText } from '../src/lib/tileProgress.js';
+import {
+  tileProgress,
+  tileProgressText,
+  unavailableSetOptionIds,
+} from '../src/lib/tileProgress.js';
 import { evidenceEventText } from '../src/lib/eventText.js';
 
 const parse = (line) => parseTileText(line, 10);
@@ -88,6 +92,14 @@ for (const [line, part] of [
   assert.equal(tileProgress(tile, { optionIds: ['c2', 'c2', 't2'] }).done, true);
   assert.equal(tileProgress(tile, { optionIds: ['c2'] }).done, false);
   assert.equal(tileProgressText(tile), '0/2 sets complete');
+  assert.deepEqual(
+    [...unavailableSetOptionIds(tile, { optionIds: ['c2'] })].sort(),
+    ['c1', 'c2', 't1'].sort(),
+  );
+  assert.deepEqual(
+    [...unavailableSetOptionIds(tile, { optionIds: ['c2', 't2'] })].sort(),
+    ['c1', 'c2', 't1', 't2'].sort(),
+  );
 }
 
 {
