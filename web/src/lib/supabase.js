@@ -115,6 +115,42 @@ export const adminListTiles = (gameId) =>
 export const adminListShipCells = (gameId) =>
   rpc('admin_list_ship_cells', { p_game_id: gameId });
 
+// ---- the tile library, and boards built one square at a time ----
+
+/**
+ * Every catalogued tile, most-used first. The rows come back in the same shape
+ * `admin_list_tiles` returns a board in, so one renderer serves both.
+ */
+export const adminListLibrary = () => rpc('admin_list_library');
+
+/**
+ * Insert (`id` null) or update one catalogue entry. `tile` is the shape
+ * `parseTileLine` emits — name, icon, amount, early, rule, perSet, description,
+ * options[] — plus an optional `tags` array. Returns the entry's id.
+ */
+export const adminSaveLibraryTile = (id, tile) =>
+  rpc('admin_save_library_tile', { p_id: id ?? null, p_tile: tile });
+
+export const adminDeleteLibraryTile = (id) =>
+  rpc('admin_delete_library_tile', { p_id: id });
+
+/**
+ * Copy a finished board into the catalogue. Skips tasks already in there rather
+ * than overwriting them; returns `{ added, skipped, total }`.
+ */
+export const adminImportBoardToLibrary = (gameId) =>
+  rpc('admin_import_board_to_library', { p_game_id: gameId });
+
+/**
+ * Fill one square. Same payload as one element of `adminSetTiles`, plus
+ * `libraryId` when it came from the catalogue. Overwrites whatever was there.
+ */
+export const adminSetTile = (gameId, row, col, tile) =>
+  rpc('admin_set_tile', { p_game_id: gameId, p_row: row, p_col: col, p_tile: tile });
+
+export const adminClearTile = (gameId, row, col) =>
+  rpc('admin_clear_tile', { p_game_id: gameId, p_row: row, p_col: col });
+
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 

@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
+  adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
+  adminImportBoardToLibrary, adminSetTile, adminClearTile,
 } from '../lib/supabase.js';
+import BoardBuilder from './BoardBuilder.jsx';
 import AdminOverview from './AdminOverview.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
@@ -30,12 +33,26 @@ const STEP_HINT = {
   finished:  'This game is over.',
 };
 
+/**
+ * What `run` resolves to when the action was refused.
+ *
+ * A symbol rather than false or null: an action that succeeded may resolve to
+ * either of those, and confusing the two is how a failed save comes to look
+ * like a successful one.
+ */
+const FAILED = Symbol('admin action failed');
+const worked = (result) => result !== FAILED;
+
 export default function Admin() {
   const [games, setGames] = useState([]);
   const [teams, setTeams] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [members, setMembers] = useState([]);
   const [tiles, setTiles] = useState([]);
+  // The tile catalogue. Loaded once for the whole console rather than per game:
+  // it belongs to no game, and the builder is the only thing that reads it.
+  const [library, setLibrary] = useState([]);
+  const [libraryError, setLibraryError] = useState(null);
   const [shipCells, setShipCells] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [gameId, setGameId] = useState(null);
@@ -46,6 +63,13 @@ export default function Admin() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [confirm, confirmDialog] = useConfirm();
+  const errorRef = useRef(null);
+
+  // Scrolled to whenever a new one arrives, not merely when one is on screen —
+  // two refusals in a row should still take you to the message.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [error]);
 
   const game = games.find((g) => g.id === gameId) ?? null;
   const gameTeams = teams.filter((t) => t.game_id === gameId);
@@ -89,8 +113,32 @@ export default function Admin() {
     }
   }, []);
 
+  /**
+   * The catalogue, reported into the builder rather than across the console.
+   *
+   * It loads on mount, before a game is even open, so a failure here used to
+   * greet every admin with a red line above the Games list — about a panel that
+   * is three sections further down and has nothing to do with what they came to
+   * do. Worse, the most likely failure is the one that says nothing useful to
+   * anyone but a developer: `admin_list_library` not existing yet, because the
+   * migration that creates it has not been pushed.
+   *
+   * So it fails soft. Everything else on the console keeps working, and the
+   * builder says what is wrong in the place the answer matters.
+   */
+  const loadLibrary = useCallback(async () => {
+    try {
+      setLibrary((await adminListLibrary()) ?? []);
+      setLibraryError(null);
+    } catch (err) {
+      setLibrary([]);
+      setLibraryError(err.message);
+    }
+  }, []);
+
   useEffect(() => { loadGames(); }, [loadGames]);
   useEffect(() => { loadGameDetail(gameId); }, [gameId, loadGameDetail]);
+  useEffect(() => { loadLibrary(); }, [loadLibrary]);
 
   // Team renames can originate from a captain's screen. They emit an event so
   // the organiser's labels update without a manual refresh.
@@ -125,16 +173,33 @@ export default function Admin() {
     };
   }, [gameId, loadGames, loadGameDetail]);
 
+  /**
+   * Run one admin action, refresh what it could have changed, and report.
+   *
+   * Returns FAILED — not `undefined` — when the action threw. Several actions
+   * legitimately resolve to nothing, so `undefined` cannot mean "it did not
+   * work", and every caller that closes a form or moves on afterwards has to be
+   * able to tell the two apart. It used to swallow the error and resolve, which
+   * meant a refused save looked exactly like a successful one: the form closed,
+   * the builder advanced to the next square, and the only sign of trouble was a
+   * red line at the top of a pane you had scrolled a long way down.
+   */
   async function run(fn, okMessage) {
     setBusy(true); setError(null); setNotice(null);
     try {
       const result = await fn();
       await loadGames();
       await loadGameDetail(gameId);
+      // The catalogue comes back too. Placing a tile bumps its use count and
+      // editing one changes what the picker shows, so almost every builder
+      // action makes the loaded copy stale — and one small query on an admin
+      // console is cheaper than working out which actions those were.
+      await loadLibrary();
       if (okMessage) setNotice(typeof okMessage === 'function' ? okMessage(result) : okMessage);
       return result;
     } catch (err) {
       setError(err.message);
+      return FAILED;
     } finally {
       setBusy(false);
     }
@@ -163,8 +228,8 @@ export default function Admin() {
       ok: tiles.length === needTiles,
       detail: `${tiles.length} of ${needTiles}`,
       fix: tiles.length === 0
-        ? 'Paste the task list into Tiles below.'
-        : `${needTiles - tiles.length} still missing — see Tiles below.`,
+        ? 'Build the board below, or paste the task list into Tiles.'
+        : `${needTiles - tiles.length} still empty — fill them in the board builder below.`,
     },
     {
       key: 'teams', label: 'Teams', required: true,
@@ -288,13 +353,17 @@ export default function Admin() {
       </nav>
 
       <div className="admin">
-      {error && <p className="error">{error}</p>}
+      {/* Brought into view rather than left where it renders. The console is a
+          long pane and the error line lives at the top of it, so a refusal
+          raised from the board builder — most of a page further down — used to
+          be announced somewhere the organiser was not looking. */}
+      {error && <p className="error" ref={errorRef} role="alert">{error}</p>}
       {notice && <p className="muted">{notice}</p>}
 
       {activePane === 'games' && <>
       <NewGame busy={busy} onCreate={(...args) =>
         run(() => adminCreateGame(...args), 'Game created. Add its tiles next.')
-          .then((id) => { if (id) { setGameId(id); setPane('configure'); } })
+          .then((id) => { if (worked(id) && id) { setGameId(id); setPane('configure'); } })
       } />
 
       <section className="card">
@@ -429,12 +498,57 @@ export default function Admin() {
             )}
           </section>
 
+          {/* Before the paste box, because it is now the way most boards get
+              built. The paste box stays below it for a board that already
+              exists as text — the two write the same rows through the same
+              validation, and neither is a mode you have to commit to. */}
+          <BoardBuilder
+            game={game}
+            tiles={tiles}
+            library={library}
+            libraryError={libraryError}
+            busy={busy}
+            // Each of the three writes below answers "did it actually save",
+            // because the builder closes a form and moves to the next square on
+            // the strength of it.
+            onSetTile={(row, col, tile) =>
+              run(() => adminSetTile(game.id, row, col, tile)).then(worked)
+            }
+            onClearTile={(row, col) =>
+              run(() => adminClearTile(game.id, row, col), 'Square cleared.').then(worked)
+            }
+            onSaveLibraryTile={(id, tile) =>
+              run(() => adminSaveLibraryTile(id, tile),
+                  id ? 'Catalogue tile updated.' : 'Added to the catalogue.').then(worked)
+            }
+            onDeleteLibraryTile={(entry) =>
+              confirm(
+                entry.times_used > 0
+                  ? `It is on ${entry.times_used} square${entry.times_used === 1 ? '' : 's'} across past boards.\n`
+                    + 'Those boards keep their own copy — only the catalogue entry goes, '
+                    + 'so nothing that has been played changes.'
+                  : 'It is not on any board yet.',
+                {
+                  title: `Remove "${entry.name}" from the catalogue?`,
+                  confirmLabel: 'Remove it',
+                  danger: true,
+                }
+              ).then((ok) => ok && run(
+                () => adminDeleteLibraryTile(entry.id), 'Removed from the catalogue.'
+              ))
+            }
+            onImportBoard={() =>
+              run(() => adminImportBoardToLibrary(game.id),
+                  (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`)
+            }
+          />
+
           <Tiles
             game={game}
             tiles={tiles}
             busy={busy}
             onSave={(rows) =>
-              run(() => adminSetTiles(game.id, rows), (n) => `${n} tiles saved.`)
+              run(() => adminSetTiles(game.id, rows), (n) => `${n} tiles saved.`).then(worked)
             }
           />
 
@@ -677,7 +791,12 @@ function Tiles({ game, tiles, busy, onSave }) {
               <div className="row" style={{ marginTop: '.6rem' }}>
                 <button
                   disabled={busy || rows.length !== need || tileErrors.length > 0}
-                  onClick={() => onSave(rows).then(() => { setText(''); setOpen(false); })}
+                  // Only cleared once the save actually landed. Wiping a
+                  // hundred pasted lines because the database refused them is
+                  // the worst possible response to an error.
+                  onClick={() => onSave(rows).then((ok) => {
+                    if (ok) { setText(''); setOpen(false); }
+                  })}
                 >
                   Save {rows.length} tiles
                 </button>

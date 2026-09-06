@@ -2400,3 +2400,246 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
 /* A piece already handed in reads as done rather than as an instruction. */
 .tile-info-options li.taken { color: var(--label-3); }
 .tile-info-options li.taken span:first-child { color: var(--strike); }
+
+/* ---- board builder ----
+ *
+ * Two panes: the board you are filling, and the catalogue you are filling it
+ * from. Side by side above 1180px, because the whole point is seeing the square
+ * and its candidates at once; stacked below that, where the board would
+ * otherwise squeeze the list into a column of ellipses.
+ *
+ * The grid reuses .tile-board and .tile-cell so a square looks the same here as
+ * it does in the proofreading view — .builder-cell only adds what a target
+ * needs that a label does not.
+ */
+.builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  gap: 1.2rem;
+  align-items: start;
+  margin-top: .8rem;
+}
+@media (max-width: 1400px) { .builder { grid-template-columns: 1fr; } }
+
+.builder-panel {
+  display: grid;
+  gap: .7rem;
+  align-content: start;
+  padding: .9rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  /* Follows you down the board rather than scrolling away from it: the list is
+     what you are reaching for while the grid is what you are looking at. */
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+@media (max-width: 1400px) { .builder-panel { position: static; max-height: none; } }
+
+.builder-panel h3 { margin: 0; font-size: 1rem; }
+.builder-head { justify-content: space-between; align-items: center; }
+
+button.builder-cell {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  box-shadow: none;
+  transition: background .2s var(--ease-out), border-color .2s var(--ease-out),
+              box-shadow .2s var(--ease-out), transform .16s var(--ease-out);
+}
+button.builder-cell:hover:not(:disabled) {
+  background: var(--fill);
+  border-color: transparent;
+  box-shadow: var(--glow-sm);
+  filter: none;
+  position: relative;
+  z-index: 1;
+}
+button.builder-cell:active { transform: scale(.96); transition-duration: .09s; }
+/* The square being filled. Gold ring rather than a gold fill: the tile artwork
+   inside has to stay readable, and a filled cell already means something on
+   every other board in this app. */
+button.builder-cell.on {
+  border-color: var(--gold);
+  background: rgba(242, 193, 78, .10);
+  box-shadow: var(--glow-sm);
+}
+button.builder-cell.empty:hover { border-style: solid; }
+.builder-cell span {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.builder-current {
+  display: grid; gap: .5rem;
+  padding: .6rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.builder-current-tile { display: flex; gap: .6rem; align-items: flex-start; }
+.builder-current-tile .tile-icon { width: 30px; height: 30px; object-fit: contain; }
+.builder-current-tile > div { display: grid; gap: .1rem; min-width: 0; }
+.builder-current-tile b { font-size: .9375rem; }
+
+/* ---- the catalogue list ---- */
+
+.library-search { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.library-search input[type="search"] { flex: 1 1 9rem; }
+.library-search select { flex: 0 1 8rem; }
+
+.library-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: .25rem;
+  /* Capped rather than endless: the search box above it is the way through a
+     long catalogue, and a list that pushes the board off screen makes the
+     search box the thing you have to scroll back to. */
+  max-height: 26rem;
+  overflow-y: auto;
+}
+.library-list li { display: flex; gap: .3rem; align-items: stretch; }
+
+.library-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex; gap: .55rem; align-items: center;
+  text-align: left;
+  padding: .45rem .55rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font: inherit;
+  letter-spacing: inherit;
+  box-shadow: none;
+}
+.library-pick:hover:not(:disabled) {
+  background: var(--fill);
+  border-color: transparent;
+  color: var(--gold-lit);
+  filter: none;
+}
+.library-pick .tile-icon { width: 24px; height: 24px; object-fit: contain; flex: none; }
+.library-name {
+  flex: 1 1 auto; min-width: 0;
+  font-size: .875rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.library-rule { flex: none; font-size: .75rem; }
+.library-edit { flex: none; padding: .45rem .6rem; font-size: .75rem; }
+/* A ghost button that destroys something stays quiet until it is reached for.
+   `button.danger` paints a red fill, which is right for the one Reset button on
+   a page and wrong for a Delete beside every row of a hundred-item list — a
+   column of red is just noise, and it makes the destructive thing the most
+   prominent thing in the panel. So the fill is dropped and only the hover
+   carries the warning. */
+button.danger.ghost {
+  background: var(--fill);
+  color: var(--label-2);
+}
+button.danger.ghost:hover:not(:disabled) {
+  background: rgba(255, 69, 58, .22);
+  color: var(--hit-lit);
+}
+
+/* ---- icon picker ---- */
+
+.icon-picker { display: grid; gap: .4rem; }
+.icon-picker-current {
+  display: flex; gap: .55rem; align-items: center;
+  padding: .45rem .6rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font: inherit; letter-spacing: inherit;
+  text-align: left;
+  box-shadow: none;
+}
+.icon-picker-current:hover:not(:disabled) { background: var(--fill); filter: none; }
+.icon-picker-current .tile-icon { width: 24px; height: 24px; object-fit: contain; }
+.icon-picker-current > span:first-of-type,
+.icon-picker-current > span:nth-of-type(1) { flex: 1 1 auto; }
+/* Stands in for artwork that is not there, at the size artwork would be, so the
+   row does not change height between "no icon" and an icon. */
+.icon-picker-none {
+  display: grid; place-items: center;
+  width: 24px; height: 24px; flex: none;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-xs);
+  color: var(--label-3); font-size: .75rem;
+}
+
+.icon-picker-body {
+  display: grid; gap: .5rem;
+  padding: .6rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: .3rem;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.icon-choice {
+  aspect-ratio: 1;
+  display: grid; place-items: center;
+  padding: .2rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  box-shadow: none;
+}
+.icon-choice:hover:not(:disabled) { background: var(--fill); border-color: transparent; filter: none; }
+.icon-choice.on { border-color: var(--gold); background: rgba(242, 193, 78, .12); }
+.icon-choice .tile-icon { width: 100%; height: 100%; object-fit: contain; }
+
+/* ---- the tile form ---- */
+
+.tile-form { display: grid; gap: .7rem; }
+.tile-form .field { display: grid; gap: .3rem; }
+.tile-form .field > span {
+  font-size: .8125rem; font-weight: 500; color: var(--label-2);
+}
+.tile-form .field em { font-style: normal; font-weight: 400; }
+/* The explanation is prose, not a paste box, so it does not want the monospace
+   face and the seven-line minimum the textarea rule sets for tile lists. */
+.tile-form .tile-form-note {
+  min-height: 3.5rem;
+  font-family: inherit;
+  font-size: .875rem;
+}
+.tile-form-hint { margin: -.35rem 0 0; }
+.tile-form-actions { margin-top: .2rem; }
+
+/* A tick box and its sentence, side by side — `label`'s grid would stack them. */
+.field-inline {
+  display: flex; gap: .5rem; align-items: start;
+  font-size: .8125rem; color: var(--label-2);
+}
+.field-inline input { margin-top: .15rem; flex: none; }
+
+.tile-form-drops {
+  display: grid; gap: .4rem;
+  padding: .6rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.tile-form-drops .row { justify-content: space-between; align-items: center; }
+.tile-form-drops h4 { margin: 0; font-size: .8125rem; font-weight: 600; }
+
+.drop-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.drop-rows li { display: flex; gap: .3rem; align-items: center; }
+.drop-rows input { padding: .4rem .5rem; font-size: .8125rem; }
+.drop-grp    { flex: 0 1 7rem; min-width: 0; }
+.drop-label  { flex: 1 1 8rem; min-width: 0; }
+.drop-points { flex: 0 0 4rem; }
+.drop-remove { flex: none; padding: .35rem .55rem; line-height: 1; }

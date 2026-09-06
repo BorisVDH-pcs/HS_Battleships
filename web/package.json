@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:tile-rules": "node scripts/tile-rules-selftest.mjs"
+    "test:tile-rules": "node scripts/tile-rules-selftest.mjs",
+    "test:tile-draft": "node scripts/tile-draft-selftest.mjs",
+    "icons:manifest": "node scripts/build-icon-manifest.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",
