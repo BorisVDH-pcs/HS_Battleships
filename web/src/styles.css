@@ -2039,9 +2039,14 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   padding: 1.3rem 1.4rem 1.15rem;
   border: 1px solid var(--hairline);
   border-radius: var(--r-2xl);
-  background: rgba(36, 36, 38, .82);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  /* Solid, with no backdrop-filter of its own. This sheet sits inside
+     .confirm-backdrop, which is already blurring the page behind it, and a
+     backdrop-filter nested inside another one has to resample the outer
+     layer's blurred output — which Chromium recomputes as the pointer moves
+     over it, so the dialog visibly flickered whenever the mouse crossed the
+     board behind it. The second blur was buying almost nothing anyway: it was
+     blurring an already 8px-blurred field. */
+  background: var(--panel-solid);
   box-shadow: var(--shadow-lg);
   animation: confirm-in .34s var(--ease-out);
 }
@@ -2128,9 +2133,10 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   width: min(34rem, 100%);
   border: 1px solid var(--hairline);
   border-radius: var(--r-2xl);
-  background: rgba(36, 36, 38, .86);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  /* Solid for the same reason as .confirm above: nested inside
+     .guide-backdrop's blur, a second backdrop-filter flickers under a
+     moving pointer. */
+  background: var(--panel-solid);
   box-shadow: var(--shadow-lg);
   animation: confirm-in .34s var(--ease-out);
 }
