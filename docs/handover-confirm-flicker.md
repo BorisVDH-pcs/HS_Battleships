@@ -150,3 +150,75 @@ dialog rendered correctly on the blurred board (then cancelled — no write).
 flow once and sweep the mouse over the board to confirm the flicker is gone.
 That specific dialog was not reproducible from this session's account, because
 neither active tile had enough evidence to trigger it.
+
+---
+
+# Round two — the flicker that survived (2026-09-06)
+
+Boris reported the flicker was still there, but only on **submit and fire**:
+the dialog looked like it wanted to open "both on top of the submission box and
+over the board", the two fighting each other.
+
+That is the case the note above ended on: the "Fire the shot?" dialog was never
+reproduced live, because neither of the test account's active tiles had enough
+evidence to raise it. The nested-blur fix was real, but it was not the only
+cause — and the second cause affects **only** the dialogs raised from inside a
+slot, which is exactly the one that could not be tested.
+
+## Second cause: a containing block that moves
+
+`useConfirm()` returned the dialog as plain JSX, and every call site rendered it
+where it was raised. For `EvidenceUploader` that is
+`.side-col > .active-tiles > .slots > .slot.filled > .evidence` — and two
+properties on that chain capture `position: fixed`:
+
+| Selector | Property | Effect |
+| --- | --- | --- |
+| `.side-col .active-tiles` (styles.css:685) | `backdrop-filter: blur(30px)` | Permanent containing block **and** stacking context |
+| `.slot:not(.empty):hover` (styles.css:804) | `transform: translateY(-2px)` | Containing block that appears and disappears with the pointer |
+
+A `backdrop-filter` or a `transform` on an ancestor makes that ancestor the
+containing block for `position: fixed` descendants. So `.confirm-backdrop`
+(`position: fixed; inset: 0`) was never measured against the window — it was
+measured against the card. Worse, the hover transform means the containing
+block **changes** as the pointer moves, over a `.28s` transition. Measured
+live against the real stylesheet, at a 1280x800 viewport:
+
+```
+BEFORE  rest     318x198 @ 41,101     <- the .active-tiles column's box
+BEFORE  hover    284x166 @ 58,117     <- jumps to the .slot padding box
+BEFORE  unhover  318x198 @ 41,101     <- jumps back
+
+AFTER   rest    1280x800 @ 0,0
+AFTER   hover   1280x800 @ 0,0
+AFTER   unhover 1280x800 @ 0,0
+```
+
+Every pass of the mouse across the card moved the sheet 17px right, 16px down
+and shrank it by 34x32. That is the flicker, and it is why it read as two
+positions fighting: the dialog really was being laid out against two different
+boxes, a third of a second apart.
+
+The column being its own stacking context is the same story from the other
+side — `z-index: 50` on the scrim only ever competed *within* the column, so it
+could not cover the board no matter how high it went.
+
+## The fix
+
+`ConfirmDialog` now portals to `<body>` (`createPortal`), the way `TileInfo`
+already did for the same reason — its comment at `TileInfo.jsx:159` describes
+this exact failure for the price-list panel. Out at the body there is no
+ancestor able to reposition, clip or re-stack the sheet, and no outer
+`backdrop-filter` left for the scrim's own `blur(8px)` to nest inside.
+
+One change in `ConfirmDialog.jsx` fixes every call site at once, including
+`ActiveTiles`' own "Lock in" / "Complete & fire" confirms — those render at
+`.active-tiles` level, so they had the column's containing block too (though
+not the hover flip, which is why they looked steadier).
+
+React portals still propagate events through the React tree, not the DOM tree,
+so the backdrop's click-outside-to-cancel and the slot's click-to-select-paste
+-target behave exactly as before. Nothing at the call sites changed.
+
+Verified: `npm run build` clean (104 modules), no console errors on load, and
+the measurements above taken against the app's own stylesheet.

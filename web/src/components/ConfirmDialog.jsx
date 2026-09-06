@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * In-app confirmation, replacing window.confirm and window.prompt.
@@ -92,7 +93,22 @@ function ConfirmDialog({
     (requireText ? inputRef : confirmRef).current?.focus();
   }, [requireText]);
 
-  return (
+  // Portaled to <body>, not left where it was raised. Two call sites sit
+  // inside the active-tile column, and that column is a blurred material
+  // (`backdrop-filter`) whose cards also lift on hover (`transform:
+  // translateY(-2px)`). Either property makes the ancestor the containing
+  // block for `position: fixed` descendants, so this scrim was measured
+  // against the card rather than the window — and because the hover transform
+  // comes and goes as the pointer moves, the containing block kept switching
+  // underneath it, snapping the sheet between the card box and the viewport
+  // box. That is the flicker that survived dropping the nested blur: "Fire
+  // the shot?" is raised by the uploader inside a slot, which is exactly the
+  // affected subtree. The column is its own stacking context too, so z-index
+  // 50 could not lift the scrim over the board from in there. Out here it is
+  // a plain overlay against the viewport, with no ancestor able to reposition,
+  // clip or re-stack it — and no outer backdrop-filter left to nest inside.
+  // Same reasoning, and same fix, as the TileInfo panel.
+  return createPortal(
     <div
       className="confirm-backdrop"
       // A press outside the dialog cancels, matching what people expect of a
@@ -136,7 +152,8 @@ function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
