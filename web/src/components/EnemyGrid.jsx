@@ -19,7 +19,9 @@ import TileIcon from './TileIcon.jsx';
  * screenshot once a tile has been fired — the uploader is gone by then, and the
  * tile is just a mark on the board.
  */
-export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTileId, openTileId }) {
+export default function EnemyGrid({
+  tiles, onClaim, onInspect, canClaim, busyTileId, openTileId, shotResult,
+}) {
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
 
   return (
@@ -41,6 +43,7 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
 
               const fired = tile.claim_status === 'fired';
               const active = tile.claim_status === 'active';
+              const resultIsShowing = shotResult?.tileId === tile.id;
               const cls = [
                 'cell',
                 // 'dealt' colours it as the shooter's news, not the fleet
@@ -53,6 +56,7 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                 !tile.revealed && canClaim ? 'claimable' : '',
                 tile.revealed ? 'clickable' : '',
                 openTileId === tile.id ? 'picked' : '',
+                resultIsShowing ? `result-feedback result-${shotResult.result}` : '',
               ].filter(Boolean).join(' ');
 
               return (
@@ -81,6 +85,20 @@ export default function EnemyGrid({ tiles, onClaim, onInspect, canClaim, busyTil
                       {tile.claim_result === 'hit'
                         ? (tile.ship_sunk ? '☠' : '✸')
                         : '○'}
+                    </span>
+                  )}
+                  {resultIsShowing && (
+                    <span
+                      key={shotResult.nonce}
+                      className={`shot-result shot-result-${shotResult.result}`}
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      <span aria-hidden="true">
+                        {shotResult.result === 'hit' ? '✸' : '○'}
+                      </span>
+                      {shotResult.result === 'hit' ? 'HIT!' : 'MISS!'}
                     </span>
                   )}
                 </button>

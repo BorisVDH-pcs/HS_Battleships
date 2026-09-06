@@ -21,7 +21,7 @@ import { useConfirm } from './components/ConfirmDialog.jsx';
 import GamePicker from './components/GamePicker.jsx';
 import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
 import { statusLabel } from './lib/status.js';
-import { REVEAL_DELAY_MS } from './lib/fireEffect.js';
+import { REVEAL_DELAY_MS, SHOT_RESULT_DURATION_MS } from './lib/fireEffect.js';
 import { tileProgressText } from './lib/tileProgress.js';
 
 export default function App() {
@@ -33,6 +33,7 @@ export default function App() {
   const [myGames, setMyGames] = useState([]);
   const [notice, setNotice] = useState(null);
   const [shot, setShot] = useState(null);
+  const [shotResult, setShotResult] = useState(null);
   const [busyTileId, setBusyTileId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   // Which board is on screen. The two used to sit side by side, which cost
@@ -46,6 +47,13 @@ export default function App() {
   // holds state of its own.
   const [confirm, confirmDialog] = useConfirm();
   const guideRef = useRef(null);
+  const resultRevealTimerRef = useRef(null);
+  const resultHideTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    clearTimeout(resultRevealTimerRef.current);
+    clearTimeout(resultHideTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!supabase) { setReady(true); return; }
@@ -265,7 +273,10 @@ export default function App() {
   // clears its pending reveal timers.
   function switchGame(nextId) {
     if (!nextId || nextId === gameId) return;
+    clearTimeout(resultRevealTimerRef.current);
+    clearTimeout(resultHideTimerRef.current);
     setShot(null);
+    setShotResult(null);
     setOpenTileId(null);
     setBusyTileId(null);
     setNotice(null);
@@ -443,6 +454,7 @@ export default function App() {
                       openTileId={openTileId}
                       canClaim={canClaim}
                       busyTileId={busyTileId}
+                      shotResult={shotResult}
                     />
                     <BoardLegend view="enemy" />
                     {openTile && (
@@ -499,12 +511,23 @@ export default function App() {
                       // Sound/animation come from the realtime subscription
                       // above, not from here — but this client already knows
                       // the result, so an un-delayed refresh would color the
-                      // tile and post the notice before its own gif/sound had
+                      // tile and show its result before its own gif/sound had
                       // even started. Wait out the same beat everyone else's
                       // realtime-triggered reveal does.
-                      setTimeout(() => {
-                        setNotice(`${tile.name} — ${result.toUpperCase()}!`);
+                      clearTimeout(resultRevealTimerRef.current);
+                      clearTimeout(resultHideTimerRef.current);
+                      setShotResult(null);
+                      resultRevealTimerRef.current = setTimeout(() => {
+                        // A shot can be submitted while "Your fleet" is open.
+                        // Bring its destination into view so the local result
+                        // is never hidden on the other board tab.
+                        setBoardTab('enemy');
+                        setShotResult({ tileId: tile.id, result, nonce: Date.now() });
                         game.refresh();
+                        resultHideTimerRef.current = setTimeout(
+                          () => setShotResult(null),
+                          SHOT_RESULT_DURATION_MS
+                        );
                       }, REVEAL_DELAY_MS);
                     }}
                   />

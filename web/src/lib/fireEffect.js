@@ -11,3 +11,7 @@ export const POST_GIF_PAUSE_MS = 400;
 // (FireEffect.jsx) land at the same instant: gif, then a pause, then both
 // together.
 export const REVEAL_DELAY_MS = GIF_DURATION_MS + POST_GIF_PAUSE_MS;
+
+// Long enough to read without turning the result into a banner that competes
+// with the board. The badge fades during the final part of this window.
+export const SHOT_RESULT_DURATION_MS = 2000;

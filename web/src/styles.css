@@ -490,6 +490,65 @@ button.cell:disabled { cursor: default; }
 }
 .cell.hit { animation: hit-strike .55s var(--ease-out); }
 .cell.hit.dealt { animation: strike-dealt .55s var(--ease-out); }
+
+/* The firing player's result belongs to the square they chose. It mounts only
+   after the cannon GIF and reveal pause have finished, stays readable for two
+   seconds, then fades away; the square's normal hit/miss state remains. */
+.cell.result-feedback {
+  position: relative;
+  z-index: 4;
+  overflow: visible;
+}
+.cell.result-feedback::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  z-index: 2;
+  border: 2px solid currentColor;
+  border-radius: calc(var(--r-md) + 4px);
+  pointer-events: none;
+  animation: shot-result-ring 2s var(--ease-out) both;
+}
+.cell.result-hit::after { color: var(--strike-lit); }
+.cell.result-miss::after { color: var(--miss-ink); }
+.shot-result {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: .24rem;
+  min-width: max-content;
+  padding: .28rem .48rem;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 999px;
+  color: #fff;
+  font-size: clamp(.6rem, 1.4vw, .78rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .055em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .42);
+  pointer-events: none;
+  animation: shot-result-badge 2s var(--ease-bounce) both;
+}
+.shot-result-hit { background: rgba(20, 128, 48, .96); }
+.shot-result-miss {
+  background: rgba(16, 42, 70, .97);
+  color: #d5eaff;
+}
+@keyframes shot-result-badge {
+  0%   { opacity: 0; transform: translateY(5px) scale(.68); }
+  12%  { opacity: 1; transform: translateY(0) scale(1.08); }
+  20%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-5px) scale(.96); }
+}
+@keyframes shot-result-ring {
+  0%   { opacity: 0; transform: scale(.72); }
+  12%  { opacity: .95; }
+  62%  { opacity: .35; transform: scale(1.12); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
 /* Locked in, not yet fired. A tint ring — the same affordance a selected row
    gets everywhere else in the app. */
 .cell.active {
