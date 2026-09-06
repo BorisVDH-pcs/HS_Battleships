@@ -140,6 +140,13 @@ export const adminClearTile = (gameId, row, col) =>
   rpc('admin_clear_tile', { p_game_id: gameId, p_row: row, p_col: col });
 
 /**
+ * Empty every square on a board. Returns how many squares it removed. Refused
+ * once the game is past preparation, like every other write to `tiles`.
+ */
+export const adminClearBoard = (gameId) =>
+  rpc('admin_clear_board', { p_game_id: gameId });
+
+/**
  * Deal random catalogue tiles into the squares that are still empty.
  *
  * Never touches a square that already has a tile, and never deals a task the

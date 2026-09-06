@@ -6,6 +6,7 @@ import {
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminImportBoardToLibrary, adminSetTile, adminClearTile, adminAutofillBoard,
+  adminClearBoard,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
 import AdminOverview from './AdminOverview.jsx';
@@ -512,6 +513,28 @@ export default function Admin() {
             }
             onClearTile={(row, col) =>
               run(() => adminClearTile(game.id, row, col), 'Square cleared.').then(worked)
+            }
+            // The way back to an empty board. Asked for by name rather than by
+            // count, because a board is an evening's work and "100 squares" is
+            // true of every board -- the name is the only part of the question
+            // that tells you whether you are about to empty the right one.
+            onClearBoard={() =>
+              confirm(
+                `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} on this `
+                + 'board are removed. The catalogue is untouched, so anything that '
+                + 'came from it can be placed again — but a one-off tile typed '
+                + 'straight onto a square is gone.'
+                + '\n\nThis cannot be undone.',
+                {
+                  title: `Remove every tile from "${game.name}"?`,
+                  confirmLabel: 'Remove them all',
+                  danger: true,
+                  requireText: game.name,
+                }
+              ).then((ok) => ok && run(
+                () => adminClearBoard(game.id),
+                (n) => `${n} square${n === 1 ? '' : 's'} cleared — the board is empty.`
+              ))
             }
             // Resolves to the entry's id, or null if the save was refused. The
             // builder needs the id rather than just a yes: after saving it puts

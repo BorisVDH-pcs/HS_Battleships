@@ -28,7 +28,7 @@ import { statusLabel } from '../lib/status.js';
 export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
   onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile, onImportBoard,
-  onAutofillBoard,
+  onAutofillBoard, onClearBoard,
 }) {
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
@@ -413,6 +413,26 @@ export default function BoardBuilder({
                   New tile
                 </button>
               </div>
+
+              {/* The undo for a board you have decided against -- most often
+                  one autofill dealt. Clearing a square at a time is right for a
+                  mistake and absurd for a hundred of them. Deliberately down
+                  here with nothing beside it, rather than in the row above:
+                  every other button on this panel adds something, and a
+                  destructive one is the last thing that should sit under a
+                  cursor already moving. Hidden on an empty board, where it has
+                  nothing to do and would only be a red button to misread. */}
+              {tiles.length > 0 && (
+                <div className="row builder-clear">
+                  <button
+                    className="ghost danger"
+                    disabled={busy}
+                    onClick={onClearBoard}
+                  >
+                    Remove all {tiles.length} tile{tiles.length === 1 ? '' : 's'}
+                  </button>
+                </div>
+              )}
 
               {library.length > 0 && (
                 <>

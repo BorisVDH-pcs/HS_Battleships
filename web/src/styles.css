@@ -2526,6 +2526,14 @@ button.builder-cell.empty:hover { border-style: solid; }
 .builder-current-tile > div { display: grid; gap: .1rem; min-width: 0; }
 .builder-current-tile b { font-size: .9375rem; }
 
+/* Set apart from the row of additive buttons above it by a rule and a gap, so
+   the destructive one is reached deliberately rather than in passing. */
+.builder-clear {
+  margin-top: .4rem;
+  padding-top: .8rem;
+  border-top: 1px solid var(--hairline);
+}
+
 /* ---- the catalogue list ---- */
 
 .library-search { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
