@@ -97,6 +97,29 @@ export default function BoardBuilder({
       : `The catalogue already has a different tile called "${clash.name}". Pick another name.`;
 
   /**
+   * The catalogue entry that already answers to this draft's name, if any.
+   *
+   * Saving a square files it in the catalogue too, and "always" has to mean
+   * "whenever it is new": the catalogue's identity is its name -- a unique
+   * index on it -- and admin_save_library_tile refuses a second entry under a
+   * name it already holds. Leaving that entry alone is also the right answer
+   * on its own terms, and the one admin_import_board_to_library already takes:
+   * an entry may have been tidied, tagged or re-priced since, and one square's
+   * copy of it is not the authority on any of that.
+   *
+   * Keyed on the name alone rather than on the entry the square came from, so
+   * renaming a square's tile files the new name as a new entry and leaves the
+   * old one standing -- which is what the catalogue form does with a rename
+   * too.
+   */
+  const catalogued = useMemo(() => {
+    if (!editing || editing.what !== 'square') return null;
+    const key = nameKey(editing.draft.name);
+    if (!key) return null;
+    return library.find((e) => nameKey(e.name) === key) ?? null;
+  }, [editing, library]);
+
+  /**
    * The next square with nothing on it, so filling a board is one click per
    * square rather than two. Starts after the square just filled and wraps;
    * returns null once the board is full, which is what stops the selection
@@ -127,13 +150,34 @@ export default function BoardBuilder({
   const place = (entry) =>
     placePayload(payloadFromRow(entry, { libraryId: entry.id }));
 
+  /**
+   * Put the tile on the square, and keep it.
+   *
+   * There used to be a second button for the keeping, and it was the wrong
+   * shape: a tile worth typing out is a tile worth having on the next board,
+   * and the one press that says so was the one easiest to forget -- so the
+   * work of writing a tile was quietly thrown away by default. Now the square
+   * and the catalogue are filled by the same press.
+   *
+   * An entry that already exists is left exactly as it is; see `catalogued`
+   * for why. The square still links to it either way, so it knows where its
+   * tile came from and the entry's use count keeps counting.
+   *
+   * Catalogue first, because the square wants the new entry's id. A refused
+   * catalogue write stops here with the form still open and the error on it,
+   * rather than leaving a square filled from an entry that does not exist.
+   */
   async function saveSquare() {
-    // The catalogue id rides along only when the square still came from that
-    // entry. Editing a square is a local tweak, not an edit of the catalogue.
-    const payload = payloadFromDraft(
-      editing.draft,
-      editing.id ? { libraryId: editing.id } : {}
-    );
+    let libraryId = catalogued?.id ?? null;
+    if (!libraryId) {
+      // Tags belong to the catalogue and the square form does not show them,
+      // so a tile filed this way starts untagged.
+      libraryId = await onSaveLibraryTile(
+        null, payloadFromDraft(editing.draft, { tags: [] })
+      );
+      if (!libraryId) return;
+    }
+    const payload = payloadFromDraft(editing.draft, { libraryId });
     if (await onSetTile(at.row, at.col, payload)) setEditing(null);
   }
 
@@ -217,17 +261,18 @@ export default function BoardBuilder({
                   ? `${coordLabel(at.row, at.col)} — ${current ? 'edit this square' : 'a one-off tile'}`
                   : editing.from ? `New tile, based on ${editing.from.name}` : 'New catalogue tile'}
               </h3>
-              {/* Three different situations, and the difference matters: a tile
-                  placed from the catalogue can be tweaked without touching the
-                  entry, a typed one has no entry to touch, and neither reaches
-                  the catalogue unless it is put there deliberately. */}
+              {/* Two situations now, and only one of them is a decision the
+                  press makes: whether the catalogue gains an entry or keeps the
+                  one it has. Said before the press rather than after it,
+                  because "and it went in the catalogue" is a surprise worth
+                  not having. */}
               {editing.what === 'square' && (
                 <p className="muted">
-                  {editing.id
-                    ? <>Changes stay on this board — the catalogue entry it came
-                        from is untouched. Use <em>Save to catalogue</em> to keep them.</>
-                    : <>This square only. Use <em>Save to catalogue</em> as well if
-                        it is worth having on a future board.</>}
+                  {catalogued
+                    ? <>Goes on this square. The catalogue already has <b>{catalogued.name}</b>,
+                        so that entry is left exactly as it is.</>
+                    : <>Goes on this square, and into the catalogue as a new entry
+                        so a later board can deal it.</>}
                 </p>
               )}
               {editing.what === 'library' && (
@@ -253,17 +298,7 @@ export default function BoardBuilder({
                 onSave={editing.what === 'square' ? saveSquare : () => saveLibrary()}
                 onCancel={() => setEditing(null)}
                 extraErrors={clashMessage ? [clashMessage] : []}
-                extraActions={editing.what === 'square' ? (
-                  <button
-                    className="ghost"
-                    disabled={busy}
-                    onClick={() => onSaveLibraryTile(
-                      null, payloadFromDraft(editing.draft, { tags: [] })
-                    )}
-                  >
-                    Save to catalogue
-                  </button>
-                ) : editing.from ? (
+                extraActions={editing.from ? (
                   // The way back to editing in place. Kept because the entries
                   // imported from old boards carry no tags and some carry the
                   // wording of a hurried spreadsheet, and a catalogue you can
