@@ -139,6 +139,17 @@ export function unavailableSetOptionIds(tile, staged = {}) {
   return unavailable;
 }
 
+/** Names of each-set groups whose persisted evidence already meets the quota. */
+export function completedEachSetGroupNames(tile) {
+  if ((tile.completion ?? 'points') !== 'each_set') return new Set();
+
+  return new Set(
+    tileProgress(tile).groups
+      .filter((group) => group.taken >= group.need)
+      .map((group) => group.name)
+  );
+}
+
 /** A compact progress line for places which do not render the full uploader. */
 export function tileProgressText(tile) {
   const progress = tileProgress(tile);

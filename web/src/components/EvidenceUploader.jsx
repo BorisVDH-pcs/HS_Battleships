@@ -1,6 +1,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
-import { tileProgress, unavailableSetOptionIds } from '../lib/tileProgress.js';
+import {
+  completedEachSetGroupNames,
+  tileProgress,
+  unavailableSetOptionIds,
+} from '../lib/tileProgress.js';
 import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
@@ -97,6 +101,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   const now = tileProgress(tile);
   const next = tileProgress(tile, pending);
   const willComplete = next.done;
+  const completedGroups = completedEachSetGroupNames(tile);
 
   // An option already handed in cannot be picked again on a set tile — the
   // server refuses it, so offering it would only produce an error after the
@@ -192,9 +197,17 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
         <option value="">Which drop?</option>
         {next.groups.some((g) => g.named)
           ? next.groups.map((g) => (
-              <optgroup key={g.name} label={g.name}>
-                {g.options.map(rows)}
-              </optgroup>
+              completedGroups.has(g.name)
+                ? (
+                    <option key={g.name} disabled>
+                      {g.name} — ✓ Done
+                    </option>
+                  )
+                : (
+                    <optgroup key={g.name} label={g.name}>
+                      {g.options.map(rows)}
+                    </optgroup>
+                  )
             ))
           : options.map(rows)}
       </select>

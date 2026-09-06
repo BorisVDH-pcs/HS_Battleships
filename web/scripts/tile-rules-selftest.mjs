@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { parseTileText } from '../src/lib/tileParser.js';
 import {
+  completedEachSetGroupNames,
   tileProgress,
   tileProgressText,
   unavailableSetOptionIds,
@@ -100,6 +101,16 @@ for (const [line, part] of [
     [...unavailableSetOptionIds(tile, { optionIds: ['c2', 't2'] })].sort(),
     ['c1', 'c2', 't1', 't2'].sort(),
   );
+  assert.deepEqual([...completedEachSetGroupNames(tile)], []);
+
+  const coxComplete = {
+    ...tile,
+    options: options.map((option) => ({
+      ...option,
+      taken: option.grp === 'CoX' || option.id === 't1',
+    })),
+  };
+  assert.deepEqual([...completedEachSetGroupNames(coxComplete)], ['CoX']);
 }
 
 {
