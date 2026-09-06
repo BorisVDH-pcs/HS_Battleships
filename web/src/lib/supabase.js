@@ -151,6 +151,17 @@ export const adminSetTile = (gameId, row, col, tile) =>
 export const adminClearTile = (gameId, row, col) =>
   rpc('admin_clear_tile', { p_game_id: gameId, p_row: row, p_col: col });
 
+/**
+ * Deal random catalogue tiles into the squares that are still empty.
+ *
+ * Never touches a square that already has a tile, and never deals a task the
+ * board already holds. Returns `{ filled, similar, empty, pool }` — `empty` is
+ * how many squares it found, `filled` how many it could fill, and `similar` how
+ * many of those had to be a near-duplicate of another task to get there.
+ */
+export const adminAutofillBoard = (gameId) =>
+  rpc('admin_autofill_board', { p_game_id: gameId });
+
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 

@@ -5,7 +5,7 @@ import {
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
-  adminImportBoardToLibrary, adminSetTile, adminClearTile,
+  adminImportBoardToLibrary, adminSetTile, adminClearTile, adminAutofillBoard,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
 import AdminOverview from './AdminOverview.jsx';
@@ -541,6 +541,22 @@ export default function Admin() {
             onImportBoard={() =>
               run(() => adminImportBoardToLibrary(game.id),
                   (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`)
+            }
+            // Says what it could not do as well as what it did. A catalogue too
+            // small for the board leaves squares empty, and a shuffle that
+            // reports only its successes leaves you to find that out by
+            // counting a hundred squares.
+            onAutofillBoard={() =>
+              run(() => adminAutofillBoard(game.id), (r) => {
+                const short = r.empty - r.filled;
+                return `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
+                  + (short > 0
+                      ? ` ${short} left empty — the catalogue has ${r.pool} tile${r.pool === 1 ? '' : 's'} this board can still use.`
+                      : '')
+                  + (r.similar > 0
+                      ? ` ${r.similar} of them repeat a task already on the board, which is what it took to fill it.`
+                      : '');
+              })
             }
           />
 

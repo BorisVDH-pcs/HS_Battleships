@@ -28,6 +28,7 @@ import { statusLabel } from '../lib/status.js';
 export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
   onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile, onImportBoard,
+  onAutofillBoard,
 }) {
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
@@ -371,6 +372,24 @@ export default function BoardBuilder({
                   ? 'Empty so far. Import a board that already exists, or add tiles one at a time.'
                   : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
               </p>
+
+              {/* Deals into the empty squares only, which is what makes it safe
+                  to press on a board somebody has already worked on -- and why
+                  it needs no confirmation. It is the first draft of a board,
+                  not the finished one: the point is to spend the evening on the
+                  dozen squares worth arguing about instead of all hundred. */}
+              {tiles.length < need && (
+                <button
+                  disabled={busy || library.length === 0 || Boolean(libraryError)}
+                  onClick={onAutofillBoard}
+                  title={library.length === 0
+                    ? 'The catalogue has no tiles to deal'
+                    : undefined}
+                >
+                  Fill the {need - tiles.length} empty square
+                  {need - tiles.length === 1 ? '' : 's'} at random
+                </button>
+              )}
 
               <div className="row">
                 {/* Both write to the catalogue, so neither can work while it is
