@@ -72,6 +72,20 @@ export function tileProgress(tile, staged = {}) {
       };
     }
 
+    // A single group with a quota means "choose N different items from this
+    // list". Showing 0/1 sets hides that quota and makes a two-item tile look
+    // one item long, so count the distinct items directly in this shape.
+    if (groups.length === 1) {
+      const [group] = groups;
+      return {
+        rule, groups,
+        done: group.taken >= group.need,
+        unit: 'Items',
+        have: group.taken,
+        need: group.need,
+      };
+    }
+
     return {
       rule, groups,
       done: groups.length > 0 && complete.length === groups.length,
@@ -107,7 +121,9 @@ export function tileProgressText(tile) {
     return `${progress.unit} ${progress.have}/${progress.need}`;
   }
   if (progress.rule === 'each_set') {
-    return `${progress.have}/${progress.need} sets complete`;
+    return progress.unit === 'Items'
+      ? `${progress.have}/${progress.need} items collected`
+      : `${progress.have}/${progress.need} sets complete`;
   }
   if (progress.rule === 'value') {
     return `${progress.have}/${progress.need}m`;

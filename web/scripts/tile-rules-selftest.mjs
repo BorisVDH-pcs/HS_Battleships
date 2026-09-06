@@ -91,6 +91,20 @@ for (const [line, part] of [
 }
 
 {
+  const options = [
+    { id: 'part-a', grp: 'Components', label: 'Part A', taken: false },
+    { id: 'part-b', grp: 'Components', label: 'Part B', taken: false },
+    { id: 'part-c', grp: 'Components', label: 'Part C', taken: false },
+    { id: 'part-d', grp: 'Components', label: 'Part D', taken: false },
+  ];
+  const tile = { completion: 'each_set', per_set: 2, options };
+  assert.equal(tileProgressText(tile), '0/2 items collected');
+  assert.equal(tileProgress(tile, { optionIds: ['part-a'] }).done, false);
+  assert.equal(tileProgress(tile, { optionIds: ['part-a', 'part-a'] }).done, false);
+  assert.equal(tileProgress(tile, { optionIds: ['part-a', 'part-d'] }).done, true);
+}
+
+{
   const tile = { completion: 'value', required_evidence: 250, evidence_points: 190 };
   assert.equal(tileProgress(tile, { points: 59 }).done, false);
   assert.equal(tileProgress(tile, { points: 60 }).done, true);
