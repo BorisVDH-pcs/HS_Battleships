@@ -292,13 +292,9 @@ export default function Admin() {
     return 'Still needed: ' + missing.map((c) => c.label.toLowerCase()).join(', ');
   }
 
-  // Configure is where every fixable requirement is fixed — tiles, captains and
-  // players all live in that pane — so the count of what is still blocking goes
-  // on it. Fleets are the captains' job and Teams is fixed at creation, so
-  // neither is something this console can badge a way to.
-  const configureBadge = blocking.filter(
-    (c) => c.key === 'tiles' || c.key === 'captains' || c.key === 'roster'
-  ).length;
+  // Keep this badge in sync with the setup overview: it represents everything
+  // still blocking the game, including fleets that captains place later.
+  const configureBadge = blocking.length;
 
   // Configure and Track are both about a chosen game, so with none chosen there
   // is nothing for them to show. Derived rather than corrected in an effect, so
