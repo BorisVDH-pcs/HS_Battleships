@@ -436,18 +436,27 @@ export default function BoardBuilder({
                   so unlike its neighbour it asks first. That is also why it can
                   sit above the additive row without the separator the clear
                   button gets below: a stray press costs a dialog, not a
-                  board. */}
+                  board.
+
+                  In a .row rather than bare in the panel, which is a grid and
+                  would stretch it edge to edge. The full width belongs to the
+                  autofill above -- the press this panel is built around -- and
+                  a second bar the same size reads as a second primary action.
+                  Sized to its text, it sits with the other secondary buttons
+                  instead. */}
               {tiles.length > 0 && (
-                <button
-                  className="ghost"
-                  disabled={busy || library.length === 0 || Boolean(libraryError)}
-                  onClick={onReshuffleBoard}
-                  title={library.length === 0
-                    ? 'The catalogue has no tiles to deal'
-                    : undefined}
-                >
-                  Re-randomize the board
-                </button>
+                <div className="row">
+                  <button
+                    className="ghost"
+                    disabled={busy || library.length === 0 || Boolean(libraryError)}
+                    onClick={onReshuffleBoard}
+                    title={library.length === 0
+                      ? 'The catalogue has no tiles to deal'
+                      : undefined}
+                  >
+                    Re-randomize the board
+                  </button>
+                </div>
               )}
 
               <div className="row">
