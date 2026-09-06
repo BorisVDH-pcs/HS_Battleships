@@ -26,12 +26,25 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * say. That submit reads differently and asks first, since it is the
  * irreversible one.
  *
+ * WEIGHTED TILES (0046). Some tiles list several drops worth different points
+ * and ask for a total rather than a count. There, each staged screenshot picks
+ * its own drop — one submit can carry a rare and a common together, and the
+ * same drop may be picked as many times as a team actually got it. The picker
+ * is per file rather than per submit for exactly that reason: a single
+ * selection for the whole batch would quietly mis-score the mixed case, which
+ * is the case weighted tiles exist for.
+ *
+ * The points shown here are for reading, never for scoring. add_evidence looks
+ * up what an option is worth server-side; nothing this component computes is
+ * trusted by the database.
+ *
  * There are deliberately no thumbnails of submitted evidence here. They made
  * the card nearly twice as tall for something a player has already seen; the
  * organiser's review screen is where the images actually need looking at.
  */
 const EvidenceUploader = forwardRef(function EvidenceUploader({
   claimId, gameId, teamId, required, evidence, onUploaded, tileName,
+  options = [], points = 0,
 }, ref) {
   const [staged, setStaged] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -40,7 +53,8 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   const inputRef = useRef(null);
   const [confirm, confirmDialog] = useConfirm();
 
-  const have = evidence.length;
+  const weighted = options.length > 0;
+  const have = weighted ? points : evidence.length;
   const done = have >= required;
 
   function stage(files) {
@@ -50,14 +64,22 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
       return;
     }
     setError(null);
-    setStaged((s) => [...s, ...images]);
+    // A weighted tile starts each file unassigned rather than defaulting to the
+    // first drop. A wrong default that scores is worse than a picker that waits.
+    setStaged((s) => [...s, ...images.map((file) => ({ file, optionId: null }))]);
   }
 
   useImperativeHandle(ref, () => ({ stageFiles: stage }));
 
+  const pointsOf = (id) => options.find((o) => o.id === id)?.points ?? 0;
+  const allAssigned = !weighted || staged.every((s) => s.optionId);
+
   // Computed from what is staged, not from `evidence`, which does not update
   // until the refetch after upload.
-  const willComplete = have + staged.length >= required;
+  const stagedWorth = weighted
+    ? staged.reduce((sum, s) => sum + pointsOf(s.optionId), 0)
+    : staged.length;
+  const willComplete = have + stagedWorth >= required;
 
   async function submit() {
     if (willComplete && !(await confirm(
@@ -72,8 +94,10 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
       // Sequentially: parallel uploads racing the same locked-in tile is a good way
       // sail past the required count and confuse the person doing it.
       let last = null;
-      for (const file of staged) {
-        last = await uploadEvidence({ gameId, teamId, claimId, file });
+      for (const item of staged) {
+        last = await uploadEvidence({
+          gameId, teamId, claimId, file: item.file, optionId: item.optionId,
+        });
       }
       setStaged([]);
       // add_evidence() fires the shot itself once the requirement is met, and
@@ -93,28 +117,83 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   return (
     <div className="evidence">
       <p className="evidence-count">
-        Evidence <strong className={done ? 'met' : ''}>{have} / {required}</strong>
+        {weighted ? 'Points' : 'Evidence'}{' '}
+        <strong className={done ? 'met' : ''}>{have} / {required}</strong>
+        {!done && stagedWorth > 0 && (
+          <span className="muted"> (+{stagedWorth} staged)</span>
+        )}
         {!done && <span className="muted"> — needed before you can fire</span>}
       </p>
+
+      {/* The price list. Shown only once the tile is locked in, because these
+          labels are tile content — tiles_for_me redacts them for every square
+          this team has not claimed. Repeats are allowed, so this is a menu of
+          what things are worth, not a checklist to tick off. */}
+      {weighted && staged.length === 0 && (
+        <ul className="evidence-options">
+          {options.map((o) => (
+            <li key={o.id}>
+              <span>{o.label}</span>
+              <span className="muted">{o.points} pts</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Who submitted is recorded on every row and shown on the organiser's
           review screen. It is not repeated here: the count is the only part
           the team acts on, and this card is already tall. */}
       {staged.length > 0 ? (
         <div className="evidence-staged">
-          <span className="evidence-staged-name">
-            {staged.length === 1 ? staged[0].name : `${staged.length} screenshots`}
-          </span>
+          {weighted ? (
+            <ul className="evidence-staged-list">
+              {staged.map((item, i) => (
+                <li key={i}>
+                  <span className="evidence-staged-name">{item.file.name || `Screenshot ${i + 1}`}</span>
+                  <select
+                    value={item.optionId ?? ''}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const optionId = e.target.value || null;
+                      setStaged((s) => s.map((x, j) => (j === i ? { ...x, optionId } : x)));
+                    }}
+                  >
+                    <option value="">Which drop?</option>
+                    {options.map((o) => (
+                      <option key={o.id} value={o.id}>{o.label} — {o.points} pts</option>
+                    ))}
+                  </select>
+                  <button
+                    className="ghost"
+                    aria-label="Remove"
+                    disabled={busy}
+                    onClick={() => setStaged((s) => s.filter((_, j) => j !== i))}
+                  >
+                    &times;
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="evidence-staged-name">
+              {staged.length === 1
+                ? (staged[0].file.name || 'Screenshot')
+                : `${staged.length} screenshots`}
+            </span>
+          )}
           <div className="row">
             <button className="ghost" onClick={() => setStaged([])} disabled={busy}>
               Remove
             </button>
-            <button onClick={submit} disabled={busy}>
+            <button onClick={submit} disabled={busy || !allAssigned}>
               {busy
                 ? (willComplete ? 'Firing…' : 'Submitting…')
                 : (willComplete ? 'Submit & fire' : 'Submit')}
             </button>
           </div>
+          {!allAssigned && (
+            <p className="muted">Say which drop each screenshot shows before submitting.</p>
+          )}
         </div>
       ) : (
         <div

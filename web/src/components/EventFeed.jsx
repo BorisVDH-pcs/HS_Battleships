@@ -52,9 +52,19 @@ export default function EventFeed({ events, teams, myTeamId }) {
         return e.payload?.fleets_cleared
           ? 'The game has been reset — fleets need placing again.'
           : 'The game has been reset. Fleets are unchanged.';
-      case 'evidence_submitted':
-        return `${e.payload?.uploaded_by_name ?? who} submitted proof for ` +
-          `${e.payload?.tile_name ?? 'a tile'} (${e.payload?.evidence_count}/${e.payload?.required_evidence}).`;
+      case 'evidence_submitted': {
+        // The drop's name is tile content, and safe here only because this
+        // event type is one the RLS policy scopes to the submitting team
+        // (0035, restated in 0046). It must never reach a global line.
+        const by = e.payload?.uploaded_by_name ?? who;
+        const tile = e.payload?.tile_name ?? 'a tile';
+        const need = e.payload?.required_evidence;
+        if (e.payload?.option_label) {
+          return `${by} submitted ${e.payload.option_label} for ${tile} — ` +
+            `${e.payload.points_awarded} points (${e.payload.points_total}/${need}).`;
+        }
+        return `${by} submitted proof for ${tile} (${e.payload?.evidence_count}/${need}).`;
+      }
       case 'slot_freed':
         return 'An active tile is available now. Lock in another target.';
       default:

@@ -45,13 +45,18 @@ export async function downscale(file) {
 /**
  * Upload one file as evidence for a claim.
  *
+ * `optionId` names which of the tile's drops this screenshot shows, for tiles
+ * priced in points rather than counted in screenshots. The points it is worth
+ * are looked up server-side from the option, never sent from here — a client
+ * that could name its own score would not be a score.
+ *
  * The path is ids only — `{game}/{team}/{claim}/{uuid}` — never the tile name
  * or its icon slug. A filename is visible in the network log, and the tile's
  * identity is secret #2 (see architecture.md). add_evidence() re-derives this
  * same prefix server-side and rejects anything that does not match, so a
  * tampered path buys nothing.
  */
-export async function uploadEvidence({ gameId, teamId, claimId, file }) {
+export async function uploadEvidence({ gameId, teamId, claimId, file, optionId = null }) {
   if (!file.type.startsWith('image/')) {
     throw new Error(`${file.name || 'That file'} is not an image.`);
   }
@@ -75,6 +80,11 @@ export async function uploadEvidence({ gameId, teamId, claimId, file }) {
     p_claim_id: claimId,
     p_storage_path: path,
     p_public_url: publicUrl,
+    // Which drop this screenshot shows, on a tile whose drops are worth
+    // different amounts (0046). Null on an unweighted tile, where every
+    // screenshot is worth one point; add_evidence refuses the mismatch either
+    // way, so this is never the only thing deciding the score.
+    p_option_id: optionId,
   });
   if (error) throw new Error(error.message);
   return data;

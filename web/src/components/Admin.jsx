@@ -587,12 +587,47 @@ function Tiles({ game, tiles, busy, onSave }) {
   // `[A-Za-z0-9_-]` — so `Tile | slayer_helmet | 3` silently became the slug
   // `slayer_helmet3` and a missing picture, rather than an evidence count.
   const rows = lines.map((line, i) => {
-    const [name, icon, amount] = line.split('|');
+    // A priced tile (0046) lists its drops after a `>`:
+    // `... | 6 > Rare:6, Common:2`.
+    //
+    // The `>` is looked for only AFTER the first pipe, which settles two cases
+    // that would otherwise be silent. A tile whose name contains one — "kill >
+    // 50 of something" — keeps its name, because the name ends at that pipe.
+    // And a priced line that forgets the amount field, `Tile | icon > Rare:6`,
+    // still has its drops parsed — so it draws the "no target" error below
+    // rather than quietly folding `> Rare:6, Common:2` into the icon slug and
+    // leaving a tile with a broken picture and no prices. (That is the same
+    // trap the `slayer_helmet3` comment above describes, one field along.)
+    //
+    // A drop label may not contain a pipe, for the same reason an icon may not.
+    const firstPipe = line.indexOf('|');
+    const gt = firstPipe === -1 ? -1 : line.indexOf('>', firstPipe);
+    const head = gt === -1 ? line : line.slice(0, gt);
+    const tail = gt === -1 ? '' : line.slice(gt + 1);
+
+    const [name, icon, amount] = head.split('|');
     const raw = (amount ?? '').trim();
     // A trailing + marks a tile with more than one route to done: the number is
     // the worst case, and the team may declare it finished sooner (0025).
     const early = raw.endsWith('+');
     const n = parseInt(early ? raw.slice(0, -1) : raw, 10);
+
+    // `Label:points`, comma separated. Split on the LAST colon so a label may
+    // contain one. A missing or unparseable number stays NaN rather than
+    // defaulting to 1, so the checks below can name the line instead of letting
+    // the server quietly clamp it.
+    const options = tail
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const c = part.lastIndexOf(':');
+        return {
+          label: (c === -1 ? part : part.slice(0, c)).trim(),
+          points: c === -1 ? NaN : parseInt(part.slice(c + 1).trim(), 10),
+        };
+      });
+
     return {
       row: Math.floor(i / game.grid_size) + 1,
       col: (i % game.grid_size) + 1,
@@ -603,6 +638,7 @@ function Tiles({ game, tiles, busy, onSave }) {
       // It clamps to 1..30; this only decides whether to send a number at all.
       ...(Number.isFinite(n) ? { amount: n } : {}),
       ...(early ? { early: true } : {}),
+      ...(options.length ? { options } : {}),
     };
   });
 
@@ -617,6 +653,25 @@ function Tiles({ game, tiles, busy, onSave }) {
   const earlyWithoutAmount = rows
     .map((r, i) => ({ line: i + 1, ...r }))
     .filter((r) => r.early && r.amount === undefined);
+
+  // Same reasoning as badAmounts: the server clamps a silly points value into
+  // range rather than refusing it, and an unlabelled drop is skipped outright.
+  // Either way the paste would look like it had worked.
+  const badOptions = rows
+    .map((r, i) => ({ line: i + 1, options: r.options ?? [] }))
+    .filter(({ options }) => options.some(
+      (o) => !o.label || !Number.isFinite(o.points) || o.points < 1 || o.points > 30
+    ));
+  // A target of 1 on a priced tile means the cheapest drop finishes it single
+  // handed, which is a forgotten amount far more often than a real intent.
+  const optionsWithoutAmount = rows
+    .map((r, i) => ({ line: i + 1, ...r }))
+    .filter((r) => (r.options?.length ?? 0) > 0 && (r.amount ?? 1) <= 1);
+  // 0046 refuses early completion on a priced tile, so a line carrying both
+  // would silently lose its +.
+  const optionsWithEarly = rows
+    .map((r, i) => ({ line: i + 1, ...r }))
+    .filter((r) => (r.options?.length ?? 0) > 0 && r.early);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
 
@@ -667,13 +722,24 @@ function Tiles({ game, tiles, busy, onSave }) {
                 only where a cheaper route genuinely exists: without the{' '}
                 <code>+</code>, the amount is the only way to finish.
               </p>
+              <p className="muted">
+                For a tile whose drops are worth different amounts, price them
+                after a <code>&gt;</code>:{' '}
+                <code>Tile | icon | 6 &gt; Rare:6, Mid:3, Common:2</code>. The
+                amount is then a target in <em>points</em>, each screenshot is
+                worth the drop it shows, and the tile fires once the total
+                reaches the target. A team may hand in the same drop as many
+                times as it got it, so any mix that adds up counts. Priced tiles
+                cannot also use <code>+</code> — the prices already say when the
+                tile is done.
+              </p>
               {/* The placeholder's examples are invented on purpose: this string
                   ships in the public bundle, and the tile list is secret #2 — a
                   placeholder is no place to publish three real squares. */}
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\n…'}
+                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\n…'}
               />
               {badAmounts.length > 0 && (
                 <p className="error">
@@ -693,10 +759,38 @@ function Tiles({ game, tiles, busy, onSave }) {
                   would do nothing — give it the worst case, or drop the +.
                 </p>
               )}
+              {badOptions.length > 0 && (
+                <p className="error">
+                  {badOptions.length === 1
+                    ? `Line ${badOptions[0].line} has a drop with no name, or points outside 1-30`
+                    : `${badOptions.length} lines have a drop with no name, or points outside 1-30`}
+                  . Each one reads <code>Label:points</code>, comma separated.
+                </p>
+              )}
+              {optionsWithoutAmount.length > 0 && (
+                <p className="error">
+                  {optionsWithoutAmount.length === 1
+                    ? `Line ${optionsWithoutAmount[0].line} prices its drops but asks for no total`
+                    : `${optionsWithoutAmount.length} lines price their drops but ask for no total`}
+                  . The cheapest drop would finish the tile on its own — give it
+                  a target, as in <code>| 6 &gt; Rare:6, Common:2</code>.
+                </p>
+              )}
+              {optionsWithEarly.length > 0 && (
+                <p className="error">
+                  {optionsWithEarly.length === 1
+                    ? `Line ${optionsWithEarly[0].line} has both a + and priced drops`
+                    : `${optionsWithEarly.length} lines have both a + and priced drops`}
+                  . A priced tile already says when it is done, and the server
+                  refuses the early completion — drop the +.
+                </p>
+              )}
               <div className="row" style={{ marginTop: '.6rem' }}>
                 <button
                   disabled={busy || rows.length !== need
-                            || badAmounts.length > 0 || earlyWithoutAmount.length > 0}
+                            || badAmounts.length > 0 || earlyWithoutAmount.length > 0
+                            || badOptions.length > 0 || optionsWithoutAmount.length > 0
+                            || optionsWithEarly.length > 0}
                   onClick={() => onSave(rows).then(() => { setText(''); setOpen(false); })}
                 >
                   Save {rows.length} tiles

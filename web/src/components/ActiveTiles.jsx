@@ -115,7 +115,11 @@ export default function ActiveTiles({
           // required_evidence is redacted for tiles nobody has locked in, but one in
           // a slot is locked in by definition, so the fallback is belt and braces.
           const required = tile.required_evidence ?? 1;
-          const ready = mine.length >= required;
+          // A weighted tile (0046) is measured in points, not screenshots; an
+          // unweighted one banks a point per screenshot, so the two agree.
+          const options = tile.options ?? [];
+          const banked = options.length > 0 ? (tile.evidence_points ?? 0) : mine.length;
+          const ready = banked >= required;
 
           return (
             <article
@@ -150,6 +154,8 @@ export default function ActiveTiles({
                 tileName={tile.name}
                 required={required}
                 evidence={mine}
+                options={options}
+                points={tile.evidence_points ?? 0}
                 onUploaded={async ({ completed, fired, result }) => {
                   // The submit that meets the requirement IS the shot, and
                   // add_evidence fires it in the same transaction — so by the
@@ -180,8 +186,11 @@ export default function ActiveTiles({
                   there is something to review, because complete_tile_early
                   refuses with no evidence at all — a button that only ever
                   errors is worse than no button. Hidden once `ready`, since by
-                  then the ordinary submit fires it and "early" is meaningless. */}
-              {tile.early_complete && !ready && mine.length > 0 && (
+                  then the ordinary submit fires it and "early" is meaningless.
+                  Hidden on a priced tile too: 0046 refuses it there, because a
+                  tile that says what each drop is worth already says when it
+                  is done. */}
+              {tile.early_complete && options.length === 0 && !ready && mine.length > 0 && (
                 <button
                   className="ghost"
                   onClick={() => completeEarly(tile, mine.length)}
