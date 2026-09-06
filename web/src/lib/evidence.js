@@ -50,13 +50,19 @@ export async function downscale(file) {
  * are looked up server-side from the option, never sent from here — a client
  * that could name its own score would not be a score.
  *
+ * `amount` is the one exception, and only for a tile whose rule is `value`
+ * (0049): tiles asking for an amount of GP cannot price every item in the game,
+ * so the submitter types what the drop was worth and the organiser checks it
+ * against the screenshot. add_evidence refuses a typed amount on any other
+ * rule, so this cannot become a way to score an ordinary tile.
+ *
  * The path is ids only — `{game}/{team}/{claim}/{uuid}` — never the tile name
  * or its icon slug. A filename is visible in the network log, and the tile's
  * identity is secret #2 (see architecture.md). add_evidence() re-derives this
  * same prefix server-side and rejects anything that does not match, so a
  * tampered path buys nothing.
  */
-export async function uploadEvidence({ gameId, teamId, claimId, file, optionId = null }) {
+export async function uploadEvidence({ gameId, teamId, claimId, file, optionId = null, amount = null }) {
   if (!file.type.startsWith('image/')) {
     throw new Error(`${file.name || 'That file'} is not an image.`);
   }
@@ -85,6 +91,10 @@ export async function uploadEvidence({ gameId, teamId, claimId, file, optionId =
     // screenshot is worth one point; add_evidence refuses the mismatch either
     // way, so this is never the only thing deciding the score.
     p_option_id: optionId,
+    // What the drop was worth, on a tile scored by a typed value rather than a
+    // drop list (0049). Null everywhere else, and add_evidence refuses a tile
+    // that gets one it did not ask for -- or none when it did.
+    p_amount: amount,
   });
   if (error) throw new Error(error.message);
   return data;

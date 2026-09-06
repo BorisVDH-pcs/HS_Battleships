@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { fireTile, completeTileEarly } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
+import { tileProgress } from '../lib/tileProgress.js';
 import TileIcon from './TileIcon.jsx';
+import TileInfo from './TileInfo.jsx';
 import EvidenceUploader from './EvidenceUploader.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 
@@ -112,14 +114,13 @@ export default function ActiveTiles({
           const { row, col } = fromPosition(tile.position);
           const label = coordLabel(row, col);
           const mine = byClaim.get(tile.claim_id) ?? [];
-          // required_evidence is redacted for tiles nobody has locked in, but one in
-          // a slot is locked in by definition, so the fallback is belt and braces.
-          const required = tile.required_evidence ?? 1;
-          // A weighted tile (0046) is measured in points, not screenshots; an
-          // unweighted one banks a point per screenshot, so the two agree.
           const options = tile.options ?? [];
-          const banked = options.length > 0 ? (tile.evidence_points ?? 0) : mine.length;
-          const ready = banked >= required;
+          // Whichever of the four rules this tile uses (0049), one helper
+          // answers "how far along, and is it done" — the same helper the
+          // uploader uses, so the counter and the Submit button cannot
+          // disagree about whether the next screenshot fires the shot.
+          const progress = tileProgress(tile);
+          const ready = progress.done;
 
           return (
             <article
@@ -140,6 +141,10 @@ export default function ActiveTiles({
 
               <div className="slot-head">
                 <strong>{tile.name}</strong>
+                {/* Renders nothing when the tile has neither small print nor
+                    priced drops, so the badge marks the tiles that actually
+                    have something to say rather than sitting on all of them. */}
+                <TileInfo tile={tile} />
                 <span className="coord">{label}</span>
               </div>
 
@@ -151,11 +156,7 @@ export default function ActiveTiles({
                 claimId={tile.claim_id}
                 gameId={gameId}
                 teamId={teamId}
-                tileName={tile.name}
-                required={required}
-                evidence={mine}
-                options={options}
-                points={tile.evidence_points ?? 0}
+                tile={tile}
                 onUploaded={async ({ completed, fired, result }) => {
                   // The submit that meets the requirement IS the shot, and
                   // add_evidence fires it in the same transaction — so by the
@@ -189,8 +190,10 @@ export default function ActiveTiles({
                   then the ordinary submit fires it and "early" is meaningless.
                   Hidden on a priced tile too: 0046 refuses it there, because a
                   tile that says what each drop is worth already says when it
-                  is done. */}
-              {tile.early_complete && options.length === 0 && !ready && mine.length > 0 && (
+                  is done — and 0049 extends that to the set and value rules,
+                  which say it more exactly still. */}
+              {tile.early_complete && (tile.completion ?? 'points') === 'points'
+                && options.length === 0 && !ready && mine.length > 0 && (
                 <button
                   className="ghost"
                   onClick={() => completeEarly(tile, mine.length)}

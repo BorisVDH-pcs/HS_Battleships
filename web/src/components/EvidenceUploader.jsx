@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
+import { tileProgress } from '../lib/tileProgress.js';
 import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
@@ -26,25 +27,29 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * say. That submit reads differently and asks first, since it is the
  * irreversible one.
  *
- * WEIGHTED TILES (0046). Some tiles list several drops worth different points
- * and ask for a total rather than a count. There, each staged screenshot picks
- * its own drop — one submit can carry a rare and a common together, and the
- * same drop may be picked as many times as a team actually got it. The picker
- * is per file rather than per submit for exactly that reason: a single
- * selection for the whole batch would quietly mis-score the mixed case, which
- * is the case weighted tiles exist for.
+ * WHAT A SCREENSHOT HAS TO SAY (0046, 0049). Three of the four tile rules ask
+ * the submitter for something beyond the image:
  *
- * The points shown here are for reading, never for scoring. add_evidence looks
- * up what an option is worth server-side; nothing this component computes is
- * trusted by the database.
+ *   points / set rules — which drop it shows, picked from the tile's list. The
+ *     picker is per file rather than per submit because one submit can carry a
+ *     rare and a common together, and a single selection for the whole batch
+ *     would quietly mis-score exactly the mixed case weighted tiles exist for.
+ *     On a set tile the options are grouped by set and anything already handed
+ *     in is disabled, so the picker doubles as the checklist of what is left.
+ *
+ *   value — what the drop was worth, in millions. Used by the tiles that ask
+ *     for an amount of GP, where there is no list of drops to pick from.
+ *
+ * Numbers shown here are for reading, never for scoring. add_evidence looks up
+ * what an option is worth server-side and claim_is_complete decides whether the
+ * tile is finished; nothing this component computes is trusted by the database.
  *
  * There are deliberately no thumbnails of submitted evidence here. They made
  * the card nearly twice as tall for something a player has already seen; the
  * organiser's review screen is where the images actually need looking at.
  */
 const EvidenceUploader = forwardRef(function EvidenceUploader({
-  claimId, gameId, teamId, required, evidence, onUploaded, tileName,
-  options = [], points = 0,
+  claimId, gameId, teamId, tile, onUploaded,
 }, ref) {
   const [staged, setStaged] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -53,9 +58,12 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   const inputRef = useRef(null);
   const [confirm, confirmDialog] = useConfirm();
 
-  const weighted = options.length > 0;
-  const have = weighted ? points : evidence.length;
-  const done = have >= required;
+  const tileName = tile.name;
+  const options = tile.options ?? [];
+  const rule = tile.completion ?? 'points';
+  const isSet = rule === 'one_set' || rule === 'each_set';
+  const isValue = rule === 'value';
+  const picksDrop = options.length > 0;
 
   function stage(files) {
     const images = [...files].filter((f) => f.type.startsWith('image/'));
@@ -64,22 +72,49 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
       return;
     }
     setError(null);
-    // A weighted tile starts each file unassigned rather than defaulting to the
-    // first drop. A wrong default that scores is worse than a picker that waits.
-    setStaged((s) => [...s, ...images.map((file) => ({ file, optionId: null }))]);
+    // Each file starts unassigned rather than defaulting to the first drop.
+    // A wrong default that scores is worse than a picker that waits.
+    setStaged((s) => [...s, ...images.map((file) => ({ file, optionId: null, amount: '' }))]);
   }
 
   useImperativeHandle(ref, () => ({ stageFiles: stage }));
 
   const pointsOf = (id) => options.find((o) => o.id === id)?.points ?? 0;
-  const allAssigned = !weighted || staged.every((s) => s.optionId);
 
-  // Computed from what is staged, not from `evidence`, which does not update
-  // until the refetch after upload.
-  const stagedWorth = weighted
-    ? staged.reduce((sum, s) => sum + pointsOf(s.optionId), 0)
-    : staged.length;
-  const willComplete = have + stagedWorth >= required;
+  // What is about to be submitted, in the shape tileProgress understands: a
+  // number for the rules that sum, a set of option ids for the rules that
+  // collect.
+  const stagedPoints = isValue
+    ? staged.reduce((sum, s) => sum + (parseInt(s.amount, 10) || 0), 0)
+    : picksDrop
+      ? staged.reduce((sum, s) => sum + pointsOf(s.optionId), 0)
+      : staged.length;
+  const pending = {
+    points: stagedPoints,
+    optionIds: staged.map((s) => s.optionId).filter(Boolean),
+  };
+
+  const now = tileProgress(tile);
+  const next = tileProgress(tile, pending);
+  const willComplete = next.done;
+
+  // An option already handed in cannot be picked again on a set tile — the
+  // server refuses it, so offering it would only produce an error after the
+  // upload had already cost the player a round trip.
+  const spent = new Set(
+    isSet ? [
+      ...options.filter((o) => o.taken).map((o) => o.id),
+      ...pending.optionIds,
+    ] : []
+  );
+
+  const allAssigned = staged.every((s) => {
+    if (isValue) {
+      const n = parseInt(s.amount, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 1000;
+    }
+    return !picksDrop || Boolean(s.optionId);
+  });
 
   async function submit() {
     if (willComplete && !(await confirm(
@@ -96,7 +131,9 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
       let last = null;
       for (const item of staged) {
         last = await uploadEvidence({
-          gameId, teamId, claimId, file: item.file, optionId: item.optionId,
+          gameId, teamId, claimId, file: item.file,
+          optionId: item.optionId,
+          amount: isValue ? parseInt(item.amount, 10) : null,
         });
       }
       setStaged([]);
@@ -114,58 +151,92 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
     }
   }
 
+  /** The per-file control: which drop, or how much it was worth. */
+  function assign(item, i) {
+    if (isValue) {
+      return (
+        <input
+          type="number"
+          min="1"
+          max="1000"
+          inputMode="numeric"
+          placeholder="Worth, in millions"
+          value={item.amount}
+          disabled={busy}
+          onChange={(e) => {
+            const amount = e.target.value;
+            setStaged((s) => s.map((x, j) => (j === i ? { ...x, amount } : x)));
+          }}
+        />
+      );
+    }
+
+    // Grouped when the tile has sets, flat when it does not: an <optgroup> per
+    // brother or per boss turns a list of twenty-four into six readable ones,
+    // and there is nothing to group by on a plain price list.
+    const rows = (o) => (
+      <option key={o.id} value={o.id} disabled={spent.has(o.id) && o.id !== item.optionId}>
+        {o.label}
+        {spent.has(o.id) ? ' ✓' : (isSet ? '' : ` — ${o.points} pts`)}
+      </option>
+    );
+
+    return (
+      <select
+        value={item.optionId ?? ''}
+        disabled={busy}
+        onChange={(e) => {
+          const optionId = e.target.value || null;
+          setStaged((s) => s.map((x, j) => (j === i ? { ...x, optionId } : x)));
+        }}
+      >
+        <option value="">Which drop?</option>
+        {next.groups.some((g) => g.named)
+          ? next.groups.map((g) => (
+              <optgroup key={g.name} label={g.name}>
+                {g.options.map(rows)}
+              </optgroup>
+            ))
+          : options.map(rows)}
+      </select>
+    );
+  }
+
   return (
     <div className="evidence">
       <p className="evidence-count">
-        {weighted ? 'Points' : 'Evidence'}{' '}
-        <strong className={done ? 'met' : ''}>{have} / {required}</strong>
-        {!done && stagedWorth > 0 && (
-          <span className="muted"> (+{stagedWorth} staged)</span>
+        {now.unit}{' '}
+        <strong className={now.done ? 'met' : ''}>
+          {now.have} / {now.need}{now.suffix ?? ''}
+        </strong>
+        {!now.done && stagedPoints > 0 && !isSet && (
+          <span className="muted"> (+{stagedPoints} staged)</span>
         )}
-        {!done && <span className="muted"> — needed before you can fire</span>}
+        {!now.done && <span className="muted"> — needed before you can fire</span>}
       </p>
 
-      {/* The price list. Shown only once the tile is locked in, because these
-          labels are tile content — tiles_for_me redacts them for every square
-          this team has not claimed. Repeats are allowed, so this is a menu of
-          what things are worth, not a checklist to tick off. */}
-      {weighted && staged.length === 0 && (
-        <ul className="evidence-options">
-          {options.map((o) => (
-            <li key={o.id}>
-              <span>{o.label}</span>
-              <span className="muted">{o.points} pts</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* The price list used to sit here, open on the card whenever the tile
+          was weighted and nothing was staged. It has moved behind the "?" in
+          the tile's header. A slayer tile prices thirty-eight drops, and thirty
+          -eight rows of small print pushed the drop zone — the only part of
+          this card anyone acts on — off the bottom of a narrow column. The
+          prices are still two places away at most: the "?" panel lists them
+          all, and the per-file picker below names the points on every option. */}
 
       {/* Who submitted is recorded on every row and shown on the organiser's
           review screen. It is not repeated here: the count is the only part
           the team acts on, and this card is already tall. */}
       {staged.length > 0 ? (
         <div className="evidence-staged">
-          {weighted ? (
+          {picksDrop || isValue ? (
             <ul className="evidence-staged-list">
               {staged.map((item, i) => (
                 <li key={i}>
                   {/* No filename here on purpose. It is squeezed to a character
                       or two by the card width, tells the player nothing they
-                      did not just do, and the drop picker is the only part of
-                      this row anyone acts on. */}
-                  <select
-                    value={item.optionId ?? ''}
-                    disabled={busy}
-                    onChange={(e) => {
-                      const optionId = e.target.value || null;
-                      setStaged((s) => s.map((x, j) => (j === i ? { ...x, optionId } : x)));
-                    }}
-                  >
-                    <option value="">Which drop?</option>
-                    {options.map((o) => (
-                      <option key={o.id} value={o.id}>{o.label} — {o.points} pts</option>
-                    ))}
-                  </select>
+                      did not just do, and the control beside it is the only
+                      part of this row anyone acts on. */}
+                  {assign(item, i)}
                   <button
                     className="ghost"
                     aria-label="Remove"
@@ -195,7 +266,11 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
             </button>
           </div>
           {!allAssigned && (
-            <p className="muted">Say which drop each screenshot shows before submitting.</p>
+            <p className="muted">
+              {isValue
+                ? 'Type what each drop was worth, in whole millions.'
+                : 'Say which drop each screenshot shows before submitting.'}
+            </p>
           )}
         </div>
       ) : (
@@ -213,7 +288,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
           <button
             type="button"
             className="link"
-            onClick={(e) => { inputRef.current?.click(); }}
+            onClick={() => { inputRef.current?.click(); }}
           >
             choose a file
           </button>

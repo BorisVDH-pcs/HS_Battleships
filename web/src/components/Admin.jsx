@@ -586,7 +586,23 @@ function Tiles({ game, tiles, busy, onSave }) {
   // field landed inside the slug, and admin_set_tiles then scrubbed it to
   // `[A-Za-z0-9_-]` — so `Tile | slayer_helmet | 3` silently became the slug
   // `slayer_helmet3` and a missing picture, rather than an evidence count.
-  const rows = lines.map((line, i) => {
+  const rows = lines.map((rawLine, i) => {
+    // The explanation (0048) is split off FIRST, on the first `::`, so that
+    // everything below parses the mechanical part of the line and nothing else.
+    // It has to come first because a description is free prose and will contain
+    // the characters the rest of this parser is looking for — the V4 sheet has
+    // one with a `|` in a boss list, several with `:` before a list of drops,
+    // and one with a wise-old-man URL, whose `https:` would otherwise be read
+    // as a drop priced `//wiseoldman.net/…`.
+    //
+    // `::` rather than a fourth pipe, for the same reason: a doubled character
+    // does not occur in prose, and the description is the one field where the
+    // organiser is pasting a sentence somebody else wrote rather than typing a
+    // value. Putting it last also keeps every existing line valid unchanged.
+    const sep = rawLine.indexOf('::');
+    const line = sep === -1 ? rawLine : rawLine.slice(0, sep).trim();
+    const description = sep === -1 ? '' : rawLine.slice(sep + 2).trim();
+
     // A priced tile (0046) lists its drops after a `>`:
     // `... | 6 > Rare:6, Common:2`.
     //
@@ -639,6 +655,10 @@ function Tiles({ game, tiles, busy, onSave }) {
       ...(Number.isFinite(n) ? { amount: n } : {}),
       ...(early ? { early: true } : {}),
       ...(options.length ? { options } : {}),
+      // Omitted when absent, so a line with no `::` sends no key at all and the
+      // column stays NULL rather than becoming an empty string — the "?" button
+      // keys off that, and '' would give every tile a badge with nothing in it.
+      ...(description ? { description } : {}),
     };
   });
 
@@ -733,13 +753,21 @@ function Tiles({ game, tiles, busy, onSave }) {
                 cannot also use <code>+</code> — the prices already say when the
                 tile is done.
               </p>
+              <p className="muted">
+                Anything after <code>::</code> is the tile's explanation —{' '}
+                <code>Tile | icon | 2 :: Dupes allowed</code>. It shows behind a{' '}
+                <strong>?</strong> on the team's active-tile card, and only for
+                the team that has locked the tile in. Write it as prose: pipes,
+                colons and links are all safe there, because the rest of the line
+                stops at the <code>::</code>.
+              </p>
               {/* The placeholder's examples are invented on purpose: this string
                   ships in the public bundle, and the tile list is secret #2 — a
                   placeholder is no place to publish three real squares. */}
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\n…'}
+                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\nA task that needs explaining | some_icon | 2 :: Only the ones dropped by the boss count\n…'}
               />
               {badAmounts.length > 0 && (
                 <p className="error">

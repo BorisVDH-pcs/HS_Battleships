@@ -792,6 +792,132 @@ button.cell:disabled { cursor: default; }
   flex: none;
 }
 
+/* ---- the "?" and its small print ---- */
+
+/* The name takes the slack so the badge and the coordinate stay together on
+   the right, rather than space-between pushing the badge into the middle of
+   the row once a name is short. */
+.slot-head strong { flex: 1 1 auto; min-width: 0; }
+
+.tile-info { position: relative; display: inline-flex; flex: none; }
+
+/* Deliberately quiet: this sits next to the coordinate, which is the gold
+   thing in this row and should stay the gold thing. The badge only lights up
+   under the pointer or while its panel is open — before that it reads as a
+   hint that there is more to read, not as a second heading. */
+.tile-info-btn {
+  width: 1.1rem; height: 1.1rem;
+  padding: 0;
+  display: grid; place-items: center;
+  font-family: var(--display);
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  color: var(--label-3);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  cursor: help;
+  transition: color .18s var(--ease-out), border-color .18s var(--ease-out),
+              background .18s var(--ease-out);
+}
+.tile-info-btn:hover,
+.tile-info-btn:focus-visible,
+.tile-info-btn.open {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  background: rgba(242, 193, 78, .12);
+}
+
+/* Fixed to the window, with `left`/`top` written by TileInfo. CSS cannot keep a
+   panel inside the viewport on its own, and the active tiles sit in a narrow
+   column against one edge of the board, so a purely CSS anchor ran the panel
+   off that edge. It is allowed to be wider than the card it belongs to — a slot
+   is ~190px in the beside-the-board layout and these are whole sentences — but
+   never wider than the viewport, which is what the min() is for on a phone. */
+.tile-info-panel {
+  position: fixed;
+  /* Above the board and the active-tile column, below every dialog: the confirm
+     sheet is 50 and the guide is 70, and a tooltip must never cover the thing
+     asking whether to fire the shot. */
+  z-index: 40;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2.5rem));
+  padding: .55rem .65rem;
+  /* Solid, not the translucent panel token: this lands on top of another card's
+     artwork as often as not, and glass over a picture is unreadable. */
+  background: var(--panel-solid);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  color: var(--label-2);
+  font-size: .8125rem; line-height: 1.4;
+  font-weight: 400; letter-spacing: normal;
+  text-align: left;
+  /* A description may carry a wise-old-man URL, and one long token would
+     otherwise stretch the panel to its max-width and overflow. */
+  overflow-wrap: anywhere;
+  white-space: normal;
+  /* The slayer tiles price thirty-eight drops. Past roughly a dozen rows the
+     panel would run off the bottom of the viewport, so it scrolls inside
+     itself — which is the other reason a click pins it open. */
+  display: flex; flex-direction: column; gap: .5rem;
+  max-height: min(22rem, calc(100vh - 8rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: tile-info-in .18s var(--ease-out);
+}
+
+.tile-info-text { display: block; }
+
+.tile-info-heading {
+  display: block;
+  font-size: .6875rem; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--label-3);
+}
+/* Sticky so the list stays labelled once it is scrolled past, and opaque so the
+   rows do not show through it on the way. The negative offset is the panel's
+   own top padding: sticky measures from the scrollport edge, so without it the
+   heading would come to rest one padding-width down and let a row slide into
+   the gap above it. */
+.tile-info-panel > .tile-info-heading {
+  position: sticky; top: -.55rem;
+  margin-block: -.15rem;
+  padding-block: .15rem;
+  background: var(--panel-solid);
+}
+
+.tile-info-options {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: .2rem;
+  font-size: .78125rem;
+}
+.tile-info-options li {
+  display: flex; justify-content: space-between; gap: .75rem;
+  /* Hairline between rows rather than zebra striping: at this size the stripes
+     read as a table and these are just prices. */
+  padding-block: .15rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.tile-info-options li:last-child { border-bottom: 0; }
+.tile-info-pts {
+  flex: none;
+  color: var(--gold-dim);
+  font-variant-numeric: tabular-nums; font-weight: 600;
+}
+@keyframes tile-info-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-info-panel { animation: none; }
+}
+
+@media (hover: none) {
+  /* No hover to peek with, so the badge is a real tap target rather than a
+     1.1rem dot between two pieces of text. */
+  .tile-info-btn { width: 1.35rem; height: 1.35rem; font-size: .8rem; }
+}
+
 /* ---- evidence ---- */
 
 .evidence { display: grid; gap: .35rem; }
@@ -825,17 +951,6 @@ button.cell:disabled { cursor: default; }
 /* The price list on a tile scored in points (0046). Read-only: a menu of what
    each drop is worth, not a checklist, since the same drop may be handed in
    more than once. */
-.evidence-options {
-  list-style: none; margin: 0; padding: .45rem .55rem;
-  display: grid; gap: .25rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--fill-2);
-  font-size: .75rem; color: var(--label-2);
-}
-.evidence-options li { display: flex; justify-content: space-between; gap: .6rem; }
-.evidence-options .muted { font-variant-numeric: tabular-nums; }
-
 /* One row per staged screenshot, each naming which drop it shows. The select
    has to stay reachable on a phone, so the name is what gets truncated. */
 .evidence-staged-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
@@ -2210,3 +2325,17 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   .checklist .detail { grid-column: 2 / -1; }
   .checklist .fix    { grid-column: 2 / -1; }
 }
+
+/* A set inside the "?" panel: its name and how many of it are in, then its
+   pieces. Only drawn when the options actually carry groups — an ungrouped
+   price list is one flat list, as it was before 0049. */
+.tile-info-group { display: grid; gap: .2rem; }
+.tile-info-group + .tile-info-group { margin-top: .3rem; }
+.tile-info-set {
+  display: flex; justify-content: space-between; gap: .75rem;
+  font-size: .75rem; font-weight: 600;
+  color: var(--label-2);
+}
+/* A piece already handed in reads as done rather than as an instruction. */
+.tile-info-options li.taken { color: var(--label-3); }
+.tile-info-options li.taken span:first-child { color: var(--strike); }
