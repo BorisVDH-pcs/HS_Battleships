@@ -18,7 +18,6 @@ function asRow(payload) {
     icon: payload.icon || null,
     description: payload.description ?? null,
     required_evidence: payload.amount ?? 1,
-    early_complete: Boolean(payload.early),
     completion: payload.rule ?? 'points',
     per_set: payload.perSet ?? 1,
     options: (payload.options ?? []).map((o) => ({
@@ -32,7 +31,7 @@ function asRow(payload) {
 const cases = [
   'A plain tile | some_icon',
   'Five drops | some_icon | 5',
-  'A shorter route | some_icon | 19+',
+  'Nineteen drops | some_icon | 19',
   'Priced drops | some_icon | 6 > Rare:6, Mid:3, Common:2',
   'One full set | armour | set > A/Helm, A/Body, B/Helm, B/Body',
   'From every raid | raids | each 2 > R1/D1, R1/D2, R2/D1, R2/D2',
@@ -50,7 +49,7 @@ const cases = [
  * what gets stored rather than on which keys were spelled out.
  */
 const stored = (payload) => ({
-  amount: 1, early: false, rule: 'points', perSet: 1,
+  amount: 1, rule: 'points', perSet: 1,
   icon: '', description: '', options: [],
   ...payload,
 });
@@ -112,13 +111,6 @@ for (const line of cases) {
   assert.equal('perSet' in payload, false, 'one_set does not use perSet');
 }
 
-{
-  const payload = payloadFromDraft({
-    ...EMPTY_DRAFT, name: 'Early', rule: 'value', amount: '250', early: true,
-  });
-  assert.equal('early' in payload, false, 'early survives only the points rule');
-}
-
 // ---- what the picker prints -------------------------------------------------
 
 assert.equal(ruleSummary({ completion: 'value', required_evidence: 250 }), '250m total');
@@ -131,8 +123,8 @@ assert.equal(
 );
 assert.equal(ruleSummary({ completion: 'points', required_evidence: 1, options: [] }), '1 screenshot');
 assert.equal(
-  ruleSummary({ completion: 'points', required_evidence: 19, early_complete: true, options: [] }),
-  '19 screenshots, or fewer'
+  ruleSummary({ completion: 'points', required_evidence: 19, options: [] }),
+  '19 screenshots'
 );
 
 assert.deepEqual(

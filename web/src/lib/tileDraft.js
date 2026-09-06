@@ -1,7 +1,7 @@
 // One tile, in the three shapes it has to travel in.
 //
 //   row     — what `admin_list_tiles` and `admin_list_library` return:
-//             database columns, `required_evidence` / `early_complete` / `completion`.
+//             database columns, `required_evidence` / `completion`.
 //   draft   — what the form edits: every field always present, numbers as
 //             strings, so a half-typed target is a valid draft rather than NaN.
 //   payload — what `admin_set_tile` and `admin_save_library_tile` take: the
@@ -32,7 +32,7 @@ export const RULES = [
 
 export const EMPTY_DRAFT = Object.freeze({
   name: '', icon: '', description: '',
-  rule: 'points', amount: '1', perSet: '1', early: false,
+  rule: 'points', amount: '1', perSet: '1',
   options: [], tags: '',
 });
 
@@ -67,7 +67,6 @@ export function draftFromRow(row) {
     rule: row.completion ?? 'points',
     amount: String(row.required_evidence ?? 1),
     perSet: String(row.per_set ?? 1),
-    early: Boolean(row.early_complete),
     options: (row.options ?? []).map((o) => ({
       label: o.label ?? '',
       points: String(o.points ?? 1),
@@ -104,7 +103,6 @@ export function payloadFromDraft(draft, extra = {}) {
       ? { amount: Number.isFinite(amount) ? amount : 1 }
       : {}),
     ...(rule === 'each_set' ? { perSet: Number.isFinite(perSet) ? perSet : 1 } : {}),
-    ...(rule === 'points' && draft.early ? { early: true } : {}),
     ...(options.length ? { options } : {}),
     ...((draft.description ?? '').trim() ? { description: draft.description.trim() } : {}),
     ...extra,
@@ -144,8 +142,7 @@ export function ruleSummary(row) {
   }
   if (options.length > 0) return `${row.required_evidence} pts`;
   const count = row.required_evidence ?? 1;
-  if (count > 1) return `${count} screenshot${count === 1 ? '' : 's'}${row.early_complete ? ', or fewer' : ''}`;
-  return row.early_complete ? '1 screenshot, or fewer' : '1 screenshot';
+  return `${count} screenshot${count === 1 ? '' : 's'}`;
 }
 
 /** The distinct group names on a tile, in the order its drops list them. */

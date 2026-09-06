@@ -57,10 +57,31 @@ validates the entire board with the real parser, and `npm run build` completes.
 The migrations have been reviewed against the calling code but have not been
 executed against a database.
 
+**0052 — early completion removed.** `early_complete` existed for one reason
+(0025): a tile with several routes at different prices could only be counted in
+screenshots, so it was priced at its worst case and the team got a self-declared
+*Complete Early* button. 0046 and 0049 took that reason away — a multi-route tile
+is priced drops, a set tile is `one_set` or `each_set`, a GP tile is `value`, and
+each says exactly when it is done. 0046 then refused the button on priced tiles
+and 0049 on the set and value rules, which left it reachable only on a plain
+"N screenshots" tile — the single-route case 0025 said must never have it. None
+of the 100 generated lines is flagged, and production has never recorded a claim
+declared early. Nine tiles on the 2026-08-30 demo board still carry the flag,
+along with the four catalogue entries imported from it; they revert to the plain
+worst-case count they were always priced at.
+
+So it is gone: `complete_tile_early()`, the trigger's second route to `fired`,
+`tiles.early_complete`, `tile_claims.completed_early` (never read by anything),
+`tile_library.early_complete`, the `+` in the paste grammar, the checkbox in the
+tile form, the badge on the admin board, the guide step and the button on the
+card. `enforce_evidence_before_fire` is back to one route through it:
+`claim_is_complete()` agreed, or the claim does not become `fired`.
+
 ## What is left
 
-1. **Merge to main.** Merging triggers `db-push`, which applies 0048 and 0049
-   to production. Neither migration has been run against a database.
+1. **Merge to main.** Merging triggers `db-push`. 0052 has not been run against a
+   database; it drops three columns and a function, so it is the one to watch in
+   the push log.
 2. **Load the generated board** from the private paste file through the admin
    screen.
 3. **Test in the live game** — claim a tile, submit against each rule, and

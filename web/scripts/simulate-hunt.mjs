@@ -402,11 +402,9 @@ async function main() {
         jobs.push({
           claimId: claim.id, position: p, count: 0,
           required: t?.required_evidence ?? 1,
-          early: Boolean(t?.early_complete),
         });
         console.log(`${String(++move).padStart(3)}. ${team} locks in ${label(p)}`
-          + `   [${b.mode}, ${jobs.length}/${MAX_ACTIVE} slots, needs ${t?.required_evidence ?? 1}`
-          + `${t?.early_complete ? ', short route allowed' : ''}]`);
+          + `   [${b.mode}, ${jobs.length}/${MAX_ACTIVE} slots, needs ${t?.required_evidence ?? 1}]`);
         return true;
       }
       if (!jobs.length) return false;   // nothing left to shoot at, nothing held
@@ -415,17 +413,6 @@ async function main() {
     // Otherwise advance one of the tiles in hand. Picking at random is what
     // makes the two slots visibly interleave rather than run in sequence.
     const job = pick(jobs);
-
-    // Some tiles have a second, shorter route. A team that has one screenshot in
-    // and a long way still to go will often take it — which is the point of the
-    // flag, and worth seeing in a run.
-    if (job.early && job.count >= 1 && job.count < job.required && rand() < 0.5) {
-      const r = await rpc(cl[side], 'complete_tile_early', { p_claim_id: job.claimId });
-      const note = await resolve(side, job, r.result);
-      console.log(`     ${team} calls ${label(job.position)} done by the short route`
-        + ` (${job.count}/${job.required}) — ${String(r.result).toUpperCase()}${note}`);
-      return true;
-    }
 
     const r = await rpc(cl[side], 'add_evidence', {
       p_claim_id: job.claimId,

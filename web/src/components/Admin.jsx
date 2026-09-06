@@ -756,23 +756,13 @@ function Tiles({ game, tiles, busy, onSave }) {
                 <code>Tile || 3</code>. Needs exactly {need} lines.
               </p>
               <p className="muted">
-                Add <code>+</code> after the amount — <code>… | 18+</code> — for a
-                tile that can be finished more than one way. The number is then
-                the worst case, and the team gets a <em>Complete Early</em>
-                {' '}button once it has submitted at least one screenshot. Use it
-                only where a cheaper route genuinely exists: without the{' '}
-                <code>+</code>, the amount is the only way to finish.
-              </p>
-              <p className="muted">
                 For a tile whose drops are worth different amounts, price them
                 after a <code>&gt;</code>:{' '}
                 <code>Tile | icon | 6 &gt; Rare:6, Mid:3, Common:2</code>. The
                 amount is then a target in <em>points</em>, each screenshot is
                 worth the drop it shows, and the tile fires once the total
                 reaches the target. A team may hand in the same drop as many
-                times as it got it, so any mix that adds up counts. Priced tiles
-                cannot also use <code>+</code> — the prices already say when the
-                tile is done.
+                times as it got it, so any mix that adds up counts.
               </p>
               <p className="muted">
                 Set rules use the amount field too. <code>set</code> completes

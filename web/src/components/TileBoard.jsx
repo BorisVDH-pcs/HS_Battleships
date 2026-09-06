@@ -145,20 +145,11 @@ export default function TileBoard({ tiles, canEdit = false, editOpen = false, on
                         </em>
                       </>
                     ) : (
-                      <>
-                        {/* Only when it is not the default. A column of "x1" would
-                            bury the handful of tiles that actually ask for more. */}
-                        {t.required_evidence > 1 && (
-                          <em className="tile-amount">
-                            &times;{t.required_evidence}{t.early_complete ? '+' : ''}
-                          </em>
-                        )}
-                        {/* A + with no count would be invisible otherwise, and it
-                            still changes what the tile allows. */}
-                        {t.early_complete && !(t.required_evidence > 1) && (
-                          <em className="tile-amount">+</em>
-                        )}
-                      </>
+                      /* Only when it is not the default. A column of "x1" would
+                         bury the handful of tiles that actually ask for more. */
+                      t.required_evidence > 1 && (
+                        <em className="tile-amount">&times;{t.required_evidence}</em>
+                      )
                     )}
                   </>
                 ) : (

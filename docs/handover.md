@@ -85,7 +85,7 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0022_admin_tile_progress.sql` | `admin_tile_progress` — every claim in a game with its evidence count, for the organiser's board |
 | `0023_evidence_fires.sql` | `add_evidence` now fires the shot itself in the same transaction once the requirement is met, so "fully evidenced but still active" cannot exist |
 | `0024_one_team_per_game.sql` | `my_team_in_game()`, and `tiles_for_me` / `my_evidence` / `claim_tile` scoped through it, so a player sitting in both teams of one game no longer sees the two sides merged |
-| `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through |
+| `0025_early_completion.sql` | `tiles.early_complete`, `tile_claims.completed_early`, the evidence cap raised 10 → 30 (function clamp **and** table constraint), `complete_tile_early`, and `admin_set_tiles` / `tiles_for_me` / `admin_list_tiles` carrying both through. **Reverted by `20260906230000_drop_early_completion` — see the V4 handover.** The 10 → 30 cap survives (0049 widened it again, to 1000) |
 | `0026_sunk_from_cells.sql` | `ship_status` decides `sunk` from the cells a ship occupies rather than the stored `ships.size`, counting DISTINCT hit cells with `>=`; `fire_tile` announces the derived size; `assert_fleets_consistent` added and called from `start_game` |
 | `0027_fire_only_while_active.sql` | A shot may only be fired while the game is `active`. `fire_tile`, `add_evidence` and `complete_tile_early` all refuse once a game is finished, and the winner update is narrowed to `status = 'active'` so a win cannot overwrite a win |
 | `0028_claim_released_event_type.sql` | Adds the `claim_released` event type (separate file for the same reason as 0008, 0012, 0015 and 0018) |
@@ -904,6 +904,13 @@ Accepted deliberately, extending the trade the first ten icons already made.
 
 ### Tiles with more than one route (0025)
 
+> **Superseded, and then removed.** 0046 priced a tile's drops and 0049 added the
+> set and value rules, which express every shape below exactly — so the
+> worst-case-plus-declaration trick had nothing left to do.
+> `20260906230000_drop_early_completion` drops `complete_tile_early()`,
+> `tiles.early_complete` and `tile_claims.completed_early`. The section is kept as
+> the record of why the flag existed, not as a description of the schema.
+
 Some tasks can be finished several ways at different prices — "three of this,
 nine of that, or eighteen of the other". Others ask for one complete set out of
 several candidate sets, where the worst case is a **pigeonhole** count, not the
@@ -1233,10 +1240,10 @@ request is one transaction each.
 ### The scripts
 
 Both sign in as two ordinary players and call the same RPCs the app calls —
-`place_fleet`, `start_game`, `claim_tile`, `add_evidence`,
-`complete_tile_early`. Neither ever calls `fire_tile`: the shot goes off when the
-evidence requirement is met, exactly as it does for a real upload. Passwords come
-from the environment and are never written down.
+`place_fleet`, `start_game`, `claim_tile`, `add_evidence`. Neither ever calls
+`fire_tile`: the shot goes off when the evidence requirement is met, exactly as it
+does for a real upload. Passwords come from the environment and are never written
+down.
 
 - **`simulate-match.mjs`** — a scripted replay. Fixed fleets, fixed shot lists,
   17 hits from 17 shots. Useful for a quick demo, honest about proving nothing.

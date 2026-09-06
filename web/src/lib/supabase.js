@@ -53,18 +53,6 @@ export async function fireTile(claimId) {
 }
 
 /**
- * "We finished this by the short route." Only tiles the organiser flagged as
- * having more than one route accept this, and only with at least one screenshot
- * already submitted — both refused server-side, in complete_tile_early (0025).
- * Returns `{ fired, result, evidence_count, declared_early }`.
- */
-export async function completeTileEarly(claimId) {
-  const { data, error } = await supabase.rpc('complete_tile_early', { p_claim_id: claimId });
-  if (error) throw new Error(error.message);
-  return data;
-}
-
-/**
  * Spend one pet jar preview on a tile this team could still claim. Returns
  * `{ name, icon, pet_jar_count }` — never claim_result or anything ship-
  * related, and refuses server-side if the counter is at 0, the tile is
@@ -125,7 +113,7 @@ export const adminListLibrary = () => rpc('admin_list_library');
 
 /**
  * Insert (`id` null) or update one catalogue entry. `tile` is the shape
- * `parseTileLine` emits — name, icon, amount, early, rule, perSet, description,
+ * `parseTileLine` emits — name, icon, amount, rule, perSet, description,
  * options[] — plus an optional `tags` array. Returns the entry's id.
  */
 export const adminSaveLibraryTile = (id, tile) =>

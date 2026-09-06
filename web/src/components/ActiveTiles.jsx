@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fireTile, completeTileEarly } from '../lib/supabase.js';
+import { fireTile } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
 import { tileProgress } from '../lib/tileProgress.js';
 import TileIcon from './TileIcon.jsx';
@@ -26,7 +26,7 @@ import { useConfirm } from './ConfirmDialog.jsx';
  * miss with several cards on screen.
  */
 export default function ActiveTiles({
-  tiles, maxActive, onFired, onRefresh, emptyHint, gameId, teamId, evidence = [],
+  tiles, maxActive, onFired, onRefresh, emptyHint, gameId, teamId,
 }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
@@ -48,12 +48,6 @@ export default function ActiveTiles({
 
   const active = tiles.filter((t) => t.claim_status === 'active');
 
-  // Grouped once rather than filtered per card.
-  const byClaim = new Map();
-  for (const e of evidence) {
-    if (!byClaim.has(e.claim_id)) byClaim.set(e.claim_id, []);
-    byClaim.get(e.claim_id).push(e);
-  }
   const slots = Array.from({ length: maxActive }, (_, i) => active[i] ?? null);
 
   // `asked` is false when the evidence uploader has already confirmed: the
@@ -68,27 +62,6 @@ export default function ActiveTiles({
     try {
       const result = await fireTile(tile.claim_id);
       onFired?.(tile, result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  // The short route. The count on these tiles is the worst case, so a team that
-  // got there sooner says so rather than farming to a number it no longer needs.
-  async function completeEarly(tile, have) {
-    if (!(await confirm(
-      `"${tile.name}" asks for ${tile.required_evidence}, and you have submitted ` +
-      `${have}. Say it is done only if you have actually finished it by one of ` +
-      'the shorter routes — the organiser reviews these, and it fires the shot now.',
-      { title: 'Complete early?', confirmLabel: 'Complete Early' }
-    ))) return;
-    setBusyId(tile.claim_id);
-    setError(null);
-    try {
-      const res = await completeTileEarly(tile.claim_id);
-      onFired?.(tile, res?.result ?? null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -113,8 +86,6 @@ export default function ActiveTiles({
 
           const { row, col } = fromPosition(tile.position);
           const label = coordLabel(row, col);
-          const mine = byClaim.get(tile.claim_id) ?? [];
-          const options = tile.options ?? [];
           // Whichever of the four rules this tile uses (0049), one helper
           // answers "how far along, and is it done" — the same helper the
           // uploader uses, so the counter and the Submit button cannot
@@ -180,26 +151,6 @@ export default function ActiveTiles({
                   disabled={busyId === tile.claim_id}
                 >
                   {busyId === tile.claim_id ? 'Firing…' : 'Complete & fire'}
-                </button>
-              )}
-
-              {/* Tiles with more than one route to done (0025). Hidden until
-                  there is something to review, because complete_tile_early
-                  refuses with no evidence at all — a button that only ever
-                  errors is worse than no button. Hidden once `ready`, since by
-                  then the ordinary submit fires it and "early" is meaningless.
-                  Hidden on a priced tile too: 0046 refuses it there, because a
-                  tile that says what each drop is worth already says when it
-                  is done — and 0049 extends that to the set and value rules,
-                  which say it more exactly still. */}
-              {tile.early_complete && (tile.completion ?? 'points') === 'points'
-                && options.length === 0 && !ready && mine.length > 0 && (
-                <button
-                  className="ghost"
-                  onClick={() => completeEarly(tile, mine.length)}
-                  disabled={busyId === tile.claim_id}
-                >
-                  {busyId === tile.claim_id ? 'Firing…' : 'Complete Early'}
                 </button>
               )}
             </article>

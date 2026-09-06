@@ -92,23 +92,6 @@ export default function TileForm({
         </label>
       )}
 
-      {/* Only where it can apply. Combining an early finish with a rule that
-          already says when the tile is done is rejected by the parser, the
-          database and validateDraft alike — so it should not be offerable. */}
-      {rule === 'points' && !priced && (
-        <label className="field-inline">
-          <input
-            type="checkbox"
-            checked={draft.early}
-            onChange={(e) => set({ early: e.target.checked })}
-          />
-          <span>
-            A cheaper route exists — the target is the worst case, and the team
-            gets a <em>Complete Early</em> button after its first screenshot.
-          </span>
-        </label>
-      )}
-
       <div className="tile-form-drops">
         <div className="row">
           <h4>

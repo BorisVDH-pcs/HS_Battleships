@@ -73,15 +73,6 @@ const TOUR_STEPS = [
       + 'against the enemy\'s hidden placement, and the slot frees up.',
   },
   {
-    targetId: 'active-tiles-section',
-    title: '⚡ Early Completion',
-    body: 'Some tiles list a worst-case count of submissions but also have a shorter '
-      + 'route to finishing — a bigger drop, a faster method, whatever the task allows.<br><br>'
-      + 'If a tile supports this, a <strong>Complete Early</strong> button appears once you\'ve '
-      + 'attached at least one piece of evidence. Only use it once you have genuinely '
-      + 'finished the task — the organiser reviews every submission.',
-  },
-  {
     targetId: 'fleet-board-section',
     tab: 'fleet',
     title: '🛡️ Your Fleet — Taking the Damage',

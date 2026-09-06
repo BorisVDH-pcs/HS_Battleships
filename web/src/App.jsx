@@ -505,7 +505,6 @@ export default function App() {
                     maxActive={maxActive}
                     gameId={gameId}
                     teamId={myTeamId}
-                    evidence={evidence}
                     onRefresh={() => game.refresh()}
                     onFired={(tile, result) => {
                       // Sound/animation come from the realtime subscription
