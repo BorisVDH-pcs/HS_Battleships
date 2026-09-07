@@ -46,11 +46,24 @@ export default function EvidencePanel({ title, coord, meta, items, onClose }) {
         <p className="muted">Nothing submitted for this tile yet.</p>
       ) : (
         <ul className="evidence-review">
-          {items.map((e) => (
+          {items.map((e, i) => (
             <li key={e.id}>
+              {/* The screenshot is the whole of the row and the whole of the
+                  link, so an empty alt left the link with no name at all —
+                  announced as "link", full stop, four times over.
+                  Numbered rather than named after its uploader: one tile's
+                  evidence is usually four shots from the same person minutes
+                  apart, so the uploader does not tell them apart, and it is
+                  read out anyway from the meta line beside the picture. */}
               <a href={urls[e.storage_path]} target="_blank" rel="noreferrer">
                 {urls[e.storage_path]
-                  ? <img src={urls[e.storage_path]} alt="" loading="lazy" />
+                  ? (
+                    <img
+                      src={urls[e.storage_path]}
+                      alt={`Screenshot ${i + 1} of ${items.length} for ${title}`}
+                      loading="lazy"
+                    />
+                  )
                   : <span className="evidence-pending" />}
               </a>
               <div className="meta">

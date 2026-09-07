@@ -74,16 +74,43 @@ function ConfirmDialog({
   const [typed, setTyped] = useState('');
   const confirmRef = useRef(null);
   const inputRef = useRef(null);
+  const panelRef = useRef(null);
 
   const satisfied = !requireText || typed.trim() === requireText;
 
-  // Escape cancels, wherever focus happens to be. Enter is deliberately not
-  // bound: this dialog stands in front of irreversible actions, and the whole
-  // point is a second deliberate press rather than a reflex on the key that
-  // submitted the form behind it.
+  /**
+   * Escape cancels, wherever focus happens to be. Enter is deliberately not
+   * bound: this dialog stands in front of irreversible actions, and the whole
+   * point is a second deliberate press rather than a reflex on the key that
+   * submitted the form behind it.
+   *
+   * Tab is caught here too. `aria-modal` tells a screen reader the rest of the
+   * page is inert; it does nothing whatsoever to the Tab key, so without this
+   * a few presses walked focus out of the dialog and onto the board behind it
+   * — where the buttons are still real, and the one thing this component
+   * exists to prevent is an unconsidered press. Focus is read fresh on every
+   * Tab rather than collected once, because the confirm button is disabled
+   * until the typed name matches and must not be a stop while it is.
+   */
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+      if (e.key !== 'Tab') return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+      const stops = [...panel.querySelectorAll('button, input, a[href], [tabindex]')]
+        .filter((el) => !el.disabled && el.tabIndex !== -1);
+      if (stops.length === 0) return;
+
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      // Focus can start outside the ring entirely — the page behind, after a
+      // click on the backdrop — in which case either edge is the way back in.
+      const at = stops.indexOf(document.activeElement);
+      if (at === -1) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -92,6 +119,26 @@ function ConfirmDialog({
   useEffect(() => {
     (requireText ? inputRef : confirmRef).current?.focus();
   }, [requireText]);
+
+  /**
+   * Give focus back to whatever raised the dialog.
+   *
+   * Without it, answering a question left focus on <body>, so the next Tab
+   * started from the top of the page — after "Fire the shot?", from the
+   * wordmark, a hundred squares away from the slot that asked. `isConnected`
+   * because the answer often removes the trigger: confirming a lock-in
+   * re-renders the square that was pressed.
+   */
+  // Read during the first render rather than in an effect, because the effect
+  // that moves focus into the dialog runs first and would make the dialog its
+  // own opener.
+  const openerRef = useRef(undefined);
+  if (openerRef.current === undefined) openerRef.current = document.activeElement;
+
+  useEffect(() => () => {
+    const opener = openerRef.current;
+    if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+  }, []);
 
   // Portaled to <body>, not left where it was raised. Two call sites sit
   // inside the active-tile column, and that column is a blurred material
@@ -117,6 +164,7 @@ function ConfirmDialog({
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
+        ref={panelRef}
         className={`confirm${danger ? ' danger' : ''}`}
         role="dialog"
         aria-modal="true"
