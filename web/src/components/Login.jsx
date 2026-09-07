@@ -11,9 +11,22 @@ import { usernameToEmail, validateUsername, friendlyAuthError } from '../lib/aut
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  // Sign-up only. There is no password reset in this app -- the addresses are
+  // synthetic, so there is no mailbox to send a link to -- which makes a typo
+  // here the one mistake on this screen that cannot be undone by the person
+  // who made it. Two independent guards against that: type it twice, and be
+  // able to read what you typed.
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState('signin');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
+
+  const signingUp = mode === 'signup';
+  // Held back until they have typed something, so the mismatch does not
+  // accuse them of an error while they are still on the first character.
+  const mismatch = signingUp && confirmPassword.length > 0
+    && password !== confirmPassword;
 
   async function submit(e) {
     e.preventDefault();
@@ -21,6 +34,13 @@ export default function Login() {
 
     const invalid = validateUsername(username);
     if (invalid) { setMessage(invalid); return; }
+
+    // Checked here as well as by the disabled button: a form can still be
+    // submitted with Enter from a field the button never saw.
+    if (signingUp && password !== confirmPassword) {
+      setMessage('The two passwords do not match.');
+      return;
+    }
 
     setBusy(true);
     try {
@@ -73,30 +93,75 @@ export default function Login() {
         </label>
         <label>
           Password
-          <input
-            type="password"
-            value={password}
-            required
-            minLength={8}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <span className="password-field">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              required
+              minLength={8}
+              autoComplete={signingUp ? 'new-password' : 'current-password'}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {/* Inside the label, so pressing it does not steal the click from
+                the field it belongs to. type="button" because everything in a
+                form submits it otherwise, and this one is here precisely to
+                stop people submitting a password they cannot see. */}
+            <button
+              type="button"
+              className="link password-reveal"
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((s) => !s)}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </span>
         </label>
-        <button type="submit" disabled={busy}>
-          {busy ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+
+        {signingUp && (
+          <label>
+            Confirm password
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              required
+              autoComplete="new-password"
+              aria-invalid={mismatch || undefined}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            {mismatch && (
+              <span className="field-error">The two passwords do not match.</span>
+            )}
+          </label>
+        )}
+
+        <button type="submit" disabled={busy || mismatch}>
+          {busy
+            ? (signingUp ? 'Creating account…' : 'Signing in…')
+            : (signingUp ? 'Create account' : 'Sign in')}
         </button>
       </form>
 
       <button
         className="link"
-        onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage(null); }}
+        onClick={() => {
+          setMode(signingUp ? 'signin' : 'signup');
+          setMessage(null);
+          // Dropped rather than carried across: it belongs to a form that is
+          // no longer on screen, and leaving it filled would let a mismatch
+          // survive into the mode that cannot show it.
+          setConfirmPassword('');
+        }}
       >
-        {mode === 'signin' ? 'Need an account?' : 'Already have an account?'}
+        {signingUp ? 'Already have an account?' : 'Need an account?'}
       </button>
 
-      {message && <p className="message">{message}</p>}
+      {/* role="alert" because this is the only report a failed sign-in gets.
+          Without it the message is painted into a corner of the page that a
+          screen reader has already read past, and someone who has zoomed in
+          on the form never learns the press did anything at all. */}
+      {message && <p className="message" role="alert">{message}</p>}
 
-      {mode === 'signin' && (
+      {!signingUp && (
         <p className="muted forgot">
           Forgotten your password? There is no reset email — ask an admin to set a new one.
         </p>

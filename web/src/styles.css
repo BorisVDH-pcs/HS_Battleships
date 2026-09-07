@@ -1363,6 +1363,38 @@ label {
 .login { max-width: 340px; margin: 4rem auto; }
 .login h1 { text-align: center; font-size: 1.75rem; font-weight: 700; letter-spacing: -.022em; }
 .login form { display: grid; gap: .9rem; margin: 1.5rem 0; }
+
+/* Show/hide, sat inside the field rather than beside it.
+ *
+ * Beside it, the control either steals width from the input or pushes the
+ * label out of line with the one above; overlaid, the field keeps the same
+ * box as every other field on the form and the button reads as belonging to
+ * it. The right padding is what stops a long password running underneath. */
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; padding-right: 3.6rem; }
+.password-reveal {
+  position: absolute;
+  right: .55rem;
+  /* Against the input's own box, not the label's — the label includes its
+     text above, and centring on that puts the button over the wrong row. */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: .8125rem;
+  padding: .25rem .3rem;
+  /* A tap target on a phone, without the box growing enough to touch the
+     field's border. */
+  min-height: 32px;
+}
+
+/* Said under the field it is about, not with the form-wide message at the
+   bottom: a mismatch is answered by looking at the two boxes directly above
+   it, and a message three elements away sends you hunting for which one. */
+.field-error {
+  display: block;
+  margin-top: .3rem;
+  color: var(--hit-lit);
+  font-size: .8125rem;
+}
 .message { color: var(--label-2); font-size: .875rem; }
 .login .forgot { margin-top: 1.5rem; line-height: 1.45; }
 
