@@ -416,8 +416,20 @@ export default function Admin() {
           long pane and the error line lives at the top of it, so a refusal
           raised from the board builder — most of a page further down — used to
           be announced somewhere the organiser was not looking. */}
-      {error && <p className="error" ref={errorRef} role="alert">{error}</p>}
-      {notice && <p className="muted">{notice}</p>}
+      {/* A tick and a cross, because these two were the same shape in the same
+          place and differed only in colour — so "23 tiles saved" and
+          "permission denied" read alike at a glance, which is the glance most
+          of them get. */}
+      {error && (
+        <p className="error" ref={errorRef} role="alert">
+          <span aria-hidden="true">✗ </span>{error}
+        </p>
+      )}
+      {notice && (
+        <p className="muted notice" role="status">
+          <span aria-hidden="true">✓ </span>{notice}
+        </p>
+      )}
 
       {activePane === 'games' && <>
       <NewGame busy={busy} onCreate={(...args) =>
@@ -532,8 +544,13 @@ export default function Admin() {
                 >
                   Reset to preparation
                 </button>
+                {/* Weighted the same as its neighbour, because it does the
+                    same thing to everything anybody played: a ghost button
+                    beside a red one says one of the two is the safe choice,
+                    and neither is. What it keeps is in the dialog, which is
+                    where that distinction can actually be read. */}
                 <button
-                  className="ghost"
+                  className="danger"
                   disabled={busy}
                   onClick={async () => {
                     if (!(await confirm(
@@ -847,6 +864,22 @@ function Tiles({ game, tiles, busy, onSave }) {
   const need = game.grid_size * game.grid_size;
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
+  // Controlled rather than left to the browser, so a re-render cannot snap it
+  // shut under someone who has just opened it.
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // Decided when the paste box opens, not when this component mounts. Mount is
+  // too early to ask: the card renders before adminListTiles has answered, so
+  // `tiles` is still [] and every board looks like an empty one — which had
+  // the help standing open on a finished hundred-tile board, the one place it
+  // is certainly not wanted.
+  //
+  // Depends on `open` alone. Adding `tiles` would re-decide on every refetch
+  // and shut the panel under somebody reading it.
+  useEffect(() => {
+    if (open) setHelpOpen(tiles.length === 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const { lines, rows, errors: tileErrors, warnings: tileWarnings } = parseTileText(text, game.grid_size);
 
@@ -882,6 +915,18 @@ function Tiles({ game, tiles, busy, onSave }) {
           )}
           {open && (
             <>
+              {/* Behind a disclosure. Four paragraphs of grammar -- points, sets,
+                  value targets, the :: note -- is longer than everything else
+                  in this card put together, and it is reference rather than
+                  instruction: read once, then in the way of the box it
+                  describes. Open by default on a board with no tiles, which is
+                  the one time it is being read rather than remembered. */}
+              <details
+                className="tile-syntax"
+                open={helpOpen}
+                onToggle={(e) => setHelpOpen(e.currentTarget.open)}
+              >
+                <summary>Format help</summary>
               <p className="muted" style={{ marginTop: '.8rem' }}>
                 One line per tile, in board order (A1, B1 … J1, then A2 …).
                 <code>name | icon | amount</code>, where the icon names a file in{' '}
@@ -918,6 +963,7 @@ function Tiles({ game, tiles, busy, onSave }) {
                 colons and links are all safe there, because the rest of the line
                 stops at the <code>::</code>.
               </p>
+              </details>
               {/* The placeholder's examples are invented on purpose: this string
                   ships in the public bundle, and the tile list is secret #2 — a
                   placeholder is no place to publish three real squares. */}

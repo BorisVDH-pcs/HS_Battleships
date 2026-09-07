@@ -14,6 +14,21 @@ export default function TeamNameEditor({ team, onRenamed }) {
     setSaved(false);
   }, [team.id, team.name]);
 
+  /**
+   * "Saved." is a receipt, and a receipt goes stale.
+   *
+   * It used to stand until the team's name or id changed, so a save from ten
+   * minutes ago looked exactly like one from a second ago — which matters on
+   * the console, where an organiser renaming both teams has two of these side
+   * by side and the only thing distinguishing "this one saved" from "that one
+   * did" is which message is still up.
+   */
+  useEffect(() => {
+    if (!saved) return undefined;
+    const id = setTimeout(() => setSaved(false), 4000);
+    return () => clearTimeout(id);
+  }, [saved]);
+
   const nextName = name.trim();
   const changed = nextName !== team.name;
 

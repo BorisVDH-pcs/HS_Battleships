@@ -42,6 +42,11 @@ export default function AdminOverview({ gameId, teams }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  // Whether these boards are still hearing about the game. Starts true: the
+  // 20-second poll covers the gap either way, so this exists to report a
+  // lasting failure rather than to flash during the second it takes to
+  // connect.
+  const [live, setLive] = useState(true);
   const [confirm, confirmDialog] = useConfirm();
   const panelRef = useRef(null);
 
@@ -82,8 +87,17 @@ export default function AdminOverview({ gameId, teams }) {
       .subscribe((status) => {
         // CLOSED is expected once per mount under StrictMode. A lasting failure
         // is otherwise silent — the board just stops updating.
+        //
+        // It used to be silent on screen too: this warned the console and
+        // nothing else, so an organiser watching two boards mid-event had no
+        // way to tell a quiet game from a dead socket. The 20-second poll
+        // below keeps the boards moving either way, which is exactly what
+        // makes the failure so easy to miss — and why it is worth saying.
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[admin-overview] realtime not connected:', status);
+          setLive(false);
+        } else if (status === 'SUBSCRIBED') {
+          setLive(true);
         }
       });
     return () => { supabase.removeChannel(ch); };
@@ -149,6 +163,11 @@ export default function AdminOverview({ gameId, teams }) {
 
   return (
     <>
+      {!live && (
+        <p className="live-warning" role="status">
+          ⚠ Live updates are down — these boards refresh every 20 seconds instead.
+        </p>
+      )}
       <div className="columns">
         {teams.map((team) => {
           const enemy = teams.find((t) => t.id !== team.id);

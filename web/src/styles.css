@@ -2635,6 +2635,19 @@ button.builder-cell.empty:hover { border-style: solid; }
   .builder-summary-split { margin-left: 0; }
 }
 
+/* The success twin of `.error`. Same shape, same place, opposite hairline —
+   the tick carries the meaning, this only stops it reading as body text. */
+.notice { border-left: 2px solid var(--strike); padding-left: .7rem; }
+
+/* The paste box's grammar, folded away. */
+.tile-syntax > summary {
+  cursor: pointer;
+  color: var(--label-2);
+  font-size: .875rem;
+  padding: .35rem 0;
+}
+.tile-syntax > summary:hover { color: var(--text); }
+
 /* The page that replaces a white screen.
  *
  * Centred and narrow like the login card, because it is the same kind of
