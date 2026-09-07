@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { GRID, colLetter, coordLabel, toPosition, fromPosition } from '../lib/board.js';
 import {
   newDraft, draftFromRow, payloadFromDraft, payloadFromRow, ruleSummary, nameKey,
@@ -185,6 +185,45 @@ export default function BoardBuilder({
     return null;
   }
 
+  /**
+   * The last square changed, and what was on it before.
+   *
+   * Every click here is a write, which is what makes a half-built board a real
+   * resumable thing rather than browser state — and also what makes a misclick
+   * permanent. The way back was Clear square then find the tile again and place
+   * it, which is a lot of work to undo one press, and impossible if you have
+   * already forgotten what was there.
+   *
+   * One level deep on purpose. The mistake this catches is the one you have
+   * just noticed; a stack would invite treating the board as editable history,
+   * which it is not — the writes are already in the database and another
+   * organiser may be filling squares at the same time.
+   *
+   * Cleared by the bulk actions below. Offering "undo J10" after "remove every
+   * tile" would restore one square into a board that no longer exists.
+   */
+  const [undo, setUndo] = useState(null);   // { row, col, label, prev } | null
+
+  function remember(row, col) {
+    setUndo({
+      row, col,
+      label: coordLabel(row, col),
+      prev: byPosition.get(toPosition(row, col)) ?? null,
+    });
+  }
+
+  async function undoLast() {
+    if (!undo) return;
+    const { row, col, prev } = undo;
+    // Restoring is the same write as placing, so it goes through the same
+    // guard: a refused restore leaves the offer standing rather than claiming
+    // to have put something back.
+    const ok = prev
+      ? await onSetTile(row, col, payloadFromRow(prev, { libraryId: prev.library_id }))
+      : await onClearTile(row, col);
+    if (ok) { setUndo(null); setAt({ row, col }); }
+  }
+
   // Every handler below moves on only if the write actually landed. The parent
   // resolves these to a boolean rather than throwing, and a refused save that
   // still closed the form and advanced the selection is indistinguishable from
@@ -194,6 +233,7 @@ export default function BoardBuilder({
   async function placePayload(payload) {
     if (!at) return false;
     const position = toPosition(at.row, at.col);
+    remember(at.row, at.col);
     const ok = await onSetTile(at.row, at.col, payload);
     if (ok) setAt(nextEmptyAfter(position));
     return ok;
@@ -230,6 +270,7 @@ export default function BoardBuilder({
       if (!libraryId) return;
     }
     const payload = payloadFromDraft(editing.draft, { libraryId });
+    remember(at.row, at.col);
     if (await onSetTile(at.row, at.col, payload)) setEditing(null);
   }
 
@@ -278,7 +319,25 @@ export default function BoardBuilder({
       <p className="muted">
         {tiles.length} of {need} squares filled.
         {tiles.length < need && ' Click an empty square, then a tile to put in it.'}
+        {' Arrow keys move around the board; Enter opens the square.'}
       </p>
+
+      {/* Above the board rather than in the panel, because the panel changes
+          shape three ways and the offer must not move or vanish with it. It
+          says what it will put back, since "Undo" alone cannot be told apart
+          from "undo the whole board". */}
+      {undo && (
+        <p className="builder-undo">
+          <button className="ghost" disabled={busy} onClick={undoLast}>
+            Undo {undo.label}
+          </button>
+          <span className="muted">
+            {undo.prev
+              ? <>Puts <b>{undo.prev.name}</b> back on {undo.label}.</>
+              : <>Empties {undo.label} again.</>}
+          </span>
+        </p>
+      )}
 
       <div className="builder">
         <BuilderGrid
@@ -399,7 +458,7 @@ export default function BoardBuilder({
                     <button
                       className="ghost danger"
                       disabled={busy}
-                      onClick={() => onClearTile(at.row, at.col)}
+                      onClick={() => { remember(at.row, at.col); onClearTile(at.row, at.col); }}
                     >
                       Clear square
                     </button>
@@ -485,7 +544,7 @@ export default function BoardBuilder({
               {tiles.length < need && (
                 <button
                   disabled={busy || library.length === 0 || Boolean(libraryError)}
-                  onClick={onAutofillBoard}
+                  onClick={() => { setUndo(null); onAutofillBoard(); }}
                   title={library.length === 0
                     ? 'The catalogue has no tiles to deal'
                     : undefined}
@@ -518,7 +577,7 @@ export default function BoardBuilder({
                   <button
                     className="ghost"
                     disabled={busy || library.length === 0 || Boolean(libraryError)}
-                    onClick={onReshuffleBoard}
+                    onClick={() => { setUndo(null); onReshuffleBoard(); }}
                     title={library.length === 0
                       ? 'The catalogue has no tiles to deal'
                       : undefined}
@@ -564,7 +623,7 @@ export default function BoardBuilder({
                   <button
                     className="ghost danger"
                     disabled={busy}
-                    onClick={onClearBoard}
+                    onClick={() => { setUndo(null); onClearBoard(); }}
                   >
                     Remove all {tiles.length} tile{tiles.length === 1 ? '' : 's'}
                   </button>
@@ -647,9 +706,73 @@ function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
  * invitation rather than as the error TileBoard correctly calls it.
  */
 function BuilderGrid({ tiles, at, onPick }) {
+  const gridRef = useRef(null);
+  // Which cell the Tab key lands on — a roving tabindex, so the board is one
+  // stop on the way through the page rather than a hundred. Without it,
+  // reaching the panel beside the board means pressing Tab a hundred times.
+  const [focusPos, setFocusPos] = useState(1);
+
+  // Follows a square chosen any other way — a click, or the auto-advance to
+  // the next empty square after a placement — so the keyboard picks up from
+  // wherever the board actually is rather than from where it last was.
+  useEffect(() => {
+    if (at) setFocusPos(toPosition(at.row, at.col));
+  }, [at]);
+
+  /**
+   * Arrows move, Home/End jump to the ends of a row.
+   *
+   * Selecting as it moves, rather than only on Enter: the panel beside the
+   * board is what a square means, and a selection that lagged behind the
+   * focus ring would leave the two describing different squares. Enter and
+   * Space still work — they are a button's own, and land on the square the
+   * ring is already on.
+   *
+   * Focus is moved after the state, since the cell being focused only becomes
+   * tabbable once `focusPos` has been through a render.
+   */
+  function onKeyDown(e) {
+    const moves = {
+      ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    };
+    const from = fromPosition(focusPos);
+    let row = from.row;
+    let col = from.col;
+
+    if (moves[e.key]) {
+      row += moves[e.key][0];
+      col += moves[e.key][1];
+    } else if (e.key === 'Home') {
+      col = 1;
+    } else if (e.key === 'End') {
+      col = GRID;
+    } else {
+      return;
+    }
+
+    // Clamped rather than wrapped. Wrapping off the end of row 3 into row 4
+    // reads as a jump on a grid whose whole point is that position means
+    // something.
+    row = Math.min(GRID, Math.max(1, row));
+    col = Math.min(GRID, Math.max(1, col));
+    e.preventDefault();
+
+    const position = toPosition(row, col);
+    if (position === focusPos) return;
+    setFocusPos(position);
+    onPick(row, col);
+    requestAnimationFrame(() => {
+      gridRef.current?.querySelector(`[data-pos="${position}"]`)?.focus();
+    });
+  }
+
   return (
     <div className="tile-board-wrap">
-      <div className="tile-board builder-board">
+      <div
+        className="tile-board builder-board"
+        ref={gridRef}
+        onKeyDown={onKeyDown}
+      >
         <div className="corner" />
         {Array.from({ length: GRID }, (_, i) => (
           <div key={`h${i}`} className="axis">{colLetter(i + 1)}</div>
@@ -660,12 +783,15 @@ function BuilderGrid({ tiles, at, onPick }) {
             <div key={`a${row}`} className="axis">{row}</div>,
             ...Array.from({ length: GRID }, (_, c) => {
               const col = c + 1;
-              const tile = tiles.get(toPosition(row, col));
+              const position = toPosition(row, col);
+              const tile = tiles.get(position);
               const here = at && at.row === row && at.col === col;
               return (
                 <button
                   key={`${row}-${col}`}
                   type="button"
+                  data-pos={position}
+                  tabIndex={position === focusPos ? 0 : -1}
                   className={`tile-cell builder-cell${tile ? '' : ' empty'}${here ? ' on' : ''}`}
                   onClick={() => onPick(row, col)}
                   title={tile ? tile.name : `${coordLabel(row, col)} — empty`}

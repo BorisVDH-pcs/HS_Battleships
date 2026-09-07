@@ -2652,6 +2652,14 @@ button.builder-cell.empty:hover { border-style: solid; }
  * you are reading the row for. */
 .library-placed { color: var(--gold-dim); }
 
+/* The offer to put back the square just changed. Sits above the board, where
+   it cannot move or vanish as the panel beside it changes shape. */
+.builder-undo {
+  display: flex; flex-wrap: wrap; gap: .5rem; align-items: baseline;
+  margin: 0 0 .8rem;
+}
+.builder-undo b { color: var(--label); font-weight: 600; }
+
 /* Repeated lines in a pasted board. Muted, and never blocking. */
 .tile-warnings { margin: .5rem 0 0; padding-left: 1.1rem; }
 .tile-warnings li { margin: .1rem 0; }
