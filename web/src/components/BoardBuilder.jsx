@@ -106,6 +106,47 @@ export default function BoardBuilder({
    * itself a useful ranking, and this only overrides it where the name says
    * something stronger.
    */
+  /**
+   * What is actually on this board, for the read-through before an event.
+   *
+   * Two different kinds of number, and the difference matters when reading
+   * them.
+   *
+   * The effort split is exact. It comes off `completion` and
+   * `required_evidence`, which are the fields the game itself runs on, so
+   * "nineteen squares need five or more screenshots" is a fact.
+   *
+   * The content counts are not. Nothing in the data says a tile is a raids
+   * tile: tags would be the place for that and not one of the catalogue's
+   * entries has any, so this reads the names. It is a good enough answer to
+   * "did I remember the raids and slayer tiles" — the pair worth a couple of
+   * squares every time, because they open up the most content — and it is
+   * labelled as name-matching so nobody mistakes it for a classification the
+   * database is keeping.
+   */
+  const summary = useMemo(() => {
+    // Word-bounded, so `toa` does not find "toad" and `tob` does not find
+    // "tobacco". Bosses as well as the raid names, since a square is usually
+    // named for the drop rather than the raid it came from.
+    const RAIDS = /\b(raids?|cox|tob|toa|olm|nylocas|nylo|verzik|maiden|sotetseg|xarpus|akkha|zebak|kephri|baba|warden|wardens|chamber|chambers|theatre|tombs|purples?)\b/i;
+    const SLAYER = /\bslayer\b/i;
+
+    const s = { one: 0, few: 0, many: 0, sets: 0, value: 0, raids: 0, slayer: 0 };
+    for (const t of tiles) {
+      const rule = t.completion ?? 'points';
+      if (rule === 'one_set' || rule === 'each_set') s.sets += 1;
+      else if (rule === 'value') s.value += 1;
+      else if ((t.required_evidence ?? 1) <= 1) s.one += 1;
+      else if (t.required_evidence <= 4) s.few += 1;
+      else s.many += 1;
+
+      const name = t.name ?? '';
+      if (RAIDS.test(name)) s.raids += 1;
+      if (SLAYER.test(name)) s.slayer += 1;
+    }
+    return s;
+  }, [tiles]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const words = q.split(' ').filter(Boolean);
@@ -353,6 +394,28 @@ export default function BoardBuilder({
         {tiles.length < need && ' Click an empty square, then a tile to put in it.'}
         {' Arrow keys move around the board; Enter opens the square.'}
       </p>
+
+      {/* The read-through before an event, without counting a hundred cells.
+          Effort first, because that is the exact half. */}
+      {tiles.length > 0 && (
+        <dl className="builder-summary">
+          <div><dt>1 screenshot</dt><dd>{summary.one}</dd></div>
+          <div><dt>2–4</dt><dd>{summary.few}</dd></div>
+          <div><dt>5+</dt><dd>{summary.many}</dd></div>
+          <div><dt>Sets</dt><dd>{summary.sets}</dd></div>
+          <div><dt>Value</dt><dd>{summary.value}</dd></div>
+          <div className="builder-summary-split">
+            <dt>Raids</dt><dd>{summary.raids}</dd>
+          </div>
+          <div><dt>Slayer</dt><dd>{summary.slayer}</dd></div>
+        </dl>
+      )}
+      {tiles.length > 0 && (
+        <p className="muted builder-summary-note">
+          Effort is exact. Raids and slayer are matched on the tile’s name — no
+          tile is tagged, so nothing else can answer it.
+        </p>
+      )}
 
       {/* Above the board rather than in the panel, because the panel changes
           shape three ways and the offer must not move or vanish with it. It

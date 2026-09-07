@@ -2652,6 +2652,41 @@ button.builder-cell.empty:hover { border-style: solid; }
  * you are reading the row for. */
 .library-placed { color: var(--gold-dim); }
 
+/* What is on the board, as a row of counts.
+ *
+ * A row of small stat blocks rather than a table: there are seven numbers,
+ * they are read at a glance rather than compared column to column, and a
+ * table of one row is a table pretending to be something. The separator
+ * before Raids marks where exact counting stops and name-matching begins —
+ * the note underneath says so in words, and this says it in space. */
+.builder-summary {
+  display: flex; flex-wrap: wrap; gap: .3rem;
+  margin: 0 0 .35rem;
+}
+.builder-summary > div {
+  display: flex; flex-direction: column; gap: .1rem;
+  padding: .35rem .7rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  min-width: 4.2rem;
+}
+.builder-summary dt { color: var(--label-2); font-size: .75rem; }
+.builder-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem; font-weight: 600;
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.builder-summary-split { margin-left: .7rem; }
+.builder-summary-note { margin: 0 0 .8rem; }
+@media (max-width: 620px) {
+  /* The gap reads as a break in a row; on a wrapped stack it reads as a
+     stray indent. */
+  .builder-summary-split { margin-left: 0; }
+}
+
 /* The offer to put back the square just changed. Sits above the board, where
    it cannot move or vanish as the panel beside it changes shape. */
 .builder-undo {
