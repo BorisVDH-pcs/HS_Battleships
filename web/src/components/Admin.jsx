@@ -45,6 +45,16 @@ const FAILED = Symbol('admin action failed');
 const worked = (result) => result !== FAILED;
 
 /**
+ * What `run` re-reads when the caller does not say.
+ *
+ * Everything, deliberately: a caller that has not thought about it gets the
+ * behaviour the console had before scoping existed, so forgetting to name a
+ * slice costs a few queries rather than leaving a stale checklist on screen.
+ * `tiles` is absent because `detail` already covers it.
+ */
+const ALL_SLICES = ['games', 'detail', 'library'];
+
+/**
  * What a deal from the catalogue could not do, appended to whatever the caller
  * says it did.
  *
@@ -113,6 +123,25 @@ export default function Admin() {
     setTeams(t ?? []);
     setProfiles(p ?? []);
     setMembers(m ?? []);
+  }, []);
+
+  /**
+   * The tiles alone.
+   *
+   * Split out of loadGameDetail because the board builder writes one square
+   * per click, and a hundred squares is an evening: every one of those clicks
+   * used to refetch the games list, the teams, every profile, the roster, the
+   * tiles, both fleets, the webhooks and the whole catalogue — nine queries to
+   * learn one square changed. Fleets and webhooks cannot change by placing a
+   * tile, so this is the whole of what a placement needs to re-read.
+   */
+  const loadTiles = useCallback(async (id) => {
+    if (!id) { setTiles([]); return; }
+    try {
+      setTiles((await adminListTiles(id)) ?? []);
+    } catch (err) {
+      setError(err.message);
+    }
   }, []);
 
   const loadGameDetail = useCallback(async (id) => {
@@ -205,17 +234,30 @@ export default function Admin() {
    * the builder advanced to the next square, and the only sign of trouble was a
    * red line at the top of a pane you had scrolled a long way down.
    */
-  async function run(fn, okMessage) {
+  async function run(fn, okMessage, { refresh = ALL_SLICES } = {}) {
     setBusy(true); setError(null); setNotice(null);
     try {
       const result = await fn();
-      await loadGames();
-      await loadGameDetail(gameId);
-      // The catalogue comes back too. Placing a tile bumps its use count and
-      // editing one changes what the picker shows, so almost every builder
-      // action makes the loaded copy stale — and one small query on an admin
-      // console is cheaper than working out which actions those were.
-      await loadLibrary();
+      const want = new Set(refresh);
+      // In parallel, and only what the action could have changed. These were
+      // three sequential awaits of everything, which was the honest thing to
+      // write when the console was a handful of presses per event: working
+      // out which action invalidated what is exactly the reasoning that goes
+      // stale and starts showing an organiser a game more ready than it is.
+      //
+      // The board builder is what made it untenable — one write per square,
+      // a hundred squares, nine queries each. So the choice is now the call
+      // site's, and the default is still everything: a caller that says
+      // nothing gets the old behaviour, which keeps the failure mode
+      // "refreshed more than it needed" rather than "quietly out of date".
+      await Promise.all([
+        want.has('games') ? loadGames() : null,
+        want.has('detail') ? loadGameDetail(gameId) : null,
+        // 'detail' already re-reads the tiles; asking for both is a duplicate
+        // query, not a second opinion.
+        want.has('tiles') && !want.has('detail') ? loadTiles(gameId) : null,
+        want.has('library') ? loadLibrary() : null,
+      ].filter(Boolean));
       if (okMessage) setNotice(typeof okMessage === 'function' ? okMessage(result) : okMessage);
       return result;
     } catch (err) {
@@ -528,11 +570,17 @@ export default function Admin() {
             // Each of the three writes below answers "did it actually save",
             // because the builder closes a form and moves to the next square on
             // the strength of it.
+            // The hot pair: one press per square, a hundred of them. Only the
+            // tiles can have moved — not the roster, not the fleets, not the
+            // webhooks, and not the catalogue, whose use count is no longer
+            // shown on a row.
             onSetTile={(row, col, tile) =>
-              run(() => adminSetTile(game.id, row, col, tile)).then(worked)
+              run(() => adminSetTile(game.id, row, col, tile), null, { refresh: ['tiles'] })
+                .then(worked)
             }
             onClearTile={(row, col) =>
-              run(() => adminClearTile(game.id, row, col), 'Square cleared.').then(worked)
+              run(() => adminClearTile(game.id, row, col), 'Square cleared.', { refresh: ['tiles'] })
+                .then(worked)
             }
             // The way back to an empty board. Asked for by name rather than by
             // count, because a board is an evening's work and "100 squares" is
@@ -553,7 +601,8 @@ export default function Admin() {
                 }
               ).then((ok) => ok && run(
                 () => adminClearBoard(game.id),
-                (n) => `${n} square${n === 1 ? '' : 's'} cleared — the board is empty.`
+                (n) => `${n} square${n === 1 ? '' : 's'} cleared — the board is empty.`,
+                { refresh: ['tiles'] }
               ))
             }
             // Resolves to the entry's id, or null if the save was refused. The
@@ -562,7 +611,8 @@ export default function Admin() {
             // which catalogue entry it came from.
             onSaveLibraryTile={(id, tile) =>
               run(() => adminSaveLibraryTile(id, tile),
-                  id ? 'Catalogue tile updated.' : 'Added to the catalogue.')
+                  id ? 'Catalogue tile updated.' : 'Added to the catalogue.',
+                  { refresh: ['library'] })
                 .then((result) => (worked(result) ? result : null))
             }
             onDeleteLibraryTile={(entry) =>
@@ -578,17 +628,20 @@ export default function Admin() {
                   danger: true,
                 }
               ).then((ok) => ok && run(
-                () => adminDeleteLibraryTile(entry.id), 'Removed from the catalogue.'
+                () => adminDeleteLibraryTile(entry.id), 'Removed from the catalogue.',
+                { refresh: ['library'] }
               ))
             }
             onImportBoard={() =>
               run(() => adminImportBoardToLibrary(game.id),
-                  (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`)
+                  (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`,
+                  { refresh: ['library'] })
             }
             onAutofillBoard={() =>
               run(() => adminAutofillBoard(game.id),
                   (r) => `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
-                         + dealShortfall(r))
+                         + dealShortfall(r),
+                  { refresh: ['tiles', 'library'] })
             }
             // Deal a board, read it, dislike it, roll again. The autofill
             // above cannot do this on its own: it only ever fills empty
@@ -636,7 +689,8 @@ export default function Admin() {
                 },
                 ({ cleared, deal }) =>
                   `Board re-randomized — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
-                  + `${deal.filled} filled at random.` + dealShortfall(deal)
+                  + `${deal.filled} filled at random.` + dealShortfall(deal),
+                { refresh: ['tiles', 'library'] }
               ))
             }
           />
@@ -646,7 +700,8 @@ export default function Admin() {
             tiles={tiles}
             busy={busy}
             onSave={(rows) =>
-              run(() => adminSetTiles(game.id, rows), (n) => `${n} tiles saved.`).then(worked)
+              run(() => adminSetTiles(game.id, rows), (n) => `${n} tiles saved.`,
+                  { refresh: ['tiles'] }).then(worked)
             }
           />
 
