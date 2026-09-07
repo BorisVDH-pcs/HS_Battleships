@@ -6,7 +6,7 @@ import {
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminImportBoardToLibrary, adminSetTile, adminClearTile, adminAutofillBoard,
-  adminClearBoard,
+  adminClearBoard, adminGameReadiness,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
 import AdminOverview from './AdminOverview.jsx';
@@ -64,6 +64,45 @@ const ALL_SLICES = ['games', 'detail', 'library'];
  * reports only its successes leaves you to find that out by counting a hundred
  * squares.
  */
+/**
+ * What still stands between a game and Start, named rather than counted.
+ *
+ * The same requirements the checklist inside the game enforces, and
+ * deliberately a second implementation of them: this one has counts, not rows,
+ * because reading every board's tiles to draw a list of games is the shape the
+ * console was just taken off. The checklist stays the authority — it can say
+ * *which* team has no captain, and this only says that one does not.
+ *
+ * Empty for a game already running or finished, where there is nothing left to
+ * get ready and six ticks would just be noise on a list.
+ *
+ * Empty too when the counts are missing — a console whose migration has not
+ * landed shows no badges rather than accusing every game of having no tiles.
+ */
+function readinessGaps(game, counts, teams, members) {
+  if (!game || game.status === 'active' || game.status === 'finished') return [];
+
+  const gaps = [];
+  const gameTeams = teams.filter((t) => t.game_id === game.id);
+
+  if (counts && counts.tile_count < counts.tiles_needed) {
+    gaps.push(`${counts.tiles_needed - counts.tile_count} more tiles`);
+  }
+  if (gameTeams.length !== 2) gaps.push('two teams');
+  if (gameTeams.some((t) => !members.some((m) => m.team_id === t.id && m.role === 'captain'))) {
+    gaps.push('a captain');
+  }
+  if (gameTeams.some((t) => !members.some((m) => m.team_id === t.id))) gaps.push('players');
+  // Fleets are only a gap once there is a phase in which to place them; during
+  // setup the captains cannot have done it yet, so saying so would be listing
+  // the future as a problem.
+  if (game.status === 'placement' && counts
+      && counts.teams_with_full_fleet < gameTeams.length) {
+    gaps.push('fleets');
+  }
+  return gaps;
+}
+
 function dealShortfall(r) {
   const short = r.empty - r.filled;
   return (short > 0
@@ -86,6 +125,11 @@ export default function Admin() {
   const [libraryError, setLibraryError] = useState(null);
   const [shipCells, setShipCells] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
+  // Per-game counts for the Games list badges, keyed by game id. Fails soft:
+  // the badge is a convenience and the checklist inside each game is the
+  // authority, so a missing function leaves the list exactly as it was rather
+  // than putting a red line above it.
+  const [readiness, setReadiness] = useState({});
   const [gameId, setGameId] = useState(null);
   // Which section is on screen. The console used to be one long scroll of eight
   // cards, so finding Roster meant paging past the whole board overview.
@@ -123,6 +167,16 @@ export default function Admin() {
     setTeams(t ?? []);
     setProfiles(p ?? []);
     setMembers(m ?? []);
+
+    // Alongside, not before: the list must not wait on the badges, and a
+    // console that has not had the migration cannot be a console that refuses
+    // to draw. The checklist inside each game is the authority either way.
+    try {
+      const counts = await adminGameReadiness();
+      setReadiness(Object.fromEntries((counts ?? []).map((r) => [r.game_id, r])));
+    } catch {
+      setReadiness({});
+    }
   }, []);
 
   /**
@@ -443,12 +497,23 @@ export default function Admin() {
         <ul className="game-list">
           {games.map((g) => {
             const names = teams.filter((t) => t.game_id === g.id).map((t) => t.name);
+            const outstanding = readinessGaps(g, readiness[g.id], teams, members);
             return (
               <li key={g.id} className={g.id === gameId ? 'on' : ''}>
                 <div>
                   <strong>{g.name}</strong>{' '}
                   <span className={`pill ${g.status}`}>{statusLabel(g.status)}</span>
-                  <div className="meta">{names.join(' vs ') || 'no teams'}</div>
+                  <div className="meta">
+                    {names.join(' vs ') || 'no teams'}
+                    {/* Named, not counted. "3" would send you into the game to
+                        find out which three; the words are what stop the badge
+                        being another thing to open. Only while a game can
+                        still be got ready — once it is running the list has
+                        served its purpose. */}
+                    {outstanding.length > 0 && (
+                      <span className="game-gaps"> · needs {outstanding.join(', ')}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="row">
                   {/* Managing a game is the same gesture as opening it, so it

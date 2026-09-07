@@ -103,6 +103,16 @@ export const adminListTiles = (gameId) =>
 export const adminListShipCells = (gameId) =>
   rpc('admin_list_ship_cells', { p_game_id: gameId });
 
+/**
+ * Counts per game, for the readiness badge on the Games list.
+ *
+ * Every game in one call rather than the per-game RPCs above in a loop. The
+ * three numbers it returns are all behind RLS a client cannot read directly —
+ * tiles refuses everyone, ship_cells answers only for your own team, and an
+ * admin has none — and all three are counts, never content.
+ */
+export const adminGameReadiness = () => rpc('admin_game_readiness', {});
+
 // ---- the tile library, and boards built one square at a time ----
 
 /**
