@@ -8,6 +8,27 @@ import EvidenceUploader from './EvidenceUploader.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 
 /**
+ * How long ago, in the coarsest unit still true.
+ *
+ * Coarse on purpose. The question this answers is "has somebody been sitting
+ * on this slot", and the difference between 41 and 43 minutes is not part of
+ * it — a number that precise invites reading it as a deadline. Anything under
+ * a minute is "just now" rather than a count of seconds, which also absorbs
+ * the clock skew between a phone and the database without ever printing a
+ * negative age.
+ */
+function sinceText(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return null;
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
  * The two slots. Replaces the spreadsheet's L6 / N6 cells: a team may hold at
  * most `max_active_tiles` locked-in-but-unfired tiles, enforced by a database
  * trigger rather than by checking whether two cells happen to be full.
@@ -45,6 +66,17 @@ export default function ActiveTiles({
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [selectedClaimId]);
+
+  // Re-render once a minute, only so the "held for" line stays true. The board
+  // refetches when something happens, and a slot sitting on a tile nobody is
+  // finishing is precisely the case where nothing does — which is also the
+  // case the line exists to make visible. Without this it would freeze at
+  // "2 min ago" for an hour and quietly say the opposite of what it means.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const active = tiles.filter((t) => t.claim_status === 'active');
 
@@ -118,6 +150,24 @@ export default function ActiveTiles({
                 <TileInfo tile={tile} />
                 <span className="coord">{label}</span>
               </div>
+
+              {/* Who is on this, and since when.
+                  Three slots and a team of ten is a coordination problem, and
+                  without this the card could not say whether a slot had been
+                  held for four minutes or four hours -- so the question went
+                  to Discord instead, about a card that already knew.
+
+                  Renders nothing at all when the server has not been migrated
+                  yet (0907's tiles_for_me is what returns these two columns),
+                  so this is safe to ship ahead of the database. */}
+              {(tile.claimed_by_name || tile.claimed_at) && (
+                <p className="slot-claimant">
+                  {tile.claimed_by_name
+                    ? <>Locked in by <strong>{tile.claimed_by_name}</strong></>
+                    : 'Locked in'}
+                  {tile.claimed_at && <> · {sinceText(tile.claimed_at)}</>}
+                </p>
+              )}
 
               <EvidenceUploader
                 ref={(inst) => {

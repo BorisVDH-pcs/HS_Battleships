@@ -342,6 +342,19 @@ h3 {
  *
  * inline-block so the whole pill wraps as one unit onto its own line on a
  * phone, rather than breaking between the glyph and the sentence. */
+/* Who is on this slot, under the tile's name.
+ *
+ * Secondary weight and size: it is context for the card, not another thing to
+ * do. It sits above the evidence controls because those are the card's
+ * purpose and nothing should push them further down — this line is read once
+ * when you glance at the slot, and the drop zone every time you act on it. */
+.slot-claimant {
+  margin: .15rem 0 .45rem;
+  color: var(--label-2);
+  font-size: .8125rem;
+}
+.slot-claimant strong { color: var(--label); font-weight: 600; }
+
 .live-warning {
   display: inline-block;
   margin-left: .5rem;
