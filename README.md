@@ -12,8 +12,9 @@ There is **no turn order**. A team plays whenever it has a free slot.
 
 1. **Claim** — a team picks a numbered tile on the enemy grid. Picking is the move;
    there is no question to answer. The task is revealed to that team only.
-2. **Active** — the claimed tile occupies one of the team's **two** slots.
-   No third tile can be claimed until one is fired.
+2. **Active** — the claimed tile occupies one of the team's **three** slots
+   (`games.max_active_tiles`, which an organiser can set per game).
+   No further tile can be claimed until one is fired.
 3. **Fire** — the team completes the tile's in-game task and marks it done.
    HIT/MISS resolves immediately against the opponent's hidden placement,
    and the slot frees up for the next claim.

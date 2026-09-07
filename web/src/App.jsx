@@ -286,7 +286,11 @@ export default function App() {
   }
 
   const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, evidence, live } = game;
-  const maxActive = game.game?.max_active_tiles ?? 2;
+  // Matches the column's own default, set to 3 by migration 0031. It was 2
+  // here long after the database moved, which is the kind of disagreement that
+  // stays invisible until the one game whose column is somehow null renders a
+  // board with a slot missing.
+  const maxActive = game.game?.max_active_tiles ?? 3;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
   // The database enum still calls this phase `placement`; the players call it
@@ -325,6 +329,10 @@ export default function App() {
           ref={guideRef}
           autoShow={!loading && Boolean(game.game) && !waitingForTeam}
           onTabNeed={setBoardTab}
+          // So the guide states this game's rules rather than the ones that
+          // were true when it was written.
+          maxActive={maxActive}
+          status={game.game?.status}
         />
       )}
 

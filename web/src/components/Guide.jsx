@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 
 /**
  * The player-facing "How to Play" guide: a welcome screen, a spotlighted
@@ -20,6 +20,21 @@ const QA_ITEMS = [
   // { q: 'What counts as valid proof for a tile?', a: '…' },
 ];
 
+/**
+ * The steps, before this game gets hold of them.
+ *
+ * Two things here are not knowable at module scope. `{maxActive}` is a column
+ * on the game — it was written out as "three" once, which is right for the
+ * default and wrong for any game an organiser sets differently, and a guide
+ * that states a rule the server does not enforce is worse than one that stays
+ * quiet. And `phase` names the game status a step only makes sense in: the
+ * fleet yard exists during preparation and nowhere else, so once the game is
+ * running that step was pointing at an element that is not on the page — the
+ * card came up with no highlight and nothing to look at.
+ *
+ * Both are resolved by buildSteps() below, per game, on every render of the
+ * guide.
+ */
 const TOUR_STEPS = [
   {
     targetId: 'app-header',
@@ -33,6 +48,9 @@ const TOUR_STEPS = [
   },
   {
     targetId: 'fleet-placer-section',
+    // Preparation only. CaptainPlacement is the only thing that renders this
+    // id, and App renders that only while the game is in `placement`.
+    phase: 'placement',
     title: '⚓ Placing Your Fleet',
     body: 'Before the game starts, your <strong>captain</strong> places your team\'s fleet — '
       + 'ships of size <strong>2, 3, 3, 4, 5</strong> — on your own board.<br><br>'
@@ -54,9 +72,8 @@ const TOUR_STEPS = [
   {
     targetId: 'active-tiles-section',
     title: '🗂️ Active Tiles — Your Slots',
-    body: 'A team can hold at most a set number of claimed tiles at once (currently '
-      + '<strong>three</strong>). No new tile can be claimed until one of the current ones '
-      + 'is fired.<br><br>'
+    body: 'A team can hold at most <strong>{maxActive}</strong> claimed tiles at once. '
+      + 'No new tile can be claimed until one of the current ones is fired.<br><br>'
       + 'Each card shows the task for a tile you have locked in. An empty slot '
       + 'means you are free to claim another tile on the enemy board.',
   },
@@ -119,7 +136,26 @@ const TOUR_STEPS = [
   },
 ];
 
-const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
+/**
+ * The steps this game actually has, with its own numbers in them.
+ *
+ * Filtering hits the Quick Reference as well as the tour, deliberately. The
+ * reference is not a manual — its whole point over one is the "Highlight in
+ * UI" button beside every section, and that button is exactly what a step for
+ * a phase you are past cannot do. A section that can only fail is worse
+ * company than one that is not there.
+ */
+function buildSteps({ maxActive, status }) {
+  return TOUR_STEPS
+    .filter((s) => !s.phase || s.phase === status)
+    .map((s) => ({ ...s, body: s.body.replaceAll('{maxActive}', String(maxActive)) }));
+}
+
+const Guide = forwardRef(function Guide({ autoShow, onTabNeed, maxActive = 3, status }, ref) {
+  const steps = useMemo(
+    () => buildSteps({ maxActive, status }),
+    [maxActive, status]
+  );
   // 'closed' | 'welcome' | 'tour' | 'reference' | 'qa' | 'spotlight'
   const [phase, setPhase] = useState('closed');
   const [step, setStep] = useState(0);
@@ -156,9 +192,9 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
   // the board tab if this step needs one. Re-runs on resize/scroll while a
   // spotlight is showing, since the board reflows at narrower widths.
   useEffect(() => {
-    const showingTour = phase === 'tour' && step < TOUR_STEPS.length;
+    const showingTour = phase === 'tour' && step < steps.length;
     if (!showingTour) return;
-    const target = TOUR_STEPS[step];
+    const target = steps[step];
     if (target.tab) onTabNeed?.(target.tab);
 
     function place() {
@@ -202,8 +238,8 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
   }
 
   function next() {
-    setStep((s) => Math.min(s + 1, TOUR_STEPS.length));
-    if (step + 1 >= TOUR_STEPS.length) {
+    setStep((s) => Math.min(s + 1, steps.length));
+    if (step + 1 >= steps.length) {
       localStorage.setItem(SEEN_KEY, '1');
       clearSpotlightRing();
     }
@@ -276,22 +312,22 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
 
       {phase === 'tour' && (
         <div className="guide-tour-card">
-          {step < TOUR_STEPS.length ? (
+          {step < steps.length ? (
             <>
               <div className="guide-tour-header">
-                <span className="guide-tour-badge">Step {step + 1} of {TOUR_STEPS.length}</span>
+                <span className="guide-tour-badge">Step {step + 1} of {steps.length}</span>
                 <button className="guide-tour-close" onClick={endTour}>✕ End Tour</button>
               </div>
-              <h3 dangerouslySetInnerHTML={{ __html: TOUR_STEPS[step].title }} />
-              <div className="guide-tour-body" dangerouslySetInnerHTML={{ __html: TOUR_STEPS[step].body }} />
+              <h3 dangerouslySetInnerHTML={{ __html: steps[step].title }} />
+              <div className="guide-tour-body" dangerouslySetInnerHTML={{ __html: steps[step].body }} />
               <div className="guide-tour-progress">
-                {TOUR_STEPS.map((_, i) => (
+                {steps.map((_, i) => (
                   <span key={i} className={`guide-dot${i === step ? ' on' : ''}`} />
                 ))}
               </div>
               <div className="guide-tour-actions">
                 <button className="ghost" onClick={prev} disabled={step === 0}>← Back</button>
-                <button onClick={next}>{step === TOUR_STEPS.length - 1 ? 'Finish ✓' : 'Next →'}</button>
+                <button onClick={next}>{step === steps.length - 1 ? 'Finish ✓' : 'Next →'}</button>
               </div>
               <button className="link guide-tour-skip" onClick={() => setPhase('reference')}>
                 Skip to Quick Reference →
@@ -324,7 +360,7 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
             </div>
 
             <nav className="guide-nav">
-              {TOUR_STEPS.map((s, i) => (
+              {steps.map((s, i) => (
                 <button
                   key={i}
                   className="guide-nav-btn"
@@ -336,7 +372,7 @@ const Guide = forwardRef(function Guide({ autoShow, onTabNeed }, ref) {
             </nav>
 
             <div className="guide-body">
-              {TOUR_STEPS.map((s, i) => (
+              {steps.map((s, i) => (
                 <div className="guide-section" key={i} id={`guide-s${i}`}>
                   <div className="guide-step-header">
                     <div className="guide-step-num">{i + 1}</div>
