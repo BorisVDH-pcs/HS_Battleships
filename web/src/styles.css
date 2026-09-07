@@ -1185,58 +1185,6 @@ button.cell:disabled { cursor: default; }
 .feed li.theirs span { color: var(--label-2); }
 .feed .tag { flex: none; font-size: .75rem; font-weight: 600; color: var(--label-3); }
 
-/* ---- scoreboard ----
- *
- * An inset grouped list: each row its own rounded surface, the leading row
- * carrying the tint. Nothing here needs a border to be legible, so the border
- * is a hairline and the separation comes from the fill.
- */
-
-.scoreboard { margin: 1.5rem 0; }
-.scoreboard ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
-.scoreboard li {
-  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
-  padding: .75rem 1rem;
-  background: var(--fill-3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
-  transition: background .25s var(--ease-out), box-shadow .25s var(--ease-out);
-}
-.scoreboard li.leading {
-  border-color: transparent;
-  background: rgba(242, 193, 78, .11);
-  box-shadow: var(--glow-sm);
-}
-.scoreboard li.mine .who strong { color: var(--gold); }
-.scoreboard .who strong { font-weight: 600; letter-spacing: -.011em; font-size: 1.0625rem; }
-.scoreboard .tag {
-  margin-left: .5rem; font-size: .6875rem; letter-spacing: .04em;
-  text-transform: uppercase; font-weight: 600; color: var(--label-3);
-}
-.scoreboard .meta { color: var(--label-2); font-size: .8125rem; margin-top: .15rem; }
-.scoreboard .points {
-  font-family: var(--display);
-  font-size: 1.75rem; line-height: 1; font-weight: 600;
-  color: var(--text); font-variant-numeric: tabular-nums; flex: none;
-  letter-spacing: -.022em;
-}
-.scoreboard li.leading .points {
-  color: var(--gold);
-  /* The score is the page's anchor now that it sits at the top. Size and
-     weight, not colour alone, so the standing resolves before you have read
-     either name — and tracking tightens as it grows, because large numerals
-     read as over-spaced otherwise. */
-  font-size: 2.35rem;
-  font-weight: 700;
-  letter-spacing: -.028em;
-}
-.scoreboard li:not(.leading) .points { color: var(--label-2); }
-.scoreboard > .muted { margin: .5rem 0 0; }
-
-/* The admin console nests the scoreboard inside a card that already has a
-   heading, so it must not add a second block of top margin. */
-.card .scoreboard { margin: 0; }
-.card .scoreboard h2 { display: none; }
 
 /* ---- controls ----
  *
@@ -1568,10 +1516,10 @@ label {
 .card > h2 { margin-top: 0; }
 
 /* The admin console spaces its cards with the `.admin` grid gap. The player
-   view has no such wrapper — its cards are plain siblings of the boards and
-   the scoreboard — so without this the placement card and the team-name card
-   meet border to border. 1.5rem matches the scoreboard and active-tile
-   rhythm, and collapses against them rather than stacking. */
+   view has no such wrapper — its cards are plain siblings of the boards — so
+   without this the placement card and the team-name card meet border to
+   border. 1.5rem matches the active-tile rhythm, and collapses against it
+   rather than stacking. */
 .app > .card { margin: 1.5rem 0; }
 .row { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
 .row > label { flex: 1 1 10rem; }
@@ -2058,7 +2006,7 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
     --fill-3: rgba(120, 120, 128, .22);
     --fill-3-solid: #303032;
   }
-  .card, .board, .scoreboard li, .game-list li, .slot { border-color: var(--hairline); }
+  .card, .board, .game-list li, .slot { border-color: var(--hairline); }
 }
 
 /* ---- fire effect ----
@@ -2685,6 +2633,27 @@ button.builder-cell.empty:hover { border-style: solid; }
   /* The gap reads as a break in a row; on a wrapped stack it reads as a
      stray indent. */
   .builder-summary-split { margin-left: 0; }
+}
+
+/* The page that replaces a white screen.
+ *
+ * Centred and narrow like the login card, because it is the same kind of
+ * moment: one thing to read and one thing to press, with nothing else on
+ * screen competing for the decision. */
+.app > .boundary { max-width: 34rem; margin: 4rem auto; }
+.boundary h2 { margin-top: 0; }
+.boundary > button { margin: .4rem 0 1.2rem; }
+.boundary-detail {
+  display: block;
+  margin-top: .35rem;
+  padding: .55rem .7rem;
+  background: var(--fill-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  color: var(--label);
+  font-size: .8125rem;
+  /* A stack trace's first line is long and has no spaces to break at. */
+  overflow-wrap: anywhere;
 }
 
 /* Narrowing a game's worth of screenshots down to the one being argued about.
