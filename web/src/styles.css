@@ -2687,6 +2687,28 @@ button.builder-cell.empty:hover { border-style: solid; }
   .builder-summary-split { margin-left: 0; }
 }
 
+/* Narrowing a game's worth of screenshots down to the one being argued about.
+ *
+ * Search first and widest: a dispute arrives as a tile or a square, and the
+ * two dropdowns are the follow-up questions. Wraps to its own rows on a
+ * narrow screen rather than squeezing the search box to nothing. */
+.evidence-filters {
+  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+  margin: 0 0 .8rem;
+}
+/* A flex basis on every control, not `auto`. Inputs and selects are
+   `width: 100%` globally, and on the main axis `flex-basis: auto` defers to
+   that — which put each control on a row of its own and turned a filter bar
+   into three stacked full-width boxes. The catalogue's search solves it the
+   same way just above. */
+.evidence-filters input[type="search"] { flex: 1 1 10rem; min-width: 0; }
+.evidence-filters select { flex: 0 1 10rem; }
+
+.evidence-pager {
+  display: flex; gap: .6rem; align-items: center; justify-content: center;
+  margin: .9rem 0 0;
+}
+
 /* The sentence the team will read, shown while it is still being decided. */
 .tile-form-summary {
   margin: -.2rem 0 .6rem;
