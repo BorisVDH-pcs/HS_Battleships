@@ -142,24 +142,6 @@ export default function BoardBuilder({
   // started from means you have not renamed the copy yet, and the way out is
   // right there in the form; clashing with some third tile means the name is
   // simply spoken for.
-  /**
-   * The other square on this board already holding this task, if any.
-   *
-   * The catalogue clash above is a different question — that one asks whether
-   * the name is spoken for in the library, and its answer is "rename the
-   * copy". This asks whether the board already has the task, and its answer is
-   * "you have this on D4 already". A one-off tile typed by hand is exactly the
-   * route that produced the duplicates on the pasted boards, and it went
-   * through no check at all.
-   *
-   * `placedAt` excludes the square being edited, so keeping a square's own
-   * name is never a clash.
-   */
-  const boardClash = useMemo(() => {
-    if (!editing || editing.what !== 'square') return null;
-    return placedAt.get(nameKey(editing.draft.name)) ?? null;
-  }, [editing, placedAt]);
-
   const clashMessage = !clash ? null
     : clash.id === editing?.from?.id
       ? `This is still called "${clash.name}". Give the new tile a name of its own, `
@@ -367,11 +349,7 @@ export default function BoardBuilder({
                 }
                 onSave={editing.what === 'square' ? saveSquare : () => saveLibrary()}
                 onCancel={() => setEditing(null)}
-                extraErrors={[
-                  clashMessage,
-                  boardClash && `This board already has that task on ${boardClash}. `
-                    + 'A tile may only be on one square.',
-                ].filter(Boolean)}
+                extraErrors={clashMessage ? [clashMessage] : []}
                 extraActions={editing.from ? (
                   // The way back to editing in place. Kept because the entries
                   // imported from old boards carry no tags and some carry the
@@ -440,18 +418,21 @@ export default function BoardBuilder({
 
               <ul className="library-list">
                 {matches.map((entry) => {
-                  // Where this task already is, if it is. Shown and refused
-                  // rather than filtered out: an entry that silently vanishes
-                  // from a search is indistinguishable from one that was never
-                  // in the catalogue, and the organiser goes looking for a tile
-                  // they are holding. Naming the square answers the question
-                  // the absence would have raised.
+                  // Where this task already is, if it is — said, not enforced.
+                  //
+                  // Putting one tile on several squares is deliberate: a slayer
+                  // tile spread across ten of them, or a placeholder standing
+                  // in while the board is still being decided. So this reports
+                  // and gets out of the way. The one place duplicates are
+                  // refused is the shuffle, which excludes every name the board
+                  // already holds — a deal that repeated itself would be
+                  // filling a board by accident rather than by choice.
                   const already = placedAt.get(nameKey(entry.name));
                   return (
-                  <li key={entry.id} className={already ? 'placed' : undefined}>
+                  <li key={entry.id}>
                     <button
                       className="library-pick"
-                      disabled={busy || Boolean(already)}
+                      disabled={busy}
                       title={already ? `Already on ${already}` : undefined}
                       onClick={() => place(entry)}
                     >
@@ -459,7 +440,8 @@ export default function BoardBuilder({
                       <span className="library-text">
                         <span className="library-name">{entry.name}</span>
                         <span className="library-rule muted">
-                          {already ? `Already on ${already}` : ruleSummary(entry)}
+                          {ruleSummary(entry)}
+                          {already && <span className="library-placed"> · on {already}</span>}
                         </span>
                       </span>
                     </button>

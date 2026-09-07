@@ -848,7 +848,7 @@ function Tiles({ game, tiles, busy, onSave }) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
 
-  const { lines, rows, errors: tileErrors } = parseTileText(text, game.grid_size);
+  const { lines, rows, errors: tileErrors, warnings: tileWarnings } = parseTileText(text, game.grid_size);
 
   const locked = game.status !== 'setup' && game.status !== 'placement';
 
@@ -929,6 +929,15 @@ function Tiles({ game, tiles, busy, onSave }) {
               {tileErrors.length > 0 && (
                 <ul className="error">
                   {tileErrors.map((message) => <li key={message}>{message}</li>)}
+                </ul>
+              )}
+              {/* Muted, and below the errors: a repeated tile is usually
+                  deliberate — a slayer tile across ten squares, a placeholder
+                  holding the undecided ones — so this reports what was noticed
+                  without implying anything is wrong. It does not block Save. */}
+              {tileWarnings.length > 0 && (
+                <ul className="muted tile-warnings">
+                  {tileWarnings.map((message) => <li key={message}>{message}</li>)}
                 </ul>
               )}
               <div className="row" style={{ marginTop: '.6rem' }}>
