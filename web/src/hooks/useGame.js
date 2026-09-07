@@ -27,6 +27,13 @@ const BLANK = {
  */
 export function useGame(gameId, session) {
   const [state, setState] = useState(BLANK);
+  // Whether the board on screen is still hearing about the game.
+  //
+  //   'connecting' — opening, or reopening after a drop. Says nothing yet.
+  //   'live'       — subscribed; every change arrives as it happens.
+  //   'offline'    — the channel failed. The board is as stale as the last
+  //                  successful load, and the poll below is all that moves it.
+  const [live, setLive] = useState('connecting');
 
   // Bumped on every load. A switch fires a second load while the first is still
   // in flight, and the two can come back in either order -- on a phone on event
@@ -156,9 +163,30 @@ export function useGame(gameId, session) {
   // not while the gif is still playing.
   // Every other event type (claims, sinkings, wins…) has no animation to
   // wait on, so it refetches immediately.
+  //
+  // The status callback is the difference between a live board and one that
+  // has quietly stopped being live. Everything on this page arrives through
+  // this one channel, so when it drops the board keeps showing the last state
+  // it saw — correct-looking, wrong, and with nothing on screen to say so. A
+  // player on event wifi loses this socket routinely; before, the only way
+  // back was knowing to reload a page that looked fine.
+  //
+  // SUBSCRIBED refetches rather than merely clearing the flag: a reconnect
+  // means the gap is over, not that nothing happened during it, and every
+  // event that fired while the socket was down was missed for good. That also
+  // covers the first connect, at the cost of one extra load on mount.
+  //
+  // CLOSED is deliberately not treated as a fault. It arrives once per mount
+  // under StrictMode and again on every teardown, so reading it as "offline"
+  // would light the warning during an ordinary game switch.
   const pendingTimers = useRef([]);
   useEffect(() => {
-    if (!supabase || !gameId) return;
+    if (!supabase || !gameId) return undefined;
+    // Guards the callback against a reply arriving after this effect has been
+    // torn down — a game switch tears the old channel down while its own
+    // status events are still in flight.
+    let current = true;
+    setLive('connecting');
     const channel = supabase
       .channel(`game:${gameId}`)
       .on(
@@ -172,13 +200,56 @@ export function useGame(gameId, session) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (!current) return;
+        if (status === 'SUBSCRIBED') { setLive('live'); load(); }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLive('offline');
+      });
     return () => {
+      current = false;
       supabase.removeChannel(channel);
       pendingTimers.current.forEach(clearTimeout);
       pendingTimers.current = [];
     };
   }, [gameId, load]);
 
-  return { ...state, refresh: load };
+  // Coming back to the tab refetches the game, the way App already refetches
+  // the roster. Between them these cover the two ways a board goes stale
+  // without the socket ever reporting an error: a phone that slept through a
+  // shot, and a laptop lid closed over one.
+  //
+  // Throttled on the same 1.5s as the roster's own recheck, because returning
+  // to a tab fires `focus` and `visibilitychange` together and both have to
+  // stay — only one covers a phone unlocking, only the other a desktop
+  // alt-tab.
+  const recheckAt = useRef(0);
+  useEffect(() => {
+    if (!gameId) return undefined;
+    const recheck = () => {
+      if (document.hidden) return;
+      if (Date.now() - recheckAt.current < 1500) return;
+      recheckAt.current = Date.now();
+      load();
+    };
+    window.addEventListener('focus', recheck);
+    document.addEventListener('visibilitychange', recheck);
+    return () => {
+      window.removeEventListener('focus', recheck);
+      document.removeEventListener('visibilitychange', recheck);
+    };
+  }, [gameId, load]);
+
+  // A slow poll for as long as the socket is down, so a board that cannot hear
+  // events still moves. Only while disconnected: with the channel up every
+  // change already arrives, and polling on top of it would be the 120-second
+  // Apps Script loop this replaced. AdminOverview polls unconditionally for a
+  // different reason — uploads write no game_event, so its evidence counts
+  // have nothing to listen to.
+  useEffect(() => {
+    if (!gameId || live === 'live') return undefined;
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [gameId, live, load]);
+
+  return { ...state, live, refresh: load };
 }

@@ -332,6 +332,34 @@ h3 {
 .status { color: var(--label-2); margin: 1.25rem 0 0; }
 .status strong { color: var(--text); font-weight: 600; letter-spacing: -.008em; }
 
+/* "This board has stopped hearing about the game."
+ *
+ * Deliberately not gold and not red. Gold is the tint — it means "yours", or
+ * "press this" — and this is neither; red is damage, and a dropped socket is
+ * not a hit taken. So it borrows the neutral system fill and lets the ⚠ and
+ * the words carry the caution, which is also what keeps it from competing
+ * with a HIT landing on the board two inches below.
+ *
+ * inline-block so the whole pill wraps as one unit onto its own line on a
+ * phone, rather than breaking between the glyph and the sentence. */
+.live-warning {
+  display: inline-block;
+  margin-left: .5rem;
+  padding: .12rem .55rem;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  border: 1px solid var(--line);
+  color: var(--label);
+  font-size: .8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+@media (max-width: 620px) {
+  /* At this width the status line is already two rows; a nowrap pill on the
+     end of it is what pushes the page sideways. */
+  .live-warning { margin-left: 0; margin-top: .4rem; white-space: normal; }
+}
+
 /* The one filled-tint bar in the app, and it earns it: this is the result of
    the match. Apple fills a surface with the tint when the surface *is* the
    news, not to decorate a container. */

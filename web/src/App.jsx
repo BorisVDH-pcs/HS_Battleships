@@ -285,7 +285,7 @@ export default function App() {
     setGameId(nextId);
   }
 
-  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, evidence } = game;
+  const { loading, error, teams, myTeamId, myRole, tiles, myShipCells, myFleet, enemyShots, events, evidence, live } = game;
   const maxActive = game.game?.max_active_tiles ?? 2;
   const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
   const isActive = game.game?.status === 'active';
@@ -369,6 +369,15 @@ export default function App() {
             />{' '}
             — {statusLabel(game.game.status)}
             {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
+            {/* Only when something is wrong. A board that is working says so by
+                working, and a permanent green "live" badge is a light nobody
+                reads until the day it matters — by which time it has been
+                furniture for a week. */}
+            {live === 'offline' && (
+              <span className="live-warning" role="status">
+                ⚠ Reconnecting — the board may be out of date
+              </span>
+            )}
           </p>
 
           {game.game.status === 'finished' && (
