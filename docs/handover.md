@@ -1,6 +1,6 @@
 # Handover — HS_Battleships
 
-Current as of **2026-09-01**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
+Current as of **2026-09-07**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
 Boris or by another session with no memory of this one.
 
 ---
@@ -57,7 +57,10 @@ Script author had the same rule — the public webhook omitted tile names.)
 
 ### Migrations
 
-`0001` through `0032` are applied to the live project.
+**All 57 migrations in `supabase/migrations` are applied to the live project.**
+The table below covers `0001`–`0032` and the two from 2026-09-07; the 23 between
+them were added by later sessions and never listed here. `ls` the directory for
+the truth, not this table.
 
 | File | What it does |
 |---|---|
@@ -91,8 +94,10 @@ Script author had the same rule — the public webhook omitted tile names.)
 | `0028_claim_released_event_type.sql` | Adds the `claim_released` event type (separate file for the same reason as 0008, 0012, 0015 and 0018) |
 | `0029_admin_release_claim.sql` | `admin_release_claim` — an organiser gives a team back a slot on a tile it cannot finish. Deletes the claim (so the square is lockable again), refuses a fired one, and emits `claim_released` |
 | `0030_event_order.sql` | `game_events.created_at` defaults to `clock_timestamp()` instead of `now()`. Two events written by one shot no longer share a timestamp, so the feed's order is defined rather than incidental |
-| `0031_three_active_tiles.sql` | Three active tiles per team instead of two: the column default, the `admin_create_game` argument default, and any game not yet under way. No application code changed — the limit was always read from `games.max_active_tiles` |
+| `0031_three_active_tiles.sql` | Three active tiles per team instead of two: the column default, the `admin_create_game` argument default, and any game not yet under way. No application code changed — the limit was always read from `games.max_active_tiles`. **Not quite true, and it went unnoticed for six days:** `App.jsx` fell back to `?? 2` when the column was null, and the README still said two. Both fixed 2026-09-07 |
 | `0032_discord_relay.sql` | The Discord relay `game_events.relayed_at` was always for. `pg_net`, a locked-down `discord_webhooks` table, `discord_line()` (payload only — so it cannot name a tile), `relay_pending()` batching the backlog into one message, a deferred constraint trigger so a shot and its sinking arrive together, and `relay_reconcile()` to replay anything Discord refused. **The webhook URL is not in the repo** — it lives in `discord_webhooks` |
+| `20260907173724_claim_attribution.sql` | `tiles_for_me` gains `claimed_by_name` / `claimed_at`, so a slot can say who locked it in and how long ago |
+| `20260907182504_admin_game_readiness.sql` | `admin_game_readiness()` — counts per game for the Games-list badge. **Counts only**: `tiles` denies direct reads to everyone and `ship_cells` is team-scoped, so this is the only way an admin can see what a game still needs |
 
 The Supabase migration ledger lists one fewer than there are files:
 `0005_lock_down_trigger_function` was applied as a plain statement rather than
@@ -1372,3 +1377,89 @@ news, and dumping it would have flooded the channel.
   A team channel is anyway only as private as its membership list.
 - **No `@role` ping.** `teams.discord_role_id` exists and is unused.
 - **`relay_reconcile()` is manual.** pg_cron is available but not installed.
+
+---
+
+## Session log — 2026-09-07, the website review and the fixes from it
+
+**The review is [website-review.md](website-review.md), on `main`.** 47 numbered
+items across the four surfaces — login, admin console, board creator, player
+page — each triaged by Boris as fix / leave / explain. Read it before proposing
+anything on those screens; several items are marked *leave* deliberately and one
+was withdrawn as wrong. Everything marked *fix* is now done and deployed.
+
+**Three of the 47 findings were wrong, and all three were wrong the same way:
+a number was read as a symptom without looking at what it counted.**
+
+- *Username collisions.* `Boris V` and `boris_v` normalise to the same account,
+  reported as a bug. It is not one — OSRS itself treats space and underscore as
+  interchangeable and names as case-insensitive, so the normalisation mirrors
+  Jagex. Withdrawn.
+- *Duplicate tiles on a board.* "10 repeats, 26 repeats" read as accidents, and
+  a hard uniqueness constraint was half-built before the names were checked.
+  The Slayer tile appears ten times **on identical squares in both games**, and
+  a "TBD" placeholder sixteen times. Both deliberate. **Do not add that
+  constraint.** Boris's rule: repeats are allowed when placed by hand, and
+  auto-fill must not create them — which is what `admin_autofill_board` already
+  does.
+- *Icon loading.* Reported as unoptimised; measured at 154 requests / 147KB with
+  `loading="lazy"` already in place. Dropped.
+
+After that, nothing was reported without being measured in the running app
+first, and it changed the answer on five more items. Keep that discipline here.
+
+**The app and the database disagreed about the slot count.** Migration
+`0031_three_active_tiles.sql` set the column default to 3; `App.jsx` still fell
+back to `?? 2`, and the README still said two. The guide was right and the code
+was wrong — the opposite of what the review first claimed. A fallback that
+disagrees with a column default is invisible until the one game whose column is
+somehow null renders a board with a slot missing.
+
+**`tiles` refuses a direct read from everyone, admins included** — policy
+`tiles_no_direct_read`, `using (false)` — and `ship_cells` answers only for
+`my_team_ids()`, which an admin has none of. So the readiness badge on the Games
+list could not be built client-side at all. `admin_game_readiness()` returns
+**counts only** — tile count, teams with a full fleet, webhook count — never a
+tile name, a coordinate or a URL. That is what makes it safe as one query across
+every game rather than a redacting read per game. Any future "what does this
+game still need" answer should extend that function, not read the tables.
+
+**Spending a pet-jar preview is now a board gesture.** It was a `<select>` of a
+hundred coordinates. The card arms a picking mode, the board offers the squares
+a preview can still be spent on — which is deliberately **not** the same set as
+the claimable squares — and everything else dims. The mode lives in `App.jsx`
+because the board does, and it is re-derived from the charge count on every
+render rather than stored, so a charge spent in another tab cannot leave the
+board armed with nothing to pay for.
+
+**Two accessibility traps worth knowing, because both look solved and are not.**
+`aria-modal="true"` tells a screen reader the page behind is inert; it does
+nothing whatsoever to the Tab key, so focus walked straight out of the confirm
+dialog onto the live board behind it. And the stylesheet's blanket
+`prefers-reduced-motion` rule cannot reach the cannon gif — a gif animates
+itself, and no CSS property stops it. Both are handled in JS now.
+
+**Migration workflow, which is the thing that bit an earlier session.** Write the
+file, verify the deployed function matches the base first, apply it, then read
+back the `version` Supabase actually recorded and rename the local file to
+match. Two migrations went in this way, `20260907173724` and `20260907182504`,
+and `db-push` on the next deploy correctly did nothing with them. Skipping the
+rename is what commit `739da6f` had to clean up.
+
+### Not done
+
+- **The migration table above is stale from `0033` onward.** It stops at `0032`
+  while 57 migrations are applied. The two from this session are listed; the 23
+  between them and `0032` were written by other sessions and are not.
+- **2.3, account management, is a runbook rather than a feature — by decision.**
+  Player emails are synthetic (`@players.hs-battleships.invalid`), so Supabase's
+  reset-by-email cannot work; there is nowhere to send the link. Boris resets
+  passwords from the Supabase dashboard instead. `pgcrypto` is installed in the
+  `extensions` schema so the SQL route exists, but it is **untested** — the only
+  way to test it is to change a real person's password. Note that a display name
+  lives in two places: the header reads `user_metadata.display_name`, the feed
+  and evidence rows read `profiles.display_name`. Rename both or neither.
+- **Left by choice, not oversight:** review items 2.7, 2.12, 4.4, 4.10, 4.16 and
+  4.17. Recommended against and not built: 4.11, 4.12 (grid semantics and
+  tooltip roles — the audience is a clan Discord), 4.18 (team-wide evidence).
+- **Nothing here was checked on a real phone**, same as gap 8.
