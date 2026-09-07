@@ -87,21 +87,53 @@ export default function BoardBuilder({
     return map;
   }, [tiles, current]);
 
+  /**
+   * The catalogue, filtered and then ordered by how well it answers.
+   *
+   * Filtering searches drops and tags as well as the name, because the way an
+   * organiser remembers a tile is often the loot on it rather than the wording
+   * of the task. That is what makes the ordering necessary: a search for a
+   * tile by name would return it alongside every tile that merely lists the
+   * same drop, in the catalogue's own most-used-first order, so the one you
+   * typed the name of could sit anywhere in forty rows.
+   *
+   * Four tiers, name first — an exact name, then a name that starts with what
+   * was typed, then one that contains it, then everything matched only by its
+   * drops, tags or description.
+   *
+   * The sort is stable, so within a tier the catalogue's most-used-first order
+   * survives untouched. That matters more than it looks: most-used-first is
+   * itself a useful ranking, and this only overrides it where the name says
+   * something stronger.
+   */
   const matches = useMemo(() => {
-    const words = query.toLowerCase().split(' ').filter(Boolean);
-    return library.filter((entry) => {
-      if (tag && !(entry.tags ?? []).includes(tag)) return false;
-      if (words.length === 0) return true;
-      // Drops and tags are searched as well as the name, because the way an
-      // organiser remembers a tile is often the loot on it rather than the
-      // wording of the task.
+    const q = query.trim().toLowerCase();
+    const words = q.split(' ').filter(Boolean);
+
+    const scored = [];
+    for (const entry of library) {
+      if (tag && !(entry.tags ?? []).includes(tag)) continue;
+      if (words.length === 0) { scored.push({ entry, rank: 0 }); continue; }
+
       const haystack = [
         entry.name, entry.icon ?? '', entry.description ?? '',
         ...(entry.tags ?? []),
         ...(entry.options ?? []).map((o) => `${o.grp ?? ''} ${o.label}`),
       ].join(' ').toLowerCase();
-      return words.every((word) => haystack.includes(word));
-    });
+      if (!words.every((word) => haystack.includes(word))) continue;
+
+      // Ranked on the whole query against the name, not word by word: "raids
+      // purples" should favour the tile called that over one whose drop list
+      // happens to contain both words apart.
+      const name = (entry.name ?? '').toLowerCase();
+      const rank = name === q ? 0
+        : name.startsWith(q) ? 1
+          : name.includes(q) ? 2
+            : 3;
+      scored.push({ entry, rank });
+    }
+
+    return scored.sort((a, b) => a.rank - b.rank).map((s) => s.entry);
   }, [library, query, tag]);
 
   /**
