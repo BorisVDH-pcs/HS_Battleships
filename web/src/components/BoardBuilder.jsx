@@ -33,6 +33,10 @@ export default function BoardBuilder({
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
+  // Show the board the way a team will see it once they lock a square in:
+  // artwork only, no captions. Off by default — the names are what you build
+  // with, this is what you check with.
+  const [playerView, setPlayerView] = useState(false);
   // null | { what: 'square' | 'library', id, from, was, draft }
   //   id   — the catalogue entry the save writes to, null to insert a new one.
   //   from — the entry the draft was seeded from, for the copy this becomes.
@@ -88,25 +92,6 @@ export default function BoardBuilder({
   }, [tiles, current]);
 
   /**
-   * The catalogue, filtered and then ordered by how well it answers.
-   *
-   * Filtering searches drops and tags as well as the name, because the way an
-   * organiser remembers a tile is often the loot on it rather than the wording
-   * of the task. That is what makes the ordering necessary: a search for a
-   * tile by name would return it alongside every tile that merely lists the
-   * same drop, in the catalogue's own most-used-first order, so the one you
-   * typed the name of could sit anywhere in forty rows.
-   *
-   * Four tiers, name first — an exact name, then a name that starts with what
-   * was typed, then one that contains it, then everything matched only by its
-   * drops, tags or description.
-   *
-   * The sort is stable, so within a tier the catalogue's most-used-first order
-   * survives untouched. That matters more than it looks: most-used-first is
-   * itself a useful ranking, and this only overrides it where the name says
-   * something stronger.
-   */
-  /**
    * What is actually on this board, for the read-through before an event.
    *
    * Two different kinds of number, and the difference matters when reading
@@ -147,6 +132,49 @@ export default function BoardBuilder({
     return s;
   }, [tiles]);
 
+  /**
+   * The artwork, which is the whole of what a player sees.
+   *
+   * Once a team locks a square in, the name goes onto the card in the side
+   * column and the board itself shows the icon and nothing else. Two squares
+   * carrying the same picture are therefore two squares a team cannot tell
+   * apart at a glance on the board they spend the event looking at — and it is
+   * invisible here, where every cell is captioned with its name.
+   *
+   * Not an error. A hundred squares against the icons that exist will repeat,
+   * and repeating a boss across two of its drops is reasonable. It is worth
+   * seeing before an event rather than hearing about during one.
+   */
+  const artwork = useMemo(() => {
+    const uses = new Map();
+    for (const t of tiles) if (t.icon) uses.set(t.icon, (uses.get(t.icon) ?? 0) + 1);
+    const shared = new Set([...uses].filter(([, n]) => n > 1).map(([slug]) => slug));
+    return {
+      shared,
+      missing: tiles.filter((t) => !t.icon).length,
+      sharedSquares: tiles.filter((t) => t.icon && shared.has(t.icon)).length,
+    };
+  }, [tiles]);
+
+  /**
+   * The catalogue, filtered and then ordered by how well it answers.
+   *
+   * Filtering searches drops and tags as well as the name, because the way an
+   * organiser remembers a tile is often the loot on it rather than the wording
+   * of the task. That is what makes the ordering necessary: a search for a
+   * tile by name would return it alongside every tile that merely lists the
+   * same drop, in the catalogue's own most-used-first order, so the one you
+   * typed the name of could sit anywhere in forty rows.
+   *
+   * Four tiers, name first — an exact name, then a name that starts with what
+   * was typed, then one that contains it, then everything matched only by its
+   * drops, tags or description.
+   *
+   * The sort is stable, so within a tier the catalogue's most-used-first order
+   * survives untouched. That matters more than it looks: most-used-first is
+   * itself a useful ranking, and this only overrides it where the name says
+   * something stronger.
+   */
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const words = q.split(' ').filter(Boolean);
@@ -417,6 +445,29 @@ export default function BoardBuilder({
         </p>
       )}
 
+      {tiles.length > 0 && (
+        <p className="builder-view-toggle">
+          <button className="ghost" onClick={() => setPlayerView((v) => !v)}>
+            {playerView ? 'Back to names' : 'See it as a player does'}
+          </button>
+          {playerView && (
+            <span className="muted">
+              Artwork only — what a team sees once they lock a square in.
+              {artwork.sharedSquares > 0 && (
+                <> <b>{artwork.sharedSquares}</b> squares share a picture with
+                  another (outlined).</>
+              )}
+              {artwork.missing > 0 && (
+                <> <b>{artwork.missing}</b> have no artwork and fall back to the
+                  stand-in.</>
+              )}
+              {artwork.sharedSquares === 0 && artwork.missing === 0
+                && ' Every square has its own picture.'}
+            </span>
+          )}
+        </p>
+      )}
+
       {/* Above the board rather than in the panel, because the panel changes
           shape three ways and the offer must not move or vanish with it. It
           says what it will put back, since "Undo" alone cannot be told apart
@@ -437,6 +488,8 @@ export default function BoardBuilder({
       <div className="builder">
         <BuilderGrid
           tiles={byPosition}
+          playerView={playerView}
+          sharedIcons={artwork.shared}
           at={at}
           onPick={(row, col) => { setAt({ row, col }); setEditing(null); }}
         />
@@ -800,7 +853,7 @@ function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
  * so it is a real button with a pressed state, and an empty one reads as an
  * invitation rather than as the error TileBoard correctly calls it.
  */
-function BuilderGrid({ tiles, at, onPick }) {
+function BuilderGrid({ tiles, at, onPick, playerView = false, sharedIcons }) {
   const gridRef = useRef(null);
   // Which cell the Tab key lands on — a roving tabindex, so the board is one
   // stop on the way through the page rather than a hundred. Without it,
@@ -887,13 +940,30 @@ function BuilderGrid({ tiles, at, onPick }) {
                   type="button"
                   data-pos={position}
                   tabIndex={position === focusPos ? 0 : -1}
-                  className={`tile-cell builder-cell${tile ? '' : ' empty'}${here ? ' on' : ''}`}
+                  className={[
+                    'tile-cell builder-cell',
+                    tile ? '' : 'empty',
+                    here ? 'on' : '',
+                    playerView ? 'as-player' : '',
+                    // Outlined only in the player view, where sharing a
+                    // picture is the thing being looked for. In the building
+                    // view it would be a warning about something the captions
+                    // already make a non-problem.
+                    playerView && tile?.icon && sharedIcons?.has(tile.icon) ? 'shared-art' : '',
+                  ].filter(Boolean).join(' ')}
                   onClick={() => onPick(row, col)}
                   title={tile ? tile.name : `${coordLabel(row, col)} — empty`}
                 >
-                  <b>{coordLabel(row, col)}</b>
-                  {tile?.icon && <TileIcon slug={tile.icon} fallback={null} />}
-                  <span>{tile?.name ?? ''}</span>
+                  {/* In the player view the artwork is the whole cell, the
+                      way it is on the enemy board: no caption to read the
+                      square by, which is the point of looking. `standIn` so a
+                      square with no icon shows the same placeholder a team
+                      would actually be given, rather than looking empty. */}
+                  {!playerView && <b>{coordLabel(row, col)}</b>}
+                  {playerView
+                    ? <TileIcon slug={tile?.icon} standIn={Boolean(tile)} fallback={null} />
+                    : tile?.icon && <TileIcon slug={tile.icon} fallback={null} />}
+                  {!playerView && <span>{tile?.name ?? ''}</span>}
                 </button>
               );
             }),

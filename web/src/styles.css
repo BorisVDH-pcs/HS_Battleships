@@ -2687,6 +2687,39 @@ button.builder-cell.empty:hover { border-style: solid; }
   .builder-summary-split { margin-left: 0; }
 }
 
+/* The sentence the team will read, shown while it is still being decided. */
+.tile-form-summary {
+  margin: -.2rem 0 .6rem;
+  color: var(--label-2);
+  font-size: .8125rem;
+}
+.tile-form-summary b { color: var(--gold); font-weight: 600; }
+
+.builder-view-toggle {
+  display: flex; flex-wrap: wrap; gap: .55rem; align-items: baseline;
+  margin: 0 0 .8rem;
+}
+.builder-view-toggle b { color: var(--label); font-weight: 600; }
+
+/* The board as a team meets it: artwork filling the cell, nothing to read.
+ *
+ * The caption is what makes the building view legible and what makes it a bad
+ * proof — you cannot tell whether a picture carries a square while its name is
+ * printed underneath. Letting the icon take the whole cell is the only honest
+ * way to look at that. */
+.builder-cell.as-player { justify-content: center; padding: 2px; }
+.builder-cell.as-player .tile-icon {
+  width: auto; height: auto;
+  max-width: 100%; max-height: 100%;
+}
+/* Two squares wearing the same picture. Gold rather than red: on a hundred
+   squares against the icons that exist this is expected and often reasonable,
+   so it is pointed at, not complained about. */
+.builder-cell.shared-art {
+  outline: 2px solid var(--gold-dim);
+  outline-offset: -2px;
+}
+
 /* The offer to put back the square just changed. Sits above the board, where
    it cannot move or vanish as the panel beside it changes shape. */
 .builder-undo {

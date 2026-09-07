@@ -1,4 +1,4 @@
-import { RULES, validateDraft } from '../lib/tileDraft.js';
+import { RULES, validateDraft, ruleSummary } from '../lib/tileDraft.js';
 import IconPicker from './IconPicker.jsx';
 
 /**
@@ -27,6 +27,28 @@ export default function TileForm({
   const errors = [...validateDraft(draft, at), ...extraErrors];
   const rule = draft.rule ?? 'points';
   const priced = rule === 'points' && draft.options.length > 0;
+
+  /**
+   * The sentence the team will read, in the words the card will use.
+   *
+   * `ruleSummary` is reused rather than reworded, so this cannot drift from
+   * what the slot card and the catalogue list actually say. It has to be fed a
+   * row though, not a payload: the two shapes name the same things
+   * differently — `completion`/`required_evidence`/`per_set` on the row against
+   * `rule`/`amount`/`perSet` on the payload — so handing it a payload gets
+   * every field back as undefined and a confident "1 screenshot" for every
+   * tile ever typed.
+   *
+   * Blank drops are dropped first, because an empty row added by "Add drop"
+   * would otherwise turn a plain tile into a priced one and change the
+   * sentence to points before anything had been typed into it.
+   */
+  const summary = ruleSummary({
+    completion: rule,
+    required_evidence: Number(draft.amount) || 1,
+    per_set: Number(draft.perSet) || 1,
+    options: (draft.options ?? []).filter((o) => (o.label ?? '').trim()),
+  });
 
   const setOption = (index, patch) => set({
     options: draft.options.map((o, i) => (i === index ? { ...o, ...patch } : o)),
@@ -69,6 +91,22 @@ export default function TileForm({
       <p className="muted tile-form-hint">
         {RULES.find((r) => r.value === rule)?.hint}
       </p>
+
+      {/* What the team will actually be told this tile needs.
+       *
+       * The hint above explains the rule in general; this is the sentence that
+       * ends up on their card, built by the same `ruleSummary` the card and
+       * the catalogue list use — so it cannot drift from what they read, the
+       * way a hand-written second copy of the card would. Which matters here
+       * because the rule fields interact: an amount means screenshots on a
+       * bare tile and points on a priced one, and the difference is invisible
+       * in the inputs.
+       */}
+      {summary && (
+        <p className="tile-form-summary">
+          Players will see: <b>{summary}</b>
+        </p>
+      )}
 
       {(rule === 'points' || rule === 'value') && (
         <label className="field">
