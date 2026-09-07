@@ -76,7 +76,11 @@ export default function PetJar({
   // already previewed. Previewed-but-unclaimed tiles already carry name/icon
   // (0039), so they are listed below rather than offered again.
   const targets = tiles.filter((t) => !t.revealed && !t.previewed);
-  const previewed = tiles.filter((t) => t.previewed && !t.revealed);
+  const previewed = tiles.filter((t) => {
+    if (!t.previewed || t.revealed) return false;
+    const { row, col } = fromPosition(t.position);
+    return coordLabel(row, col) !== preview?.coord;
+  });
 
   return (
     <section className="pet-jar" id="pet-jar-section">
