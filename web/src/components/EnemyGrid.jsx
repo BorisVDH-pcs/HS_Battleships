@@ -21,12 +21,13 @@ import TileIcon from './TileIcon.jsx';
  */
 export default function EnemyGrid({
   tiles, onClaim, onInspect, canClaim, busyTileId, openTileId, shotResult,
+  petPick = false, onPetPick,
 }) {
   const byPosition = new Map(tiles.map((t) => [t.position, t]));
 
   return (
     <div className="board">
-      <div className="board-grid">
+      <div className={`board-grid${petPick ? ' pet-picking' : ''}`}>
         <div className="corner" />
         {Array.from({ length: GRID }, (_, i) => (
           <div key={`h${i}`} className="axis">{colLetter(i + 1)}</div>
@@ -44,6 +45,11 @@ export default function EnemyGrid({
               const fired = tile.claim_status === 'fired';
               const active = tile.claim_status === 'active';
               const resultIsShowing = shotResult?.tileId === tile.id;
+              // While a pet-jar preview is being spent the board answers a
+              // different question, so it offers a different set of squares:
+              // the ones a preview can still be spent on, which is not the
+              // same set as the ones that can be locked in.
+              const petTarget = petPick && !tile.revealed && !tile.previewed;
               const cls = [
                 'cell',
                 // 'dealt' colours it as the shooter's news, not the fleet
@@ -53,8 +59,9 @@ export default function EnemyGrid({
                 // and goes dark, same as MyFleet's own sunk squares.
                 fired && tile.ship_sunk ? 'sunk' : '',
                 active ? 'active' : '',
-                !tile.revealed && canClaim ? 'claimable' : '',
-                tile.revealed ? 'clickable' : '',
+                !petPick && !tile.revealed && canClaim ? 'claimable' : '',
+                petTarget ? 'pet-target' : '',
+                !petPick && tile.revealed ? 'clickable' : '',
                 openTileId === tile.id ? 'picked' : '',
                 resultIsShowing ? `result-feedback result-${shotResult.result}` : '',
               ].filter(Boolean).join(' ');
@@ -64,12 +71,22 @@ export default function EnemyGrid({
                   key={position}
                   className={cls}
                   disabled={
-                    busyTileId === tile.id || (!tile.revealed && !canClaim)
+                    busyTileId === tile.id ||
+                    (petPick
+                      ? !petTarget
+                      : !tile.revealed && !canClaim)
                   }
-                  title={tile.revealed
-                    ? `${label} — ${tile.name} · see evidence`
-                    : `${label} — not yet locked in`}
-                  onClick={() => (tile.revealed ? onInspect?.(tile) : onClaim(tile))}
+                  title={petPick
+                    ? (petTarget
+                      ? `${label} — spend a preview here`
+                      : `${label} — no preview to spend here`)
+                    : (tile.revealed
+                      ? `${label} — ${tile.name} · see evidence`
+                      : `${label} — not yet locked in`)}
+                  onClick={() => {
+                    if (petPick) { onPetPick?.(tile); return; }
+                    if (tile.revealed) onInspect?.(tile); else onClaim(tile);
+                  }}
                 >
                   {/* A fired square keeps its picture. The result is carried
                       by the coloured ground and the mark over the top, so the

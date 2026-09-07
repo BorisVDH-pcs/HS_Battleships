@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { uploadPetJar } from '../lib/petJar.js';
-import { spendPetJar } from '../lib/supabase.js';
 import { fromPosition, coordLabel } from '../lib/board.js';
 import TileIcon from './TileIcon.jsx';
 
@@ -12,13 +11,19 @@ import TileIcon from './TileIcon.jsx';
  * Deliberately not a reuse of EvidenceUploader: a submission here isn't proof
  * against a claimed tile, so there is no claim id, no required count, no
  * "submit fires the shot" moment — just a counter going up or down by one.
+ *
+ * Spending is not done here. A preview is spent on a square, and the squares
+ * are on the board — so this card only turns the picking mode on and off, and
+ * App runs the spend against whichever square is pressed. See `pickMode`.
  */
-export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
+export default function PetJar({
+  gameId, teamId, count, tiles, onRefresh,
+  pickMode = false, onPickMode, preview, onDismissPreview,
+}) {
   const [staged, setStaged] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [selected, setSelected] = useState('');
-  const [preview, setPreview] = useState(null); // last spend result, shown inline
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
   const zoneRef = useRef(null);
 
@@ -32,16 +37,26 @@ export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
     setStaged(image);
   }
 
+  /**
+   * Paste-to-attach.
+   *
+   * The dependency array is `[staged]` rather than absent: with none at all
+   * this re-bound the listener after every render of the card — including the
+   * ones a parent refresh causes, several a minute on a live board — and each
+   * pass tore the old listener off and added a new one. `staged` is what
+   * actually changes the node this attaches to, because the zone is unmounted
+   * while a file is waiting to be sent.
+   */
   useEffect(() => {
     const el = zoneRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     function onPaste(e) {
       const files = [...(e.clipboardData?.files ?? [])];
       if (files.length) { e.preventDefault(); stage(files); }
     }
     el.addEventListener('paste', onPaste);
     return () => el.removeEventListener('paste', onPaste);
-  });
+  }, [staged]);
 
   async function submit() {
     setBusy(true);
@@ -57,31 +72,23 @@ export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
     }
   }
 
-  // A tile this team could still claim: not claimed by us, not already
-  // previewed. Previewed-but-unclaimed tiles already carry name/icon (0039),
-  // so they are listed separately below rather than offered again.
-  const claimable = tiles.filter((t) => !t.revealed && !t.previewed);
+  // A tile this team could still spend a preview on: not claimed by us, not
+  // already previewed. Previewed-but-unclaimed tiles already carry name/icon
+  // (0039), so they are listed below rather than offered again.
+  const targets = tiles.filter((t) => !t.revealed && !t.previewed);
   const previewed = tiles.filter((t) => t.previewed && !t.revealed);
-
-  async function spend() {
-    if (!selected) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await spendPetJar(selected);
-      setPreview(result);
-      setSelected('');
-      onRefresh?.();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <section className="pet-jar" id="pet-jar-section">
-      <h2>Pet or Jar Submission <span className="pet-jar-count">{count}</span></h2>
+      {/* The number used to stand on its own beside the heading, which left it
+          reading as a count of submissions made rather than of previews still
+          in hand — the opposite direction. */}
+      <h2>
+        Pet or Jar Submission
+        <span className="pet-jar-count">
+          {count} preview{count === 1 ? '' : 's'}
+        </span>
+      </h2>
 
       {staged ? (
         <div className="evidence-staged">
@@ -98,10 +105,15 @@ export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
       ) : (
         <div
           ref={zoneRef}
-          className="evidence-drop"
+          className={`evidence-drop${dragging ? ' over' : ''}`}
           tabIndex={0}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); stage(e.dataTransfer.files); }}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            stage(e.dataTransfer.files);
+          }}
         >
           Drop a pet/jar screenshot, paste, or{' '}
           <button
@@ -121,27 +133,39 @@ export default function PetJar({ gameId, teamId, count, tiles, onRefresh }) {
         </div>
       )}
 
-      {count > 0 && claimable.length > 0 && (
-        <div className="pet-jar-spend">
-          <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-            <option value="">Preview a tile…</option>
-            {claimable.map((t) => {
-              const { row, col } = fromPosition(t.position);
-              return (
-                <option key={t.id} value={t.id}>{coordLabel(row, col)}</option>
-              );
-            })}
-          </select>
-          <button onClick={spend} disabled={busy || !selected}>
-            {busy ? 'Spending…' : 'Preview'}
-          </button>
-        </div>
+      {/* Spending used to be a hundred-option dropdown of coordinates, which
+          asked a player to read "F7" off the board and then find it again in a
+          list — a coordinate is what you say out loud, not how you point. The
+          board is the picker. */}
+      {count > 0 && targets.length > 0 && (
+        pickMode ? (
+          <div className="pet-jar-spend">
+            <span className="pet-jar-picking" role="status">
+              Pick a square on the enemy board.
+            </span>
+            <button className="ghost" onClick={() => onPickMode?.(false)}>
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="pet-jar-spend">
+            <button onClick={() => onPickMode?.(true)}>Preview a square…</button>
+          </div>
+        )
       )}
 
       {preview && (
         <p className="pet-jar-preview">
           <TileIcon slug={preview.icon} standIn />
           <strong>{preview.name}</strong>
+          <span className="muted">{preview.coord}</span>
+          <button
+            className="link pet-jar-preview-dismiss"
+            onClick={() => onDismissPreview?.()}
+            aria-label="Dismiss this preview"
+          >
+            ✕
+          </button>
         </p>
       )}
 

@@ -308,6 +308,15 @@ h1, h2, h3 { font-family: var(--display); }
   color: var(--label-2); font-size: .875rem;
 }
 .who .name { color: var(--text); font-weight: 500; }
+/* Icon plus word, not an icon on its own: a crossed-out speaker is the same
+   glyph whether it reports the state or offers to change it, and the word is
+   what settles which. The word is dropped on a phone, where the header has to
+   fit a name and two other controls. */
+.who .sound-toggle { display: inline-flex; align-items: baseline; gap: .3rem; }
+.who .sound-toggle[aria-pressed="true"] { color: var(--label-3); }
+@media (max-width: 560px) {
+  .sound-toggle-label { display: none; }
+}
 
 /* Section headers, the way a grouped list labels its sections: small, semibold,
    secondary, sentence case. The old all-caps + .18em tracking shouted every
@@ -448,6 +457,30 @@ button.cell.claimable:hover {
 /* Feedback belongs on the press, not the release. */
 button.cell.claimable:active { transform: scale(.93); transition-duration: .09s; }
 button.cell:disabled { cursor: default; }
+
+/* Spending a pet-jar preview. The board is answering a different question for
+   a moment, so the squares that can answer it are lit and everything else is
+   dimmed — the dimming is what makes this read as a mode rather than as the
+   normal board with a few extra squares live. Same gold as claimable, because
+   it is the same gesture; the surrounding card says which one is armed. */
+button.cell.pet-target {
+  cursor: pointer;
+  border-color: var(--gold-deep);
+  color: var(--gold);
+}
+button.cell.pet-target:hover {
+  border-color: transparent;
+  background: rgba(242, 193, 78, .14);
+  color: var(--gold-lit);
+  box-shadow: var(--glow-sm);
+  transform: scale(1.06);
+  position: relative;
+  z-index: 1;
+}
+button.cell.pet-target:active { transform: scale(.93); transition-duration: .09s; }
+/* Everything a preview cannot be spent on. Faded rather than hidden: the marks
+   already on the board are how a team decides where to spend one. */
+.board-grid.pet-picking .cell:not(.pet-target) { opacity: .45; }
 
 /*
  * A hull is structure, not an event — so it is drawn as an outline, and a
@@ -782,13 +815,24 @@ button.cell:disabled { cursor: default; }
   font-variant-numeric: tabular-nums;
   letter-spacing: -.01em;
 }
-.pet-jar-spend { display: flex; gap: .4rem; }
-.pet-jar-spend select { flex: 1 1 auto; min-width: 0; }
+.pet-jar-spend { display: flex; gap: .4rem; align-items: center; }
+.pet-jar-spend > button:first-child { flex: 1 1 auto; }
+/* Says where the next press has to go, in the card the press was started
+   from — the board is beside it, not under it. */
+.pet-jar-picking {
+  flex: 1 1 auto;
+  font-size: .8125rem;
+  color: var(--gold);
+}
 .pet-jar-preview {
   display: flex; align-items: center; gap: .5rem; margin: 0;
   font-size: .875rem;
 }
-.pet-jar-preview .tile-icon { width: 32px; height: 32px; }
+.pet-jar-preview .tile-icon { width: 32px; height: 32px; flex: none; }
+.pet-jar-preview strong { min-width: 0; }
+/* A preview is a note, not a permanent part of the card; it can be put away
+   once it has been read. The tile stays listed underneath either way. */
+.pet-jar-preview-dismiss { margin-left: auto; flex: none; }
 .pet-jar-previewed { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
 .pet-jar-previewed li { display: flex; align-items: center; gap: .5rem; font-size: .8125rem; }
 .pet-jar-previewed .tile-icon { width: 28px; height: 28px; }
@@ -1807,7 +1851,7 @@ label {
 .tile-cell .tile-icon {
   width: 22px; height: 22px;
   object-fit: contain;
-  align-self: flex-start;
+  align-self: center;
 }
 
 /* ---- admin task boards ---- */
@@ -2031,6 +2075,15 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
      allowed to overshoot before it settles. */
   animation: fire-effect-pop .42s var(--ease-bounce);
 }
+/* Stands in for the cannon gif under prefers-reduced-motion, at about the size
+   the explosion covers, so the shot still reads as an event on the screen. */
+.fire-effect-still {
+  font-size: clamp(4rem, 22vw, 9rem);
+  line-height: 1;
+  color: var(--gold-lit);
+  text-shadow: 0 0 30px rgba(242, 193, 78, .5);
+}
+
 @keyframes fire-effect-pop {
   0%   { opacity: 0; transform: scale(.6); }
   60%  { opacity: 1; }
@@ -2716,14 +2769,6 @@ button.builder-cell.empty:hover { border-style: solid; }
   width: auto; height: auto;
   max-width: 100%; max-height: 100%;
 }
-/* Two squares wearing the same picture. Gold rather than red: on a hundred
-   squares against the icons that exist this is expected and often reasonable,
-   so it is pointed at, not complained about. */
-.builder-cell.shared-art {
-  outline: 2px solid var(--gold-dim);
-  outline-offset: -2px;
-}
-
 /* The offer to put back the square just changed. Sits above the board, where
    it cannot move or vanish as the panel beside it changes shape. */
 .builder-undo {

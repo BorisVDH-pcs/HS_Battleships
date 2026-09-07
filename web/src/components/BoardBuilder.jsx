@@ -150,7 +150,6 @@ export default function BoardBuilder({
     for (const t of tiles) if (t.icon) uses.set(t.icon, (uses.get(t.icon) ?? 0) + 1);
     const shared = new Set([...uses].filter(([, n]) => n > 1).map(([slug]) => slug));
     return {
-      shared,
       missing: tiles.filter((t) => !t.icon).length,
       sharedSquares: tiles.filter((t) => t.icon && shared.has(t.icon)).length,
     };
@@ -455,7 +454,7 @@ export default function BoardBuilder({
               Artwork only — what a team sees once they lock a square in.
               {artwork.sharedSquares > 0 && (
                 <> <b>{artwork.sharedSquares}</b> squares share a picture with
-                  another (outlined).</>
+                  another.</>
               )}
               {artwork.missing > 0 && (
                 <> <b>{artwork.missing}</b> have no artwork and fall back to the
@@ -489,7 +488,6 @@ export default function BoardBuilder({
         <BuilderGrid
           tiles={byPosition}
           playerView={playerView}
-          sharedIcons={artwork.shared}
           at={at}
           onPick={(row, col) => { setAt({ row, col }); setEditing(null); }}
         />
@@ -853,7 +851,7 @@ function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
  * so it is a real button with a pressed state, and an empty one reads as an
  * invitation rather than as the error TileBoard correctly calls it.
  */
-function BuilderGrid({ tiles, at, onPick, playerView = false, sharedIcons }) {
+function BuilderGrid({ tiles, at, onPick, playerView = false }) {
   const gridRef = useRef(null);
   // Which cell the Tab key lands on — a roving tabindex, so the board is one
   // stop on the way through the page rather than a hundred. Without it,
@@ -945,11 +943,6 @@ function BuilderGrid({ tiles, at, onPick, playerView = false, sharedIcons }) {
                     tile ? '' : 'empty',
                     here ? 'on' : '',
                     playerView ? 'as-player' : '',
-                    // Outlined only in the player view, where sharing a
-                    // picture is the thing being looked for. In the building
-                    // view it would be a warning about something the captions
-                    // already make a non-problem.
-                    playerView && tile?.icon && sharedIcons?.has(tile.icon) ? 'shared-art' : '',
                   ].filter(Boolean).join(' ')}
                   onClick={() => onPick(row, col)}
                   title={tile ? tile.name : `${coordLabel(row, col)} — empty`}

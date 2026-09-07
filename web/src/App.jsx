@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Guide from './components/Guide.jsx';
-import { supabase, isSupabaseConfigured, claimTile } from './lib/supabase.js';
+import { supabase, isSupabaseConfigured, claimTile, spendPetJar } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
 import { coordLabel, fromPosition, sunkShipIds } from './lib/board.js';
 import Login from './components/Login.jsx';
@@ -20,6 +20,7 @@ import StatsPanel from './components/StatsPanel.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import GamePicker from './components/GamePicker.jsx';
 import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
+import { readMuted, writeMuted } from './lib/sound.js';
 import { statusLabel } from './lib/status.js';
 import { REVEAL_DELAY_MS, SHOT_RESULT_DURATION_MS } from './lib/fireEffect.js';
 import { tileProgressText } from './lib/tileProgress.js';
@@ -43,6 +44,12 @@ export default function App() {
   // A locked-in square the team has pressed to re-read its evidence. Held as an
   // id rather than the row, so it survives a refresh of the tile list.
   const [openTileId, setOpenTileId] = useState(null);
+  // Spending a pet-jar preview: the board becomes the picker, so the mode and
+  // its result live here rather than inside the card that starts it.
+  const [petPick, setPetPick] = useState(false);
+  const [petPreview, setPetPreview] = useState(null);
+  // Lazily initialised so the stored answer is read once, not on every render.
+  const [muted, setMuted] = useState(readMuted);
   // Above the early returns below, with the rest of the hooks — useConfirm
   // holds state of its own.
   const [confirm, confirmDialog] = useConfirm();
@@ -260,6 +267,36 @@ export default function App() {
     }
   }
 
+  /**
+   * Spend one pet-jar preview on the square just pressed.
+   *
+   * Asked for first, because a preview is earned one screenshot at a time and
+   * the board is a hundred small targets — a mis-press used to spend a charge
+   * on a square nobody chose, with nothing to undo it. The coordinate is in
+   * the question so the answer is against the square the player meant.
+   */
+  async function onPetPick(tile) {
+    const { row, col } = fromPosition(tile.position);
+    const label = coordLabel(row, col);
+    if (!(await confirm(
+      `Spend a preview on ${label}? It shows the task, not whether a ship is there.`,
+      { title: `Preview ${label}`, confirmLabel: 'Spend it' }
+    ))) return;
+
+    setBusyTileId(tile.id);
+    setNotice(null);
+    try {
+      const result = await spendPetJar(tile.id);
+      setPetPreview({ ...result, coord: label });
+      setPetPick(false);
+      await game.refresh();
+    } catch (err) {
+      setNotice(err.message);
+    } finally {
+      setBusyTileId(null);
+    }
+  }
+
   // Moving to another game. Four pieces of state below are keyed to the board
   // being left, and none of them survive the move meaningfully:
   //
@@ -268,6 +305,9 @@ export default function App() {
   //                  open on a square that is not there;
   //   busyTileId  -- leaves a square spinning forever, nothing will clear it;
   //   notice      -- an error about a game no longer on screen.
+  //
+  // petPick/petPreview go the same way: the picking mode would be armed over
+  // another game's board, and the preview names a tile that is not on it.
   //
   // useGame needs no help: `load` is keyed on gameId and the channel cleanup
   // clears its pending reveal timers.
@@ -280,6 +320,8 @@ export default function App() {
     setOpenTileId(null);
     setBusyTileId(null);
     setNotice(null);
+    setPetPick(false);
+    setPetPreview(null);
     setBoardTab('enemy');
     writeGamePick(uid, nextId);
     setGameId(nextId);
@@ -300,6 +342,11 @@ export default function App() {
   const isFinished = game.game?.status === 'finished';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
+  // Derived rather than trusted: the last charge can be spent in another tab,
+  // or the game can finish, while the mode is armed. Reading it from the count
+  // means the board cannot be left offering a preview there is nothing to pay
+  // for, without a second effect to switch it off.
+  const petPicking = petPick && !isFinished && (myTeam?.pet_jar_count ?? 0) > 0;
   // ship_status.sunk is always false when a player reads it, so this counted
   // an intact fleet however much of it was on the bottom - see sunkShipIds.
   // myFleet is still the source of how many hulls there are; only its damage
@@ -315,6 +362,20 @@ export default function App() {
         <Wordmark />
         <div className="who">
           <span className="name">{displayName || 'Signed in'}</span>
+          {/* Beside the sign-out, not buried in the guide: the moment someone
+              wants this is the moment a cannon has just gone off in an office,
+              and it has to be reachable without reading anything. Outside the
+              admin split — an organiser watching shots land has the same
+              room to worry about. */}
+          <button
+            className="link sound-toggle"
+            onClick={() => { const next = !muted; setMuted(next); writeMuted(next); }}
+            aria-pressed={muted}
+            title={muted ? 'Sound off — turn it on' : 'Sound on — turn it off'}
+          >
+            {muted ? '🔇' : '🔊'}
+            <span className="sound-toggle-label">{muted ? 'Sound off' : 'Sound on'}</span>
+          </button>
           {!isAdmin && (
             <button className="link" onClick={() => guideRef.current?.openWelcome()}>
               📖 How to Play
@@ -344,7 +405,7 @@ export default function App() {
       {/* Outside the admin/player split on purpose: an admin has no team but
           still has the page open, and should hear a shot land same as
           anyone else. */}
-      <FireEffect shot={shot} />
+      <FireEffect shot={shot} muted={muted} />
 
       {!isAdmin && <>
       {loading && <p>Loading game…</p>}
@@ -472,6 +533,8 @@ export default function App() {
                       canClaim={canClaim}
                       busyTileId={busyTileId}
                       shotResult={shotResult}
+                      petPick={petPicking}
+                      onPetPick={onPetPick}
                     />
                     <BoardLegend view="enemy" />
                     {openTile && (
@@ -556,6 +619,13 @@ export default function App() {
                     count={myTeam?.pet_jar_count ?? 0}
                     tiles={tiles}
                     onRefresh={() => game.refresh()}
+                    pickMode={petPicking}
+                    // Turning the mode on brings the board it applies to into
+                    // view: the button is in the side column, which is on
+                    // screen next to either board tab.
+                    onPickMode={(on) => { setPetPick(on); if (on) setBoardTab('enemy'); }}
+                    preview={petPreview}
+                    onDismissPreview={() => setPetPreview(null)}
                   />
                 )}
               </div>
