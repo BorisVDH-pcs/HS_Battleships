@@ -349,7 +349,9 @@ h3 {
  * purpose and nothing should push them further down — this line is read once
  * when you glance at the slot, and the drop zone every time you act on it. */
 .slot-claimant {
-  margin: .15rem 0 .45rem;
+  /* No margin: the card's own row-gap spaces it, the way it spaces the
+     uploader below. */
+  margin: 0;
   color: var(--label-2);
   font-size: .8125rem;
 }
@@ -838,9 +840,12 @@ button.cell:disabled { cursor: default; }
               border-color .28s var(--ease-out), background .28s var(--ease-out);
 }
 /* The thumbnail and the title share the first row; anything else — the
-   uploader, the fire button, the empty-slot hint — spans the full width. */
+   uploader, the fire button, the claimant line, the empty-slot hint — spans
+   the full width. Anything left off this list auto-places into the 3.5rem
+   artwork column and wraps a word at a time down a 56px gutter. */
 .slot > .slot-art { grid-column: 1; grid-row: 1; }
 .slot > .slot-head { grid-column: 2; grid-row: 1; }
+.slot > .slot-claimant,
 .slot > .evidence,
 .slot > button { grid-column: 1 / -1; }
 .slot:not(.empty):hover {
