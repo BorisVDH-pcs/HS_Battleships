@@ -2644,6 +2644,20 @@ button.builder-cell.empty:hover { border-style: solid; }
 }
 .library-list li { display: flex; gap: .3rem; align-items: stretch; }
 
+/* A task already somewhere on this board.
+ *
+ * Dimmed rather than hidden: an entry that disappears from a search reads as
+ * one that was never in the catalogue, and sends the organiser looking for a
+ * tile they are already holding. Faded and unpressable, with the square named
+ * in place of the rule summary, it answers the question instead of raising
+ * it. The Edit button beside it stays live — the entry is still editable, it
+ * just cannot be dealt a second time. */
+.library-list li.placed .library-pick {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.library-list li.placed .library-rule { color: var(--gold-dim); }
+
 .library-pick {
   flex: 1 1 auto;
   min-width: 0;

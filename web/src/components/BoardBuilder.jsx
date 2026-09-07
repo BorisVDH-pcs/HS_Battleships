@@ -55,6 +55,38 @@ export default function BoardBuilder({
     return [...all].sort();
   }, [library]);
 
+  /**
+   * Where each task already sits on this board, by name.
+   *
+   * Keyed on the name rather than on `library_id`, because the boards that
+   * actually collected duplicates are the pasted ones — `admin_set_tiles`
+   * writes no link to the catalogue, so every square on them has a null
+   * `library_id` and an id-keyed check would see an empty board. The name is
+   * the thing both routes have.
+   *
+   * The square being edited is left out. Re-picking the tile a square already
+   * holds is a no-op, not a clash, and flagging it would make the entry you
+   * came here to confirm look like the one thing you may not choose.
+   *
+   * Autofill needs no part of this: its `pool` already excludes every name the
+   * board holds and deals each entry at most once. This is for the two routes
+   * that had no check at all — clicking an entry onto a second square, and
+   * pasting a hundred lines.
+   */
+  const placedAt = useMemo(() => {
+    const map = new Map();
+    for (const t of tiles) {
+      if (current && t.position === current.position) continue;
+      const key = nameKey(t.name);
+      // First wins: on a board that already holds a task twice, naming the
+      // earlier square is the more useful half of "it is already somewhere".
+      if (!key || map.has(key)) continue;
+      const { row, col } = fromPosition(t.position);
+      map.set(key, coordLabel(row, col));
+    }
+    return map;
+  }, [tiles, current]);
+
   const matches = useMemo(() => {
     const words = query.toLowerCase().split(' ').filter(Boolean);
     return library.filter((entry) => {
@@ -110,6 +142,24 @@ export default function BoardBuilder({
   // started from means you have not renamed the copy yet, and the way out is
   // right there in the form; clashing with some third tile means the name is
   // simply spoken for.
+  /**
+   * The other square on this board already holding this task, if any.
+   *
+   * The catalogue clash above is a different question — that one asks whether
+   * the name is spoken for in the library, and its answer is "rename the
+   * copy". This asks whether the board already has the task, and its answer is
+   * "you have this on D4 already". A one-off tile typed by hand is exactly the
+   * route that produced the duplicates on the pasted boards, and it went
+   * through no check at all.
+   *
+   * `placedAt` excludes the square being edited, so keeping a square's own
+   * name is never a clash.
+   */
+  const boardClash = useMemo(() => {
+    if (!editing || editing.what !== 'square') return null;
+    return placedAt.get(nameKey(editing.draft.name)) ?? null;
+  }, [editing, placedAt]);
+
   const clashMessage = !clash ? null
     : clash.id === editing?.from?.id
       ? `This is still called "${clash.name}". Give the new tile a name of its own, `
@@ -317,7 +367,11 @@ export default function BoardBuilder({
                 }
                 onSave={editing.what === 'square' ? saveSquare : () => saveLibrary()}
                 onCancel={() => setEditing(null)}
-                extraErrors={clashMessage ? [clashMessage] : []}
+                extraErrors={[
+                  clashMessage,
+                  boardClash && `This board already has that task on ${boardClash}. `
+                    + 'A tile may only be on one square.',
+                ].filter(Boolean)}
                 extraActions={editing.from ? (
                   // The way back to editing in place. Kept because the entries
                   // imported from old boards carry no tags and some carry the
@@ -385,17 +439,28 @@ export default function BoardBuilder({
               />
 
               <ul className="library-list">
-                {matches.map((entry) => (
-                  <li key={entry.id}>
+                {matches.map((entry) => {
+                  // Where this task already is, if it is. Shown and refused
+                  // rather than filtered out: an entry that silently vanishes
+                  // from a search is indistinguishable from one that was never
+                  // in the catalogue, and the organiser goes looking for a tile
+                  // they are holding. Naming the square answers the question
+                  // the absence would have raised.
+                  const already = placedAt.get(nameKey(entry.name));
+                  return (
+                  <li key={entry.id} className={already ? 'placed' : undefined}>
                     <button
                       className="library-pick"
-                      disabled={busy}
+                      disabled={busy || Boolean(already)}
+                      title={already ? `Already on ${already}` : undefined}
                       onClick={() => place(entry)}
                     >
                       <TileIcon slug={entry.icon} fallback={null} />
                       <span className="library-text">
                         <span className="library-name">{entry.name}</span>
-                        <span className="library-rule muted">{ruleSummary(entry)}</span>
+                        <span className="library-rule muted">
+                          {already ? `Already on ${already}` : ruleSummary(entry)}
+                        </span>
                       </span>
                     </button>
                     <button
@@ -408,7 +473,8 @@ export default function BoardBuilder({
                       Edit
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
 
               <button
