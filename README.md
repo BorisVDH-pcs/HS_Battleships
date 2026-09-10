@@ -124,10 +124,3 @@ putting players on teams.
 > `email rate limit exceeded`. Accounts created through the admin SQL work either
 > way, since they set `email_confirmed_at` directly.
 
-### Demo data
-
-A "Demo Match" game exists in the Battleships project with both fleets placed,
-100 placeholder tiles, and a throwaway `demo@hsbattleships.local` account for
-clicking around. Delete both before running a real event.
-
-Credentials are deliberately not recorded here — keep them out of the repo.
