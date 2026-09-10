@@ -1,53 +1,38 @@
-# HS_Battleships
+# Contributors
 
-Team-vs-team Battleships with a 100-tile OSRS task grid — the web/database rebuild of
-the Google Sheets + Apps Script version.
+- [iftach21](https://github.com/iftach21)
+- [BorisVDH-PCS](https://github.com/BorisVDH-pcs)
 
-One game = **two teams**, each with a 10x10 board and a fleet of `2, 3, 3, 4, 5`.
-Every player has their own login; shots are attributed to the person who fired them.
+# HS Battleships
 
-## How a move works
+HS Battleships is a browser-based team event that combines the strategy of
+Battleships with collaborative Old School RuneScape challenges. Multiple matches
+can be managed independently, with each match containing two teams and a concealed
+game board.
 
-There is **no turn order**. A team plays whenever it has a free slot.
+## Game overview
 
-1. **Claim** — a team picks a numbered tile on the enemy grid. Picking is the move;
-   there is no question to answer. The task is revealed to that team only.
-2. **Active** — the claimed tile occupies one of the team's **three** slots
-   (`games.max_active_tiles`, which an organiser can set per game).
-   No further tile can be claimed until one is fired.
-3. **Fire** — the team completes the tile's in-game task and marks it done.
-   HIT/MISS resolves immediately against the opponent's hidden placement,
-   and the slot frees up for the next claim.
-4. **Sink** — when every cell of a ship has been hit, it sinks. All five ships sunk ends the game.
+Each team secretly places a fleet on its own grid. Players select concealed
+positions on the opposing board, complete the associated in-game objective, and
+submit evidence to fire at that position.
 
-Scoring is fixed: **each hit is one point**. Completed tiles, missed shots,
-sunken ships and manual adjustments do not add points.
+## Rules and mechanics
 
-Fleets are placed before the game starts and **frozen the moment it does** — for
-players, captains and admins alike. **Ships may not touch, not even at the
-corners**, so every ship is surrounded by at least one clear cell.
+- There is no fixed turn order; teams can act whenever they have an available task
+  slot.
+- Objectives remain concealed until a position is claimed or previewed through an
+  earned game mechanic.
+- A team can work on only a limited number of claimed objectives at once.
+- Completing an objective and submitting the required evidence resolves the shot
+  as a hit or miss.
+- Ships cannot touch, including diagonally, and their positions are locked when the
+  match begins.
+- A ship sinks when all of its occupied positions have been hit.
+- The first team to sink the opposing fleet wins.
+- Match activity and team statistics update live for the players.
 
-## Running an event (admin)
-
-Admins get an **Admin** tab in the app. Everything below is also enforced
-server-side, so the tab is a convenience, not the permission:
-
-1. **New game** — name it and name both teams.
-2. **Tiles** — paste 100 lines, one per tile in board order, optionally
-   `name | icon`. This replaces the Middleman sheet's `Tile Data`.
-3. **Team names** — rename either team whenever needed.
-4. **Open placement** — moves the game from `setup` to `placement`.
-5. **Roster** — add players to teams and pick captains. Players appear here
-   once they have signed up on the login screen.
-6. **Fleets** — captains place their own fleets from the player page. The admin
-   page shows both boards as a read-only live overview.
-7. **Start game** — refuses unless there are two teams, 100 tiles and both
-   fleets complete. Fleets freeze at this moment.
-
-Captains also get a **Your team** card on their player page where they can
-rename their own team. The database refuses cross-team renames.
-
-Grant admin with `update profiles set is_admin = true where display_name = '…';`
+The application also provides tools for organisers to configure matches, manage
+teams and players, review evidence, and monitor progress.
 
 ## Stack
 
