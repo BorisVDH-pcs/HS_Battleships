@@ -816,7 +816,7 @@ export default function BoardBuilder({
                   from the whole catalogue exactly as before this existed. */}
               {!live && tags.length > 0 && (
                 <label className="field builder-deal-tag">
-                  <span>Deal only tiles labelled</span>
+                  <span>Include only tiles labelled</span>
                   <select value={tag} onChange={(e) => setTag(e.target.value)}>
                     <option value="">All labels</option>
                     {tags.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -889,8 +889,7 @@ export default function BoardBuilder({
                       ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
                       : 'Clears the board and draws a new one from the catalogue.'}
                   >
-                    Re-deal from the catalogue
-                    {tag && ` "${tag}"`}
+                    Randomize
                   </button>
                 </div>
               )}
