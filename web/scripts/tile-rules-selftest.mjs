@@ -3,6 +3,7 @@ import { validateTileRow } from '../src/lib/tileParser.js';
 import {
   completedEachSetGroupNames,
   tileProgress,
+  replayTile,
   tileProgressText,
   unavailableSetOptionIds,
 } from '../src/lib/tileProgress.js';
@@ -288,6 +289,76 @@ assert.equal(
     ] }),
     [],
   );
+}
+
+// ---- the browser's half of the builder's tile tester -------------------------
+// replayTile() plays picks into a fresh claim the way admin_test_tile() does
+// server-side. The builder shows both answers and shouts when they differ, so
+// these assertions are this side's contribution to that comparison.
+
+{
+  const tile = {
+    completion: 'points', required_evidence: 30,
+    options: [
+      { id: 'cape', label: 'Fire cape', points: 2, max_times: 4 },
+      { id: 'col',  label: 'Colosseum', points: 3, max_times: 3 },
+      { id: 'inf',  label: 'Inferno',   points: 4, max_times: 2 },
+      { id: 'vard', label: 'Vard',      points: 7, max_times: 1 },
+    ],
+  };
+
+  // Fifteen fire capes: four count, eleven are skipped, and 8 is not 30 —
+  // the same answer the database gave for the same list.
+  const capes = replayTile(tile, Array.from({ length: 15 }, () => ({ optionId: 'cape' })));
+  assert.equal(capes.complete, false);
+  assert.equal(capes.points, 8);
+  assert.equal(capes.accepted, 4);
+  assert.equal(capes.skipped, 11);
+
+  // 4 capes (8) + 3 colosseum (9) + 2 inferno (8) + 1 vard (7) = 32, over the
+  // line on the tenth submission.
+  const mixed = [
+    ...Array.from({ length: 4 }, () => ({ optionId: 'cape' })),
+    ...Array.from({ length: 3 }, () => ({ optionId: 'col' })),
+    ...Array.from({ length: 2 }, () => ({ optionId: 'inf' })),
+    { optionId: 'vard' },
+  ];
+  const run = replayTile(tile, mixed);
+  assert.equal(run.complete, true);
+  assert.equal(run.completedAtStep, 10);
+  assert.equal(run.points, 32);
+  assert.equal(run.accepted, 10);
+}
+
+{
+  // A set tile: a repeat is skipped, and the tile closes on the last DIFFERENT
+  // piece rather than on the fourth submission.
+  const tile = {
+    completion: 'one_set',
+    options: [
+      { id: 'h', grp: 'A', label: 'Helm' },
+      { id: 'b', grp: 'A', label: 'Body' },
+      { id: 'x', grp: 'B', label: 'Other' },
+    ],
+  };
+  const run = replayTile(tile, [
+    { optionId: 'h' }, { optionId: 'h' }, { optionId: 'b' },
+  ]);
+  assert.equal(run.complete, true);
+  assert.equal(run.completedAtStep, 3);
+  assert.equal(run.skipped, 1, 'the repeat could not have been submitted');
+}
+
+{
+  // A plain screenshot tile: no drops to pick, so every entry is worth one.
+  const tile = { completion: 'points', required_evidence: 3, options: [] };
+  assert.equal(replayTile(tile, [{}, {}]).complete, false);
+  assert.equal(replayTile(tile, [{}, {}, {}]).completedAtStep, 3);
+
+  // A value tile sums what was typed, and refuses what is out of range.
+  const value = { completion: 'value', required_evidence: 250, options: [] };
+  assert.equal(replayTile(value, [{ amount: 100 }, { amount: 150 }]).complete, true);
+  assert.equal(replayTile(value, [{ amount: 0 }, { amount: 250 }]).skipped, 1);
 }
 
 console.log('Tile parser and completion-rule self-test passed.');

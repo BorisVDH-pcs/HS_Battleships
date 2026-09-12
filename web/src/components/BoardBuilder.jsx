@@ -7,7 +7,8 @@ import TileIcon from './TileIcon.jsx';
 import TileInfo from './TileInfo.jsx';
 import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
-import { tileGroups } from '../lib/tileProgress.js';
+import { tileGroups, replayTile } from '../lib/tileProgress.js';
+import { adminTestTile } from '../lib/supabase.js';
 
 /**
  * Building a board by pointing at it.
@@ -848,7 +849,46 @@ function EvidencePreview({ tile }) {
   const isSet = rule === 'one_set' || rule === 'each_set';
   const isValue = rule === 'value';
   const [value, setValue] = useState('');
-  if (!isValue && options.length === 0) return null;
+  const [picks, setPicks] = useState([]);
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  // A plain screenshot tile has nothing to pick, but it can still be tested —
+  // "does five screenshots finish it" is a real question with a real answer,
+  // and it is the one shape where the target and the count are the same
+  // number, which is exactly where an off-by-one hides.
+  const picksNothing = !isValue && options.length === 0;
+
+  const label = (id) => options.find((o) => o.id === id)?.label ?? 'Screenshot';
+
+  /**
+   * Submit one more screenshot and see what it did.
+   *
+   * The whole session is replayed server-side on every press rather than kept
+   * open between them. A claim that stayed alive across presses would be a
+   * real row on a real board waiting for someone to close the browser on it;
+   * this way each press is its own transaction, rolled back before it returns,
+   * and the tester holds the only state there is — the list of what has been
+   * submitted so far.
+   */
+  async function submit(pick) {
+    const next = [...picks, pick];
+    setPicks(next);
+    setBusy(true);
+    setError(null);
+    try {
+      const server = await adminTestTile(tile.id, next.map((p) => ({
+        ...(p.optionId ? { option_id: p.optionId } : {}),
+        ...(p.amount ? { amount: Number(p.amount) } : {}),
+      })));
+      setResult({ server, client: replayTile(tile, next) });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Matching EvidenceUploader's own rule for when a price is worth printing,
   // since the whole purpose of this preview is to show what the player sees:
@@ -863,9 +903,11 @@ function EvidencePreview({ tile }) {
   return (
     <div className="evidence">
       <p className="evidence-count muted">
-        What submitting evidence would ask — nothing picked here saves.
+        {picksNothing
+          ? 'This tile asks for nothing but the screenshot. Submit a few and watch it.'
+          : 'Pick a drop and submit it, as a player would. Nothing here is saved.'}
       </p>
-      {isValue ? (
+      {isValue && (
         <input
           type="number"
           min="1"
@@ -874,7 +916,11 @@ function EvidencePreview({ tile }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
-      ) : (
+      )}
+      {/* A plain screenshot tile has no control here, exactly as the real
+          uploader shows none — but it still gets the tester below, since
+          "how many screenshots finish this" is a question worth asking. */}
+      {!isValue && !picksNothing && (
         <select value={value} onChange={(e) => setValue(e.target.value)}>
           <option value="">Which drop?</option>
           {groups.some((g) => g.named)
@@ -883,6 +929,153 @@ function EvidencePreview({ tile }) {
               ))
             : options.map(rows)}
         </select>
+      )}
+
+      <TileTester
+        picks={picks}
+        onSubmit={() => {
+          if (isValue) {
+            if (value) { submit({ amount: value }); setValue(''); }
+          } else if (picksNothing) {
+            submit({});
+          } else if (value) {
+            submit({ optionId: value });
+          }
+        }}
+        canSubmit={picksNothing || Boolean(value)}
+        label={label}
+        busy={busy}
+        result={result}
+        error={error}
+        onReset={() => { setPicks([]); setResult(null); setError(null); setValue(''); }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Playing the tile, one screenshot at a time.
+ *
+ * A tile's rule only says what it means once evidence starts arriving, and the
+ * only way to find out used to be to put the square in front of a team — by
+ * which point the board is locked.
+ *
+ * It reads as a play session rather than as a test harness on purpose. The
+ * first cut staged a batch and checked it in one go, which answered the
+ * question but asked the reader to think in lists: pick, Add, pick, Add, Test.
+ * A player does not experience a tile that way. They submit one thing, see the
+ * counter move, and submit the next — and the thing worth checking is exactly
+ * that experience, including which submission is the one that fires the shot
+ * and what the refusal says when a drop has run out.
+ *
+ * TWO ANSWERS, DELIBERATELY. `admin_test_tile` replays the session through the
+ * real `claim_is_complete()` in a transaction it rolls back; `replayTile` runs
+ * the same list through `tileProgress.js`. The database is the authority — but
+ * the browser's copy of the rules is what draws the player's counter and
+ * decides when their button says "Submit & fire", and the two drifting apart
+ * is the failure this repo has been one careless edit away from since 0049.
+ * When they disagree, that is the headline and nothing else matters.
+ */
+function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, onReset }) {
+  const server = result?.server;
+  const done = Boolean(server?.complete);
+  const agree = result && server.complete === result.client.complete;
+
+  // What the last press did — the only part of the answer that is news. The
+  // rest of the history is on the list below it.
+  const last = server?.steps?.[server.steps.length - 1];
+
+  // The counter in the player's own words, from the player's own module, so
+  // this cannot read differently from the card it is predicting.
+  const progress = result?.client.progress;
+
+  return (
+    <div className="tile-tester">
+      <div className="row">
+        <button type="button" onClick={onSubmit} disabled={!canSubmit || busy || done}>
+          {busy ? 'Submitting…' : 'Test submit'}
+        </button>
+        {picks.length > 0 && (
+          <button type="button" className="ghost" onClick={onReset} disabled={busy}>
+            Start over
+          </button>
+        )}
+        {picks.length > 0 && (
+          <span className="muted">{picks.length} submitted</span>
+        )}
+      </div>
+
+      {error && <p className="error">{error}</p>}
+      {server?.error && (
+        <p className="error">The database could not run the test: {server.error}</p>
+      )}
+
+      {result && !server.error && (
+        <div className="tile-tester-result">
+          {/* The card's own counter line, drawn the way the card draws it. */}
+          {progress && (
+            <p className="evidence-count">
+              {progress.unit}{' '}
+              <strong className={progress.done ? 'met' : ''}>
+                {progress.have} / {progress.need}{progress.suffix ?? ''}
+              </strong>
+            </p>
+          )}
+
+          {last?.refused ? (
+            <p className="error">Refused: {last.refused}</p>
+          ) : done && last?.n === server.completed_at_step ? (
+            // The press that fired it. Said in the words the player's own
+            // confirmation uses, since that is the moment being rehearsed.
+            <p className="met"><strong>Submit &amp; fire</strong> — that shot goes off.</p>
+          ) : (
+            <p className="muted">
+              Accepted{last && last.awarded > 0 ? ` — worth ${last.awarded}` : ''}
+              {last && last.awarded > 0 && server.rule === 'value' ? 'm' : ''}
+              {last && last.awarded > 0 && server.rule !== 'value' ? ' pts' : ''}.
+            </p>
+          )}
+
+          {done && (
+            <p className="muted">
+              Fired on submission {server.completed_at_step} of {picks.length}
+              {server.accepted < picks.length
+                && ` · ${picks.length - server.accepted} turned away`}
+              . Start over to try another route.
+            </p>
+          )}
+
+          {!agree && (
+            // The whole reason both answers are computed. If this ever shows,
+            // tileProgress.js and claim_is_complete() have parted company and
+            // the player's card is lying to them in one direction or the other.
+            <p className="error">
+              The browser disagrees with the database: it makes this{' '}
+              {result.client.complete ? 'finished' : 'unfinished'}. The card
+              would mislead the player — one of the two rule copies needs fixing.
+            </p>
+          )}
+
+          {picks.length > 0 && (
+            <ol className="tile-tester-picks">
+              {picks.map((p, i) => {
+                const step = server.steps?.[i];
+                return (
+                  <li key={i} className={step?.refused ? 'refused' : undefined}>
+                    <span>{p.amount ? `${p.amount}m` : label(p.optionId)}</span>
+                    {step?.refused
+                      ? <em className="muted">turned away</em>
+                      : step?.n === server.completed_at_step
+                        ? <em className="met">fired</em>
+                        : null}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+
+          <p className="muted">Nothing was saved: no claim, no evidence, no shot.</p>
+        </div>
       )}
     </div>
   );

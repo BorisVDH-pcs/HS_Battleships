@@ -139,6 +139,23 @@ export const adminClearTile = (gameId, row, col) =>
   rpc('admin_clear_tile', { p_game_id: gameId, p_row: row, p_col: col });
 
 /**
+ * Play a list of drops into a tile and report whether it finishes, without
+ * committing any of it.
+ *
+ * `picks` is one entry per screenshot, in submission order: `{ option_id }` on
+ * a tile with drops, `{ amount }` on a value tile, `{}` on a plain count. The
+ * answer comes from `claim_is_complete()` itself rather than from
+ * `tileProgress.js` — the point is to ask the authority, not the mirror it is
+ * kept in step with by hand.
+ *
+ * Nothing survives the call: the claim and its evidence live inside a
+ * subtransaction the function rolls back, so no shot is fired, no event is
+ * written, and the other team's board never flickers.
+ */
+export const adminTestTile = (tileId, picks) =>
+  rpc('admin_test_tile', { p_tile_id: tileId, p_picks: picks });
+
+/**
  * Empty every square on a board. Returns how many squares it removed. Refused
  * once the game is past preparation, like every other write to `tiles`.
  */

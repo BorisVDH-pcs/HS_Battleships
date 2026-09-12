@@ -241,6 +241,85 @@ export function completedEachSetGroupNames(tile) {
   );
 }
 
+/**
+ * Play a list of picks into a fresh claim and report what this module thinks
+ * happens — the browser's half of the builder's tile tester.
+ *
+ * The server runs the same list through `claim_is_complete()` and the builder
+ * shows both answers. That is the entire point: this file is a MIRROR of the
+ * database's rules, kept in step by hand, so a tester that only asked the
+ * mirror would be asking whether the mirror agrees with itself. Two answers
+ * side by side turn a silent drift into a visible one.
+ *
+ * A pick the picker would not have offered is skipped rather than banked,
+ * because a player could not have submitted it either: that is what
+ * `unavailableSetOptionIds` decides, and reusing it here is what keeps this
+ * replay honest about the interface it is predicting.
+ *
+ * `picks` is the same shape the RPC takes — `{ optionId }`, `{ amount }`, or
+ * `{}` — so the builder can hand the one list to both.
+ */
+export function replayTile(tile, picks = []) {
+  const rule = tile.completion ?? 'points';
+  const isSet = rule === 'one_set' || rule === 'each_set';
+  const isValue = rule === 'value';
+
+  let state = {
+    ...tile,
+    evidence_points: 0,
+    evidence_count: 0,
+    options: (tile.options ?? []).map((o) => ({ ...o, got: 0, taken: false })),
+  };
+
+  let accepted = 0;
+  let points = 0;
+  let completedAtStep = null;
+
+  picks.forEach((pick, index) => {
+    const optionId = pick.optionId ?? null;
+
+    if (optionId && unavailableSetOptionIds(state).has(optionId)) return;
+
+    const option = state.options.find((o) => o.id === optionId);
+    if (optionId && !option) return;
+    if (!isValue && state.options.length > 0 && !option) return;
+
+    const award = isValue
+      ? (parseInt(pick.amount, 10) || 0)
+      : option
+        ? (isSet ? 1 : (option.points ?? 1))
+        : 1;
+    if (isValue && (award < 1 || award > 1000)) return;
+
+    state = {
+      ...state,
+      evidence_points: state.evidence_points + award,
+      evidence_count: state.evidence_count + 1,
+      options: state.options.map((o) => (
+        o.id === optionId ? { ...o, got: (o.got ?? 0) + 1, taken: true } : o
+      )),
+    };
+    accepted += 1;
+    points += award;
+
+    if (completedAtStep === null && tileProgress(state).done) {
+      completedAtStep = index + 1;
+    }
+  });
+
+  return {
+    complete: completedAtStep !== null,
+    completedAtStep,
+    points,
+    accepted,
+    skipped: picks.length - accepted,
+    // The card's counter after the last submission, so the builder can draw
+    // the same line the player would be looking at rather than inventing a
+    // second wording for the same numbers.
+    progress: tileProgress(state),
+  };
+}
+
 /** A compact progress line for places which do not render the full uploader. */
 export function tileProgressText(tile) {
   const progress = tileProgress(tile);

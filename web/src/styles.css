@@ -2876,6 +2876,49 @@ button.danger.ghost:hover:not(:disabled) {
 .drop-max::placeholder { opacity: .6; }
 .drop-remove { flex: none; padding: .35rem .55rem; line-height: 1; }
 
+/* The builder's tile tester. Divided off from the preview above it because the
+   two are different kinds of thing: that shows what a player would be asked,
+   this asks the database a question. */
+.tile-tester { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--line); }
+.tile-tester .row { gap: .35rem; flex-wrap: wrap; }
+
+/* Counters rather than `list-style`, because a flex `li` has no ::marker box
+   to put one in — and the number is the point: the verdict says which
+   submission finished the tile, and it has to be findable in this list. */
+.tile-tester-picks {
+  list-style: none; margin: .5rem 0 0; padding: 0;
+  counter-reset: pick;
+  display: grid; gap: .15rem; font-size: .8125rem;
+  max-height: 11rem; overflow-y: auto;
+}
+.tile-tester-picks li { display: flex; align-items: center; gap: .35rem; }
+.tile-tester-picks li::before {
+  counter-increment: pick; content: counter(pick) ".";
+  flex: none; min-width: 1.4rem; text-align: right; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A turned-away submission stays on the list rather than vanishing — the run
+   is a history, and "I submitted that and it did nothing" is the thing worth
+   seeing. Struck through so it reads as spent at a glance. */
+.tile-tester-picks li.refused span { text-decoration: line-through; opacity: .65; }
+.tile-tester-picks em { flex: none; font-style: normal; font-size: .6875rem; }
+.tile-tester-picks li span { flex: 1 1 auto; min-width: 0; }
+.tile-tester-picks button { flex: none; padding: .1rem .4rem; line-height: 1; }
+
+.tile-tester-result { margin-top: .5rem; display: grid; gap: .35rem; }
+.tile-tester-result p { margin: 0; }
+
+/* Refusals are the answer just as much as the verdict is — a tile that
+   "does not finish" because eleven submissions were turned away is a
+   different tile from one that simply needs more. */
+.tile-tester-refused {
+  list-style: none; margin: 0; padding: .4rem .5rem;
+  font-size: .75rem; border-radius: .35rem;
+  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  display: grid; gap: .2rem;
+  max-height: 9rem; overflow-y: auto;
+}
+
 /* What a game on the list still needs, beside its team names. Gold because it
    is a to-do rather than a fault: none of these games is broken, they are
    just not ready yet, and the console's one red is reserved for refusals. */

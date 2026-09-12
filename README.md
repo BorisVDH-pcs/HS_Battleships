@@ -98,6 +98,15 @@ is how many times that one drop may count, and null — every option saved befor
 the column existed — is unlimited. It lives on the option rather than the rule,
 so "2 points, up to four times" and "7 points, once" sit on the same price list.
 
+The builder can **play a tile** before anyone else does: pick a drop, press
+**Test submit**, and watch the counter move exactly as a player's card would —
+one screenshot at a time, refusals and all, up to the submission that fires the
+shot. Each press replays the session through `admin_test_tile()`, which asks the
+real `claim_is_complete()` inside a transaction it rolls back, so no claim, no
+evidence and no shot survive it. It shows `tileProgress.js`'s answer alongside
+the database's, so the two copies of the rules are checked against each other
+every time the button is pressed.
+
 Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).

@@ -76,6 +76,55 @@ option already in the database has, so nothing needed re-saving.
   once it has run out — rather than offering it, uploading, and being refused a
   round trip later.
 
+### Trying a tile out before a team ever sees it
+
+**20260912230000 — the dry run.** A tile's rule only says what it means once
+evidence starts arriving, and until now the only way to find out was to put the
+square in front of a team — by which point the board is locked. Both
+`points_per_set` and the repeat caps shipped having been proved only in a
+hand-written transaction nobody but its author ever ran.
+
+`admin_test_tile(tile_id, picks)` takes one entry per screenshot in submission
+order, plays them into a throwaway claim, asks `claim_is_complete()` after each,
+and reports which submission tipped it over and which were turned away.
+
+**The builder drives it one press at a time.** The first cut staged a batch and
+checked it in one go — pick, Add, pick, Add, Test — which answered the question
+but asked the reader to think in lists. A player does not experience a tile that
+way: they submit one thing, watch the counter move, and submit the next. So
+*Test submit* appends a single screenshot and replays the whole session, and the
+panel draws the player's own counter line (from `tileProgress`, so it cannot
+word it differently from the card), what that press did, and the running
+history with refusals struck through. Once the tile fires, the button disables
+until *Start over* — a player could not submit into a fired claim either.
+
+Replaying the session on every press rather than holding a claim open between
+them is deliberate: a claim that survived across presses would be a real row on
+a real board waiting for someone to close the browser on it.
+
+The play-through sits in a block with an `EXCEPTION` clause — a subtransaction —
+that ends by raising `HS001` against itself, so every insert is discarded.
+PL/pgSQL variables are not database state and survive the unwind, which is what
+lets the result be assembled inside and returned outside. Nothing commits, so
+Realtime broadcasts nothing and the other team's board never flickers.
+
+It deliberately does **not** call `add_evidence`: that fires the shot on
+completion, and `fire_tile` wants ships placed and a game under way, neither of
+which is true of a board still being built. So it plays the parts that are about
+the *tile* and leaves the parts that are about the *game* alone.
+
+**`evidence_refusal()`** was extracted from `add_evidence` rather than copied, so
+the tester and the real submit path cannot disagree about why a screenshot is
+turned away. It also folds in `each_set`'s group quota, which `add_evidence`
+never checked itself — it let the table trigger raise. Same message, raised
+slightly earlier; the trigger stays as the enforcement, per 0021.
+
+**Two answers, on purpose.** The builder shows the database's verdict *and*
+`replayTile()` from `tileProgress.js`, and says so loudly when they differ. A
+tester that only asked `tileProgress.js` would be asking the mirror whether the
+mirror agrees with itself — the drift this repo has been one careless edit away
+from since 0049 is exactly what it needs to catch.
+
 Before `points_per_set` existed, H2 faked it with an extra option per group
 ("any second Graardor unique (duplicate)"). If you ever see an option like that
 again, the tile wants this rule, not another fake option.
