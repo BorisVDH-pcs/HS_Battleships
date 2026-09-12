@@ -811,7 +811,7 @@ function PlayerSquarePreview({ at, tile, onClose }) {
             <TileInfo tile={tile} />
             <span className="coord">{label}</span>
           </div>
-          <EvidencePreview tile={tile} />
+          <EvidencePreview key={tile.id} tile={tile} />
         </article>
       ) : (
         <p className="muted">Empty. A player sees nothing here yet.</p>
@@ -834,12 +834,20 @@ function PlayerSquarePreview({ at, tile, onClose }) {
  * Grouped through the same `tileGroups` the live picker and the "?" panel
  * both use, so a set tile's dropdown here has exactly the optgroups a player
  * would get — nothing here is a second copy of that logic to drift from it.
+ *
+ * Open, not disabled: a disabled `<select>` cannot be opened at all in most
+ * browsers, which hides the very thing this exists to show — whether the
+ * full list of options is actually in there. So it is a real, pickable
+ * control with nowhere to send what gets picked; there is no submit button
+ * beside it and the choice lives only in this component's own state, gone
+ * the moment a different square is selected.
  */
 function EvidencePreview({ tile }) {
   const options = tile.options ?? [];
   const rule = tile.completion ?? 'points';
   const isSet = rule === 'one_set' || rule === 'each_set';
   const isValue = rule === 'value';
+  const [value, setValue] = useState('');
   if (!isValue && options.length === 0) return null;
 
   const rows = (o) => (
@@ -849,11 +857,20 @@ function EvidencePreview({ tile }) {
 
   return (
     <div className="evidence">
-      <p className="evidence-count muted">What submitting evidence would ask:</p>
+      <p className="evidence-count muted">
+        What submitting evidence would ask — nothing picked here saves.
+      </p>
       {isValue ? (
-        <input type="number" min="1" max="1000" placeholder="Worth, in millions" disabled />
+        <input
+          type="number"
+          min="1"
+          max="1000"
+          placeholder="Worth, in millions"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
       ) : (
-        <select disabled defaultValue="">
+        <select value={value} onChange={(e) => setValue(e.target.value)}>
           <option value="">Which drop?</option>
           {groups.some((g) => g.named)
             ? groups.map((g) => (
