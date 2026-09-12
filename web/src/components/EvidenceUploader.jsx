@@ -113,7 +113,10 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   // upload had already cost the player a round trip. On a points_per_set tile
   // the same call returns only the drops of a group that is already full,
   // since there a repeat is a legitimate submission.
-  const spent = grouped ? unavailableSetOptionIds(tile, pending) : new Set();
+  //
+  // Asked on every tile, not only grouped ones: a drop may carry its own
+  // `max_times`, and a plain points tile is exactly where that happens.
+  const spent = unavailableSetOptionIds(tile, pending);
 
   const allAssigned = staged.every((s) => {
     if (isValue) {
@@ -185,17 +188,41 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
     // Grouped when the tile has sets, flat when it does not: an <optgroup> per
     // brother or per boss turns a list of twenty-four into six readable ones,
     // and there is nothing to group by on a plain price list.
+    // How many more times this drop may be handed in, or null when it is
+    // uncapped. `pending` already counts what is staged, so a cap spends
+    // itself as the files are assigned rather than only after the submit.
+    const timesLeft = (o) => (o.max_times == null ? null : o.max_times - (
+      (o.got ?? (o.taken ? 1 : 0)) + pending.optionIds.filter((id) => id === o.id).length
+    ));
+
+    /**
+     * What each drop says after its name.
+     *
+     * A points_per_set tile IS priced, so its prices are worth naming — but
+     * they are 1 on every one of them for the tiles that rule exists for, and
+     * thirty-two rows of "— 1 pts" is noise standing in for information. Named
+     * only where it says something.
+     *
+     * A cap is named the same way: only once it is doing something. "4 left"
+     * before anything has been submitted is the drop's own small print, and
+     * the "?" panel is where small print lives; here it starts mattering when
+     * the number begins to fall.
+     */
+    const note = (o) => {
+      if (isSet) return spent.has(o.id) ? ' ✓' : '';
+
+      const price = (isPerSet && o.points === 1) ? '' : ` — ${o.points} pts`;
+      const left = timesLeft(o);
+      if (left === null) return spent.has(o.id) ? `${price} ✓` : price;
+      if (left <= 0) return `${price} — used up`;
+      if (left < o.max_times) return `${price}, ${left} left`;
+      return price;
+    };
+
     const rows = (o) => (
       <option key={o.id} value={o.id} disabled={spent.has(o.id) && o.id !== item.optionId}>
         {o.label}
-        {/* A points_per_set tile IS priced, so its prices are worth naming —
-            but they are 1 on every one of them for the tiles that rule exists
-            for, and thirty-two rows of "— 1 pts" is noise standing in for
-            information. Named only where it says something. */}
-        {spent.has(o.id) ? ' ✓'
-          : isSet ? ''
-          : (isPerSet && o.points === 1) ? ''
-          : ` — ${o.points} pts`}
+        {note(o)}
       </option>
     );
 

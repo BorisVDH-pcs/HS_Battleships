@@ -17,6 +17,12 @@
 // An option with no `grp` is its own group, which is what makes "one from each
 // of five bosses" and "two different pieces of one set" the same mechanism.
 //
+// Cutting across all five, an option may carry `max_times`: how often that one
+// drop may count. Null is unlimited, which is what every option was before the
+// column existed. It belongs to the option rather than the rule, so a capped
+// drop closes under `points` exactly as it does under `points_per_set`, and
+// the set rules — where a repeat was already worth nothing — are unaffected.
+//
 // The last two rules are a pair, and the difference between them is the only
 // thing either is for: `each_set` is "two DIFFERENT uniques from each boss",
 // `points_per_set` is "two uniques from each boss" with no such qualifier. So
@@ -60,12 +66,14 @@ export function tileProgress(tile, staged = {}) {
   // honest for any caller still handing over the older boolean-only shape.
   if (rule === 'points_per_set') {
     const worth = (o) => o.points ?? 1;
+    // Clamped to the option's cap, as claim_is_complete() clamps it: a drop
+    // past its limit is not worth anything, so counting it here would draw a
+    // group as full that the server will not accept as full.
+    const counted = (o, list) => Math.min(timesUsed(o, list), o.max_times ?? Infinity);
     const groups = tileGroups(options).map((g) => {
-      const banked = g.options.reduce(
-        (sum, o) => sum + (o.got ?? (o.taken ? 1 : 0)) * worth(o), 0
-      );
+      const banked = g.options.reduce((sum, o) => sum + counted(o, []) * worth(o), 0);
       const adding = g.options.reduce(
-        (sum, o) => sum + stagedList.filter((id) => id === o.id).length * worth(o), 0
+        (sum, o) => sum + (counted(o, stagedList) - counted(o, [])) * worth(o), 0
       );
       return { ...g, taken: banked + adding, need: perSet };
     });
@@ -163,39 +171,59 @@ export function tileProgress(tile, staged = {}) {
 }
 
 /**
- * Set options that cannot be selected for another screenshot. Besides exact
- * duplicates, an each-set group closes as soon as its distinct-item quota is
- * met; extra drops from that group cannot move the tile forward.
+ * How many times a drop has been handed in, counting what is staged.
+ *
+ * `got` is the per-option submission count from tiles_for_me(); the fallback
+ * keeps this honest for any caller still handing over the older boolean-only
+ * shape, where the most a `taken` can tell us is "at least one".
+ */
+const timesUsed = (option, stagedList = []) =>
+  (option.got ?? (option.taken ? 1 : 0))
+  + stagedList.filter((id) => id === option.id).length;
+
+/**
+ * Options that cannot be selected for another screenshot.
+ *
+ * Three reasons a drop closes, and they stack:
+ *
+ *   * it has hit its own `max_times` cap, which is a property of the OPTION
+ *     and so applies under every rule — including plain `points`, the only
+ *     rule where this function used to have nothing to say;
+ *   * it is an exact duplicate on a rule where a repeat is worth nothing;
+ *   * its group is finished, so nothing from that group can move the tile.
+ *
+ * The server refuses all three, so offering them would only produce an error
+ * after the upload had already cost the player a round trip.
  */
 export function unavailableSetOptionIds(tile, staged = {}) {
   const rule = tile.completion ?? 'points';
+  const stagedList = staged.optionIds ?? [];
+  const unavailable = new Set();
 
-  // Under `points_per_set` a repeat is the whole feature, so nothing closes
-  // except a group that has reached its target — at which point further drops
-  // from that boss cannot move the tile and offering them would only mislead.
-  if (rule === 'points_per_set') {
-    const unavailable = new Set();
-    for (const group of tileProgress(tile, staged).groups) {
-      if (group.taken >= group.need) {
-        for (const option of group.options) unavailable.add(option.id);
-      }
+  // The cap first, and for every rule. A capped drop that has run out is
+  // spent whether or not the tile groups anything.
+  for (const option of tile.options ?? []) {
+    if (option.max_times != null && timesUsed(option, stagedList) >= option.max_times) {
+      unavailable.add(option.id);
     }
-    return unavailable;
   }
 
-  if (rule !== 'one_set' && rule !== 'each_set') return new Set();
-
-  const unavailable = new Set([
-    ...(tile.options ?? []).filter((o) => o.taken).map((o) => o.id),
-    ...(staged.optionIds ?? []),
-  ]);
-
-  if (rule === 'each_set') {
+  // Under `points_per_set` a repeat is the whole feature, so nothing else
+  // closes except a group that has reached its target — at which point further
+  // drops from that boss cannot move the tile and offering them would mislead.
+  if (rule === 'points_per_set' || rule === 'each_set') {
     for (const group of tileProgress(tile, staged).groups) {
       if (group.taken >= group.need) {
         for (const option of group.options) unavailable.add(option.id);
       }
     }
+  }
+
+  if (rule === 'one_set' || rule === 'each_set') {
+    for (const option of tile.options ?? []) {
+      if (option.taken) unavailable.add(option.id);
+    }
+    for (const id of stagedList) unavailable.add(id);
   }
 
   return unavailable;

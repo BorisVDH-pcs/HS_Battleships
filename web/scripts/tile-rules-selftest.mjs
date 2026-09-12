@@ -189,4 +189,105 @@ assert.equal(
   'Boris submitted a drop worth 60m for Boss uniques (190/250m).'
 );
 
+// ---- a drop that may only count so many times -------------------------------
+// The challenge tile: a price list with a target, where every entry also says
+// how often it is allowed to count. Without the cap the cheapest drop on the
+// list is a route to the whole target on its own, which is what it forbids.
+
+{
+  const options = [
+    { id: 'cape',     label: 'Fire cape',  points: 2, max_times: 4, got: 4 },
+    { id: 'col',      label: 'Colosseum',  points: 3, max_times: 3, got: 1 },
+    { id: 'inferno',  label: 'Inferno',    points: 4, max_times: 2, got: 0 },
+    { id: 'delve',    label: 'Deep delve', points: 7, max_times: 1, got: 0 },
+  ];
+  const tile = { completion: 'points', required_evidence: 30, options, evidence_points: 11 };
+
+  // Spent on its own count, with nothing grouped and no repeat rule in sight —
+  // which is the case this function had nothing to say about before.
+  assert.deepEqual([...unavailableSetOptionIds(tile)], ['cape']);
+
+  // Staging spends it too, so the picker closes the last one as it is assigned
+  // rather than after the round trip that would have been refused.
+  assert.deepEqual(
+    [...unavailableSetOptionIds(tile, { optionIds: ['inferno', 'inferno'] })].sort(),
+    ['cape', 'inferno'],
+  );
+  assert.deepEqual(
+    [...unavailableSetOptionIds(tile, { optionIds: ['col', 'col'] })].sort(),
+    ['cape', 'col'],
+  );
+
+  // The counter is still the frozen server total; a cap changes which drops
+  // can be picked, never what an accepted screenshot was worth.
+  assert.equal(tileProgressText(tile), '11/30 pts');
+  assert.equal(tileProgress(tile, { points: 18 }).done, false);
+  assert.equal(tileProgress(tile, { points: 19 }).done, true);
+}
+
+{
+  // An uncapped drop beside capped ones is untouched by any of it.
+  const tile = {
+    completion: 'points', required_evidence: 10,
+    options: [
+      { id: 'capped',   label: 'Capped',   points: 2, max_times: 1, got: 1 },
+      { id: 'uncapped', label: 'Uncapped', points: 1, got: 9 },
+    ],
+  };
+  assert.deepEqual([...unavailableSetOptionIds(tile)], ['capped']);
+}
+
+{
+  // A cap under points_per_set clamps what a group has banked, exactly as
+  // claim_is_complete() clamps it — otherwise the card draws a group as full
+  // that the server will refuse to treat as full.
+  const tile = {
+    completion: 'points_per_set', per_set: 3,
+    options: [
+      { id: 'a1', grp: 'A', label: 'Cheap', points: 1, max_times: 2, got: 5 },
+      { id: 'a2', grp: 'A', label: 'Dear',  points: 1, got: 0 },
+    ],
+  };
+  assert.equal(tileProgress(tile).groups[0].taken, 2, 'five submissions, capped at two');
+  assert.equal(tileProgress(tile).done, false);
+  assert.equal(tileProgress(tile, { optionIds: ['a1'] }).done, false, 'still capped');
+  assert.equal(tileProgress(tile, { optionIds: ['a2'] }).done, true);
+}
+
+{
+  // What the validator refuses. A cap out of the column's range, and the one
+  // shape that leaves a tile nobody can finish: every drop capped, and the
+  // caps between them worth less than the target.
+  assert.ok(
+    validateTileRow({ rule: 'points', amount: 6, options: [
+      { label: 'Drop', points: 1, maxTimes: 99 },
+    ] }).some((error) => error.includes('other than 1–30 times')),
+  );
+  assert.ok(
+    validateTileRow({ rule: 'points', amount: 30, options: [
+      { label: 'Cheap', points: 2, maxTimes: 4 },
+      { label: 'Dear',  points: 7, maxTimes: 1 },
+    ] }).some((error) => error.includes('tops out at 15 of the 30')),
+  );
+  // One uncapped drop makes any target reachable, so nothing is refused.
+  assert.deepEqual(
+    validateTileRow({ rule: 'points', amount: 30, options: [
+      { label: 'Cheap', points: 2, maxTimes: 4 },
+      { label: 'Dear',  points: 7 },
+    ] }),
+    [],
+  );
+  // And the real thing validates.
+  assert.deepEqual(
+    validateTileRow({ rule: 'points', amount: 30, options: [
+      { label: 'Fire cape',  points: 2, maxTimes: 4 },
+      { label: 'TOA',        points: 3, maxTimes: 3 },
+      { label: 'Colosseum',  points: 3, maxTimes: 3 },
+      { label: 'Inferno',    points: 4, maxTimes: 2 },
+      { label: 'Deep delve', points: 7, maxTimes: 1 },
+    ] }),
+    [],
+  );
+}
+
 console.log('Tile parser and completion-rule self-test passed.');

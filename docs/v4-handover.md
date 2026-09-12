@@ -43,6 +43,39 @@ submitted twice is worth twice. `points_per_set` also has no `least(per_set,
 total)` cap — with repeats counting, a group of one drop can still reach any
 target, so capping would finish groups that were not finished.
 
+### Repeat caps — a property of the drop, not of the rule
+
+**20260912210000 — `max_times`.** The challenge tile is a price list with a
+target, where every entry also says how often it may count: 2 points up to four
+times, 3 up to three, 7 once. Under `points` as it stood repeats were unlimited,
+so the cheapest drop was a legitimate route to the whole target on its own —
+grind it fifteen times and the tile is done.
+
+That is not a new way of finishing a tile, so it is not a sixth rule. It is a
+limit on what one drop may contribute, so it is a nullable column on
+`tile_options` / `tile_library_options`. Null is unlimited, which is what every
+option already in the database has, so nothing needed re-saving.
+
+- **Enforced twice.** `add_evidence` refuses the over-cap screenshot (the same
+  doctrine as a repeat on a set tile: refused, not silently banked — and forced
+  anyway, since `tile_evidence.points` cannot hold a zero), and
+  `claim_is_complete()` clamps **by rank**, counting the first N rows for a drop
+  and ignoring the rest. Not `least(count, max_times) * o.points`: that reaches
+  back through `option_id` for *today's* price and would undo 0046's freezing of
+  `tile_evidence.points`.
+- **It composes.** `points_per_set` gets caps for free; the distinct-set rules
+  are unaffected, because a repeat there was already worth nothing.
+- **A tile that cannot be finished is refused at save time.**
+  `assert_points_cap_reachable()` — and `validateTileRow` in the form — reject a
+  tile whose every drop is capped and whose caps sum below the target. One
+  uncapped drop on the list makes any target reachable, so it only fires when
+  none is. Sibling of the `each_set` group-size check.
+- **In the interface.** Two number boxes per drop in the builder (worth, then
+  how many times; blank is no limit). For the team, the `?` panel shows `2/4`
+  beside a capped drop's price, and the picker greys it out and says *used up*
+  once it has run out — rather than offering it, uploading, and being refused a
+  round trip later.
+
 Before `points_per_set` existed, H2 faked it with an extra option per group
 ("any second Graardor unique (duplicate)"). If you ever see an option like that
 again, the tile wants this rule, not another fake option.
@@ -133,7 +166,11 @@ follow later catalogue edits. Changing a drop list means updating both, and the
 1. **Test in the live game** — claim a tile, submit against each rule, and
    confirm the shot fires only when it should. `points_per_set` has been proved
    against `claim_is_complete()` in a rolled-back transaction but has never been
-   exercised through the real `add_evidence` path by a player.
+   exercised through the real `add_evidence` path by a player. The same is now
+   true of repeat caps: fifteen fire capes were proved to be worth 8 and not 30,
+   and a second Awakened Vard worth nothing, but `add_evidence`'s refusal
+   message has not been seen by anyone, and neither has the builder's second
+   number box or the picker's *used up*.
 2. **Nothing has been checked on a real phone.**
 
 ## Decisions already taken (do not re-ask)

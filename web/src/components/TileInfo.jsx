@@ -220,7 +220,17 @@ export default function TileInfo({ tile }) {
                       <li key={o.id} className={o.taken ? 'taken' : undefined}>
                         <span>{o.taken ? '✓ ' : ''}{o.label}</span>
                         {rule === 'points' && (
-                          <span className="tile-info-pts">{o.points} pts</span>
+                          <span className="tile-info-pts">
+                            {o.points} pts
+                            {/* The cap belongs here rather than in the picker:
+                                it is small print, it is the same for every
+                                team, and this is the panel a team opens to ask
+                                what the tile actually costs. Shown as a count
+                                so it doubles as a tally — 2/4 says both "four
+                                allowed" and "two to go". */}
+                            {o.max_times != null
+                              && ` · ${o.got ?? (o.taken ? 1 : 0)}/${o.max_times}`}
+                          </span>
                         )}
                       </li>
                     ))}

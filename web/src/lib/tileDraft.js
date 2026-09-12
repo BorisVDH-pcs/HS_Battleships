@@ -73,6 +73,10 @@ export function draftFromRow(row) {
       label: o.label ?? '',
       points: String(o.points ?? 1),
       grp: o.grp ?? '',
+      // Blank, not '0' or '1': the input is empty when the drop is uncapped,
+      // and an uncapped drop is the ordinary case. A '1' here would silently
+      // make every existing drop single-use the next time a tile was saved.
+      maxTimes: o.max_times == null ? '' : String(o.max_times),
     })),
     tags: (row.tags ?? []).join(', '),
   };
@@ -95,11 +99,18 @@ export function payloadFromDraft(draft, extra = {}) {
   // something.
   const priced = rule === 'points' || rule === 'points_per_set';
   const options = (draft.options ?? [])
-    .map((o) => ({
-      label: (o.label ?? '').trim(),
-      points: priced ? Number(o.points) : 1,
-      ...((o.grp ?? '').trim() ? { grp: (o.grp ?? '').trim() } : {}),
-    }))
+    .map((o) => {
+      // Only the priced rules carry a cap, for the same reason they are the
+      // only ones that carry a price: on a set rule a repeat is already worth
+      // nothing, so a cap there would be a stored number nothing looks at.
+      const cap = priced ? Number(o.maxTimes) : NaN;
+      return {
+        label: (o.label ?? '').trim(),
+        points: priced ? Number(o.points) : 1,
+        ...((o.grp ?? '').trim() ? { grp: (o.grp ?? '').trim() } : {}),
+        ...((o.maxTimes ?? '') !== '' && Number.isFinite(cap) ? { maxTimes: cap } : {}),
+      };
+    })
     .filter((o) => o.label);
 
   return {

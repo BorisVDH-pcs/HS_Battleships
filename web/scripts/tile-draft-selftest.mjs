@@ -22,6 +22,7 @@ const asRow = (over) => ({
 });
 
 const drop = (label, points = 1, grp = null) => ({ label, points, grp });
+const capped = (label, points, maxTimes) => ({ label, points, grp: null, max_times: maxTimes });
 
 // ---- a row, edited and saved, is the same tile -------------------------------
 
@@ -46,6 +47,14 @@ const cases = [
     options: [drop('Hilt', 1, 'Graardor'), drop('Tassets', 1, 'Graardor'),
               drop('Hilt', 1, 'Zilyana')],
   })],
+  ['a priced tile whose drops cap their repeats', asRow({
+    name: 'Challenge', required_evidence: 30,
+    options: [capped('Cape', 2, 4), capped('Colosseum', 3, 3), drop('Awakened', 7)],
+  })],
+  ['a mix of capped and uncapped drops in one list', asRow({
+    name: 'Mixed', required_evidence: 12,
+    options: [capped('Once only', 7, 1), drop('As often as you like', 1)],
+  })],
   ['a value target', asRow({ name: 'Coins', completion: 'value', required_evidence: 250 })],
   ['prose', asRow({ name: 'Prose', required_evidence: 2, description: 'Only boss drops count' })],
 ];
@@ -59,7 +68,14 @@ for (const [what, row] of cases) {
     required_evidence: once.amount ?? row.required_evidence,
     completion: once.rule ?? 'points',
     per_set: once.perSet ?? 1,
-    options: once.options ?? [],
+    // The payload names a cap `maxTimes` and the row names it `max_times`, the
+    // same way `amount` and `required_evidence` are the same number under two
+    // names. The database does this translation; here it has to be done by
+    // hand, or the second trip would "lose" a field that never travelled.
+    options: (once.options ?? []).map(({ maxTimes, ...option }) => ({
+      ...option,
+      ...(maxTimes === undefined ? {} : { max_times: maxTimes }),
+    })),
   }));
 
   assert.deepEqual(twice, once, `round trip differs for ${what}`);
@@ -138,6 +154,46 @@ for (const [what, row] of cases) {
   assert.equal(payload.perSet, 2);
   // Its prices are read by claim_is_complete, unlike every other set rule's.
   assert.equal(payload.options[0].points, 3);
+}
+
+{
+  // A blank cap box means uncapped, and must leave as an absent field rather
+  // than a 0 or a NaN: the column is nullable precisely so that "no limit" and
+  // "a limit of something" are different answers, and every drop saved before
+  // the column existed gives the blank one.
+  const payload = payloadFromDraft({
+    ...EMPTY_DRAFT, name: 'Mixed', amount: '12',
+    options: [
+      { label: 'Once', points: '7', grp: '', maxTimes: '1' },
+      { label: 'Freely', points: '1', grp: '', maxTimes: '' },
+    ],
+  });
+  assert.equal(payload.options[0].maxTimes, 1);
+  assert.equal('maxTimes' in payload.options[1], false, 'a blank cap is no cap');
+}
+
+{
+  // A set rule drops the cap with the price, for the same reason: a repeat is
+  // already worth nothing there, so a stored cap would be a number nothing
+  // reads and a reader would rightly assume it meant something.
+  const payload = payloadFromDraft({
+    ...EMPTY_DRAFT, name: 'Sets', rule: 'one_set',
+    options: [{ label: 'Helm', points: '3', grp: 'A', maxTimes: '2' }],
+  });
+  assert.equal('maxTimes' in payload.options[0], false);
+  assert.equal(payload.options[0].points, 1);
+}
+
+{
+  // The unfinishable shape, refused through the form as well as the parser.
+  const errors = validateDraft({
+    ...EMPTY_DRAFT, name: 'Capped', amount: '30',
+    options: [
+      { label: 'Cheap', points: '2', grp: '', maxTimes: '4' },
+      { label: 'Dear', points: '7', grp: '', maxTimes: '1' },
+    ],
+  }, 'G7');
+  assert.deepEqual(errors, ['G7 caps every drop, which tops out at 15 of the 30 points it asks for.']);
 }
 
 // ---- what the picker prints -------------------------------------------------

@@ -146,7 +146,9 @@ export default function TileForm({
           {rule !== 'value' && (
             <button
               type="button" className="ghost"
-              onClick={() => set({ options: [...draft.options, { label: '', points: '1', grp: '' }] })}
+              onClick={() => set({
+                options: [...draft.options, { label: '', points: '1', grp: '', maxTimes: '' }],
+              })}
             >
               Add drop
             </button>
@@ -164,7 +166,17 @@ export default function TileForm({
               : 'A set rule needs its drops. Add the ones that make up each set.'}
           </p>
         ) : (
-          <ul className="drop-rows">
+          <>
+            {/* The two number boxes on each row are easy to mix up, and the
+                second one is new. Said once, above the list, rather than as a
+                label on every row — which is what the column widths are for. */}
+            {(rule === 'points' || rule === 'points_per_set') && (
+              <p className="muted tile-form-hint">
+                Two numbers per drop: what it is worth, then how many times it
+                may count. Leave the second blank for no limit.
+              </p>
+            )}
+            <ul className="drop-rows">
             {draft.options.map((option, index) => (
               <li key={index}>
                 {rule !== 'points' && (
@@ -184,13 +196,29 @@ export default function TileForm({
                   maxLength={80}
                 />
                 {(rule === 'points' || rule === 'points_per_set') && (
-                  <input
-                    className="drop-points"
-                    type="number" min="1" max="30"
-                    value={option.points}
-                    onChange={(e) => setOption(index, { points: e.target.value })}
-                    aria-label="Points"
-                  />
+                  <>
+                    <input
+                      className="drop-points"
+                      type="number" min="1" max="30"
+                      value={option.points}
+                      onChange={(e) => setOption(index, { points: e.target.value })}
+                      aria-label="Points"
+                    />
+                    {/* Empty means uncapped, which is why the placeholder is a
+                        symbol rather than a number: a "1" sitting there greyed
+                        out reads as the current value, and the difference
+                        between "once" and "as often as you like" is the whole
+                        point of the field. */}
+                    <input
+                      className="drop-max"
+                      type="number" min="1" max="30"
+                      placeholder="∞"
+                      value={option.maxTimes ?? ''}
+                      onChange={(e) => setOption(index, { maxTimes: e.target.value })}
+                      aria-label={`How many times ${option.label || 'this drop'} may count`}
+                      title="How many times this drop may count. Blank for no limit."
+                    />
+                  </>
                 )}
                 <button
                   type="button" className="ghost drop-remove"
@@ -201,7 +229,8 @@ export default function TileForm({
                 </button>
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
 

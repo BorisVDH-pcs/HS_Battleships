@@ -2869,6 +2869,11 @@ button.danger.ghost:hover:not(:disabled) {
 .drop-grp    { flex: 0 1 7rem; min-width: 0; }
 .drop-label  { flex: 1 1 8rem; min-width: 0; }
 .drop-points { flex: 0 0 4rem; }
+/* Narrower than the price beside it, and deliberately so: most drops are
+   uncapped, so this box is empty on most rows and should not read as a second
+   number of equal weight. */
+.drop-max    { flex: 0 0 3.25rem; }
+.drop-max::placeholder { opacity: .6; }
 .drop-remove { flex: none; padding: .35rem .55rem; line-height: 1; }
 
 /* What a game on the list still needs, beside its team names. Gold because it

@@ -93,6 +93,11 @@ mirrors it so the interface can predict the same answer.
 | `points_per_set` | every group has N points; **repeats count** |
 | `value` | the submitter types what each drop was worth, and the total reaches the target |
 
+Cutting across all five, a **drop may cap its own repeats**: `tile_options.max_times`
+is how many times that one drop may count, and null — every option saved before
+the column existed — is unlimited. It lives on the option rather than the rule,
+so "2 points, up to four times" and "7 points, once" sit on the same price list.
+
 Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).
