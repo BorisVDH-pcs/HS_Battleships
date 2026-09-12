@@ -120,6 +120,14 @@ the drop picker alike, because that is how a real player's three views stay in
 step: they are one row. So the panel's sets fill in as you submit, and a
 finished group collapses to *"General Graardor — ✓ Done"* in the picker.
 
+Holding that row one level up has a trap, which was duly fallen into:
+`PlayerSquarePreview` must be **keyed per square and per tile**, or React reuses
+the instance when you click a different square and the new tile inherits the old
+one's simulated row — H1 offering a set belonging to the tile tested before it.
+`EvidencePreview`'s own `key={tile.id}` resets its picks but cannot reset state
+held above it. `shown` also checks the row's id matches the tile, so a stale
+session is inert rather than convincing.
+
 Before that, the preview listed every drop unconditionally and was **more
 permissive than the interface it previewed** — on H2 you could submit a third
 Bandos hilt into a General Graardor that was already full and watch the tile not

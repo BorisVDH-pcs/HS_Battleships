@@ -516,7 +516,18 @@ export default function BoardBuilder({
               />
             </>
           ) : at && playerView ? (
-            <PlayerSquarePreview at={at} tile={current} onClose={() => setAt(null)} />
+            // Keyed per square AND per tile, so moving to another square starts
+            // a fresh test session rather than inheriting the last one. Without
+            // it React reuses this instance and the simulated row it is holding
+            // — which showed H1 a set belonging to the tile tested before it.
+            // Editing the tile in place counts as a new session too: the drops
+            // may be different ones.
+            <PlayerSquarePreview
+              key={`${at.row}-${at.col}-${current?.id ?? 'empty'}`}
+              at={at}
+              tile={current}
+              onClose={() => setAt(null)}
+            />
           ) : at ? (
             <>
               <div className="row builder-head">
@@ -801,7 +812,13 @@ function PlayerSquarePreview({ at, tile, onClose }) {
   // level all three can see is what reproduces that: tick a drop off in the
   // panel and it closes in the picker, because they are the same object.
   const [session, setSession] = useState(null);
-  const shown = session?.state ?? tile;
+
+  // The id check is a belt beside the braces. The `key` on this component is
+  // what actually starts a fresh session per square; this makes a stale one
+  // harmless rather than wrong, because the failure it guards against is
+  // silent and convincing — a real drop list, correctly drawn, belonging to
+  // the wrong tile.
+  const shown = session?.state?.id === tile?.id ? session.state : tile;
 
   return (
     <>
