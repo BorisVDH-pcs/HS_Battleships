@@ -4,6 +4,7 @@ import {
   newDraft, draftFromRow, payloadFromDraft, payloadFromRow, ruleSummary, nameKey,
 } from '../lib/tileDraft.js';
 import TileIcon from './TileIcon.jsx';
+import TileInfo from './TileInfo.jsx';
 import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
 
@@ -510,6 +511,8 @@ export default function BoardBuilder({
                 ) : null}
               />
             </>
+          ) : at && playerView ? (
+            <PlayerSquarePreview at={at} tile={current} onClose={() => setAt(null)} />
           ) : at ? (
             <>
               <div className="row builder-head">
@@ -772,6 +775,46 @@ export default function BoardBuilder({
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * What this square becomes once a team locks it in — the same card and the
+ * same working "?" info panel as Active tiles, so a description or a price
+ * list can be checked here rather than found missing mid-event.
+ *
+ * Read-only on purpose: player view is a check, not an editing mode, so no
+ * Edit or Clear button rides along with it. `TileInfo` already renders
+ * nothing for a tile with no small print and no priced drops — the same
+ * absence a player would see — so this needs no extra case for that.
+ */
+function PlayerSquarePreview({ at, tile, onClose }) {
+  const label = coordLabel(at.row, at.col);
+  return (
+    <>
+      <div className="row builder-head">
+        <h3>{label}</h3>
+        <button className="ghost" onClick={onClose}>Done</button>
+      </div>
+      {tile ? (
+        <article className="slot filled">
+          <div className="slot-art">
+            <TileIcon
+              slug={tile.icon}
+              standIn
+              fallback={<span className="slot-art-coord">{label}</span>}
+            />
+          </div>
+          <div className="slot-head">
+            <strong>{tile.name}</strong>
+            <TileInfo tile={tile} />
+            <span className="coord">{label}</span>
+          </div>
+        </article>
+      ) : (
+        <p className="muted">Empty. A player sees nothing here yet.</p>
+      )}
+    </>
   );
 }
 
