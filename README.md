@@ -58,6 +58,7 @@ request a player can craft to peek or cheat.
 ```
 docs/handover.md                  pick-it-up-cold notes; session log at the bottom
 docs/v4-handover.md               tile completion rules and the V4 board
+docs/tile-fixes-handover.md       UNFINISHED: five tile edits, a grouping bug, the value unit
 docs/architecture.md              schema + design decisions
 docs/how-the-spreadsheet-worked.md  reference notes on the Sheets original
 docs/website-review.md            the 2026-09-07 UI review and its triage
