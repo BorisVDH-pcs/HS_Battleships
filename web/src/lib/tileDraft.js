@@ -4,9 +4,7 @@
 //             database columns, `required_evidence` / `completion`.
 //   draft   — what the form edits: every field always present, numbers as
 //             strings, so a half-typed target is a valid draft rather than NaN.
-//   payload — what `admin_set_tile` and `admin_save_library_tile` take: the
-//             same object `parseTileLine` emits, so the builder and the paste
-//             box hand the database identical work.
+//   payload — what `admin_set_tile` and `admin_save_library_tile` take.
 //
 // The conversions live here rather than in the components because the picker,
 // the square editor and the library editor all need them, and a second copy of

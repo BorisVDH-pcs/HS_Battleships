@@ -27,7 +27,7 @@ import { statusLabel } from '../lib/status.js';
  */
 export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
-  onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile, onImportBoard,
+  onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile,
   onAutofillBoard, onReshuffleBoard, onClearBoard,
 }) {
   const [at, setAt] = useState(null);           // { row, col } | null
@@ -59,23 +59,28 @@ export default function BoardBuilder({
     return [...all].sort();
   }, [library]);
 
+  // What the random deal is allowed to draw from — the same label a board is
+  // built from by hand, so "only raids" means the same thing to both. Ignores
+  // the text search: a stray word left in that box would otherwise silently
+  // block a deal that has nothing to do with it.
+  const tagPool = useMemo(
+    () => (tag ? library.filter((e) => (e.tags ?? []).includes(tag)) : library),
+    [library, tag]
+  );
+
   /**
    * Where each task already sits on this board, by name.
    *
-   * Keyed on the name rather than on `library_id`, because the boards that
-   * actually collected duplicates are the pasted ones — `admin_set_tiles`
-   * writes no link to the catalogue, so every square on them has a null
-   * `library_id` and an id-keyed check would see an empty board. The name is
-   * the thing both routes have.
+   * Keyed on the name rather than on `library_id` so that even an older board
+   * whose squares predate the catalogue link still gets a useful answer here.
    *
    * The square being edited is left out. Re-picking the tile a square already
    * holds is a no-op, not a clash, and flagging it would make the entry you
    * came here to confirm look like the one thing you may not choose.
    *
    * Autofill needs no part of this: its `pool` already excludes every name the
-   * board holds and deals each entry at most once. This is for the two routes
-   * that had no check at all — clicking an entry onto a second square, and
-   * pasting a hundred lines.
+   * board holds and deals each entry at most once. This is for the one route
+   * that has no check of its own — clicking an entry onto a second square.
    */
   const placedAt = useMemo(() => {
     const map = new Map();
@@ -90,47 +95,6 @@ export default function BoardBuilder({
     }
     return map;
   }, [tiles, current]);
-
-  /**
-   * What is actually on this board, for the read-through before an event.
-   *
-   * Two different kinds of number, and the difference matters when reading
-   * them.
-   *
-   * The effort split is exact. It comes off `completion` and
-   * `required_evidence`, which are the fields the game itself runs on, so
-   * "nineteen squares need five or more screenshots" is a fact.
-   *
-   * The content counts are not. Nothing in the data says a tile is a raids
-   * tile: tags would be the place for that and not one of the catalogue's
-   * entries has any, so this reads the names. It is a good enough answer to
-   * "did I remember the raids and slayer tiles" — the pair worth a couple of
-   * squares every time, because they open up the most content — and it is
-   * labelled as name-matching so nobody mistakes it for a classification the
-   * database is keeping.
-   */
-  const summary = useMemo(() => {
-    // Word-bounded, so `toa` does not find "toad" and `tob` does not find
-    // "tobacco". Bosses as well as the raid names, since a square is usually
-    // named for the drop rather than the raid it came from.
-    const RAIDS = /\b(raids?|cox|tob|toa|olm|nylocas|nylo|verzik|maiden|sotetseg|xarpus|akkha|zebak|kephri|baba|warden|wardens|chamber|chambers|theatre|tombs|purples?)\b/i;
-    const SLAYER = /\bslayer\b/i;
-
-    const s = { one: 0, few: 0, many: 0, sets: 0, value: 0, raids: 0, slayer: 0 };
-    for (const t of tiles) {
-      const rule = t.completion ?? 'points';
-      if (rule === 'one_set' || rule === 'each_set') s.sets += 1;
-      else if (rule === 'value') s.value += 1;
-      else if ((t.required_evidence ?? 1) <= 1) s.one += 1;
-      else if (t.required_evidence <= 4) s.few += 1;
-      else s.many += 1;
-
-      const name = t.name ?? '';
-      if (RAIDS.test(name)) s.raids += 1;
-      if (SLAYER.test(name)) s.slayer += 1;
-    }
-    return s;
-  }, [tiles]);
 
   /**
    * The artwork, which is the whole of what a player sees.
@@ -224,11 +188,9 @@ export default function BoardBuilder({
    * For a square the test is whether the name has been *taken*, not whether it
    * is shared -- `editing.was` is the name the square already had, and keeping
    * it is never a clash. Deliberately not `editing.id`, which looks like the
-   * same question and is not: a board pasted in and then added to the catalogue
-   * has every name catalogued and every `library_id` still null, because
-   * neither `admin_set_tiles` nor `admin_import_board_to_library` writes that
-   * link. Keyed on the id, this would have refused to save any square on such a
-   * board.
+   * same question and is not: a brand-new one-off tile has `editing.id` null
+   * regardless of whether its name is already catalogued, so an id-keyed check
+   * would misread "this name is taken" as "nothing to compare against".
    */
   const clash = useMemo(() => {
     if (!editing) return null;
@@ -421,28 +383,6 @@ export default function BoardBuilder({
         {tiles.length < need && ' Click an empty square, then a tile to put in it.'}
         {' Arrow keys move around the board; Enter opens the square.'}
       </p>
-
-      {/* The read-through before an event, without counting a hundred cells.
-          Effort first, because that is the exact half. */}
-      {tiles.length > 0 && (
-        <dl className="builder-summary">
-          <div><dt>1 screenshot</dt><dd>{summary.one}</dd></div>
-          <div><dt>2–4</dt><dd>{summary.few}</dd></div>
-          <div><dt>5+</dt><dd>{summary.many}</dd></div>
-          <div><dt>Sets</dt><dd>{summary.sets}</dd></div>
-          <div><dt>Value</dt><dd>{summary.value}</dd></div>
-          <div className="builder-summary-split">
-            <dt>Raids</dt><dd>{summary.raids}</dd>
-          </div>
-          <div><dt>Slayer</dt><dd>{summary.slayer}</dd></div>
-        </dl>
-      )}
-      {tiles.length > 0 && (
-        <p className="muted builder-summary-note">
-          Effort is exact. Raids and slayer are matched on the tile’s name — no
-          tile is tagged, so nothing else can answer it.
-        </p>
-      )}
 
       {tiles.length > 0 && (
         <p className="builder-view-toggle">
@@ -682,6 +622,22 @@ export default function BoardBuilder({
                   : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
               </p>
 
+              {/* The label the random deal draws from — a subset of the
+                  catalogue for this game, same as the tag filter on the list
+                  below does for picking by hand. Shown above the two deal
+                  buttons so it reads as scoping them, not as part of the
+                  browse list further down. All labels by default, which deals
+                  from the whole catalogue exactly as before this existed. */}
+              {tags.length > 0 && (
+                <label className="field builder-deal-tag">
+                  <span>Deal only tiles labelled</span>
+                  <select value={tag} onChange={(e) => setTag(e.target.value)}>
+                    <option value="">All labels</option>
+                    {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+              )}
+
               {/* Deals into the empty squares only, which is what makes it safe
                   to press on a board somebody has already worked on -- and why
                   it needs no confirmation. It is the first draft of a board,
@@ -689,14 +645,15 @@ export default function BoardBuilder({
                   dozen squares worth arguing about instead of all hundred. */}
               {tiles.length < need && (
                 <button
-                  disabled={busy || library.length === 0 || Boolean(libraryError)}
-                  onClick={() => { setUndo(null); onAutofillBoard(); }}
-                  title={library.length === 0
-                    ? 'The catalogue has no tiles to deal'
+                  disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
+                  onClick={() => { setUndo(null); onAutofillBoard(tag); }}
+                  title={tagPool.length === 0
+                    ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
                     : undefined}
                 >
                   Fill the {need - tiles.length} empty square
                   {need - tiles.length === 1 ? '' : 's'} at random
+                  {tag && ` from "${tag}"`}
                 </button>
               )}
 
@@ -722,29 +679,24 @@ export default function BoardBuilder({
                 <div className="row">
                   <button
                     className="ghost"
-                    disabled={busy || library.length === 0 || Boolean(libraryError)}
-                    onClick={() => { setUndo(null); onReshuffleBoard(); }}
-                    title={library.length === 0
-                      ? 'The catalogue has no tiles to deal'
+                    disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
+                    onClick={() => { setUndo(null); onReshuffleBoard(tag); }}
+                    title={tagPool.length === 0
+                      ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
                       : undefined}
                   >
                     Re-randomize the board
+                    {tag && ` from "${tag}"`}
                   </button>
                 </div>
               )}
 
               <div className="row">
-                {/* Both write to the catalogue, so neither can work while it is
-                    unreachable. Offering them would only produce a second copy
-                    of the same error. */}
-                <button
-                  className="ghost"
-                  disabled={busy || tiles.length === 0 || Boolean(libraryError)}
-                  onClick={onImportBoard}
-                  title={tiles.length === 0 ? 'This game has no tiles to import' : undefined}
-                >
-                  Add this board to the catalogue
-                </button>
+                {/* The paste box now files every name it does not already
+                    recognise, the same way a square typed here does -- so
+                    this is the only way left to add a tile with no square in
+                    mind yet. Disabled on the same terms as everything else
+                    that writes to the catalogue. */}
                 <button
                   className="ghost"
                   disabled={Boolean(libraryError)}

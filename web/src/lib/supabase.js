@@ -84,10 +84,6 @@ export const adminCreateGame = (name, teamA, teamB, gridSize = 10, maxActive = 2
     p_grid_size: gridSize, p_max_active: maxActive,
   });
 
-/** tiles: [{ row, col, name, icon }] — must be exactly gridSize^2 of them. */
-export const adminSetTiles = (gameId, tiles) =>
-  rpc('admin_set_tiles', { p_game_id: gameId, p_tiles: tiles });
-
 export const adminSetMember = (teamId, profileId, role) =>
   rpc('admin_set_member', { p_team_id: teamId, p_profile_id: profileId, p_role: role });
 
@@ -122,8 +118,8 @@ export const adminGameReadiness = () => rpc('admin_game_readiness', {});
 export const adminListLibrary = () => rpc('admin_list_library');
 
 /**
- * Insert (`id` null) or update one catalogue entry. `tile` is the shape
- * `parseTileLine` emits — name, icon, amount, rule, perSet, description,
+ * Insert (`id` null) or update one catalogue entry. `tile` is the shape the
+ * board builder's form emits — name, icon, amount, rule, perSet, description,
  * options[] — plus an optional `tags` array. Returns the entry's id.
  */
 export const adminSaveLibraryTile = (id, tile) =>
@@ -133,14 +129,7 @@ export const adminDeleteLibraryTile = (id) =>
   rpc('admin_delete_library_tile', { p_id: id });
 
 /**
- * Copy a finished board into the catalogue. Skips tasks already in there rather
- * than overwriting them; returns `{ added, skipped, total }`.
- */
-export const adminImportBoardToLibrary = (gameId) =>
-  rpc('admin_import_board_to_library', { p_game_id: gameId });
-
-/**
- * Fill one square. Same payload as one element of `adminSetTiles`, plus
+ * Fill one square. Same payload shape as `adminSaveLibraryTile`, plus
  * `libraryId` when it came from the catalogue. Overwrites whatever was there.
  */
 export const adminSetTile = (gameId, row, col, tile) =>
@@ -163,9 +152,12 @@ export const adminClearBoard = (gameId) =>
  * board already holds. Returns `{ filled, similar, empty, pool }` — `empty` is
  * how many squares it found, `filled` how many it could fill, and `similar` how
  * many of those had to be a near-duplicate of another task to get there.
+ *
+ * `tag`, when given, narrows the deal to catalogue entries carrying that tag —
+ * the same filter the tile list above the button already offers.
  */
-export const adminAutofillBoard = (gameId) =>
-  rpc('admin_autofill_board', { p_game_id: gameId });
+export const adminAutofillBoard = (gameId, tag = null) =>
+  rpc('admin_autofill_board', { p_game_id: gameId, p_tag: tag || null });
 
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });

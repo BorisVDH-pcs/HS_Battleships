@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   supabase, startGame,
-  adminCreateGame, adminSetTiles, adminSetMember, adminRemoveMember,
+  adminCreateGame, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
-  adminImportBoardToLibrary, adminSetTile, adminClearTile, adminAutofillBoard,
+  adminSetTile, adminClearTile, adminAutofillBoard,
   adminClearBoard, adminGameReadiness,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
@@ -13,10 +13,8 @@ import AdminOverview from './AdminOverview.jsx';
 import TeamNameEditor from './TeamNameEditor.jsx';
 import EvidenceReview from './EvidenceReview.jsx';
 import DiscordWebhooks from './DiscordWebhooks.jsx';
-import TileBoard from './TileBoard.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { statusLabel } from '../lib/status.js';
-import { parseTileText } from '../lib/tileParser.js';
 
 // What to do next, in the order the checklist below lists it. The `setup` line
 // used to say only "add the 100 tiles", which is why games reached Start Game
@@ -345,7 +343,7 @@ export default function Admin() {
       ok: tiles.length === needTiles,
       detail: `${tiles.length} of ${needTiles}`,
       fix: tiles.length === 0
-        ? 'Build the board below, or paste the task list into Tiles.'
+        ? 'Build the board below.'
         : `${needTiles - tiles.length} still empty — fill them in the board builder below.`,
     },
     {
@@ -714,13 +712,8 @@ export default function Admin() {
                 { refresh: ['library'] }
               ))
             }
-            onImportBoard={() =>
-              run(() => adminImportBoardToLibrary(game.id),
-                  (r) => `${r.added} added to the catalogue, ${r.skipped} already there.`,
-                  { refresh: ['library'] })
-            }
-            onAutofillBoard={() =>
-              run(() => adminAutofillBoard(game.id),
+            onAutofillBoard={(tag) =>
+              run(() => adminAutofillBoard(game.id, tag),
                   (r) => `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
                          + dealShortfall(r),
                   { refresh: ['tiles', 'library'] })
@@ -737,10 +730,11 @@ export default function Admin() {
             // is the one thing they would not expect. No type-the-name guard
             // though: that belongs to "remove every tile", where what makes it
             // frightening is that nothing comes back. Here a board does.
-            onReshuffleBoard={() =>
+            onReshuffleBoard={(tag) =>
               confirm(
                 `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and filled `
                 + 'again at random from the catalogue, so the board comes back different.'
+                + (tag ? ` Only tiles labelled "${tag}" are dealt.` : '')
                 + '\n\nSquares placed by hand go with them — a square does not '
                 + 'record whether it was dealt or chosen — and a one-off tile '
                 + 'typed straight onto the board cannot come back, because it '
@@ -760,7 +754,7 @@ export default function Admin() {
                   // board under a bare Postgres message reads as a bug.
                   const cleared = await adminClearBoard(game.id);
                   try {
-                    return { cleared, deal: await adminAutofillBoard(game.id) };
+                    return { cleared, deal: await adminAutofillBoard(game.id, tag) };
                   } catch (err) {
                     throw new Error(
                       `The board was cleared, but dealing the new one failed: ${err.message} `
@@ -774,16 +768,6 @@ export default function Admin() {
                   + `${deal.filled} filled at random.` + dealShortfall(deal),
                 { refresh: ['tiles', 'library'] }
               ))
-            }
-          />
-
-          <Tiles
-            game={game}
-            tiles={tiles}
-            busy={busy}
-            onSave={(rows) =>
-              run(() => adminSetTiles(game.id, rows), (n) => `${n} tiles saved.`,
-                  { refresh: ['tiles'] }).then(worked)
             }
           />
 
@@ -916,161 +900,6 @@ function NewGame({ busy, onCreate }) {
           Create
         </button>
       </div>
-    </section>
-  );
-}
-
-/**
- * Tiles are pasted rather than typed one by one: 100 of them came out of the
- * Middleman sheet as rows, and retyping them into a form would be its own event.
- * One line per tile, in board order, `name | icon`.
- */
-function Tiles({ game, tiles, busy, onSave }) {
-  const need = game.grid_size * game.grid_size;
-  const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
-  // Controlled rather than left to the browser, so a re-render cannot snap it
-  // shut under someone who has just opened it.
-  const [helpOpen, setHelpOpen] = useState(false);
-
-  // Decided when the paste box opens, not when this component mounts. Mount is
-  // too early to ask: the card renders before adminListTiles has answered, so
-  // `tiles` is still [] and every board looks like an empty one — which had
-  // the help standing open on a finished hundred-tile board, the one place it
-  // is certainly not wanted.
-  //
-  // Depends on `open` alone. Adding `tiles` would re-decide on every refetch
-  // and shut the panel under somebody reading it.
-  useEffect(() => {
-    if (open) setHelpOpen(tiles.length === 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const { lines, rows, errors: tileErrors, warnings: tileWarnings } = parseTileText(text, game.grid_size);
-
-  const locked = game.status !== 'setup' && game.status !== 'placement';
-
-  return (
-    <section className="card">
-      <h2>Tiles</h2>
-      <p className="muted">
-        {tiles.length} of {need} saved.
-        {tiles.length > 0 && ` First: ${tiles[0].name}. Last: ${tiles[tiles.length - 1].name}.`}
-      </p>
-
-      {/* Outside the `locked` branch on purpose: checking what is on the board
-          is most useful mid-game, which is exactly when editing is forbidden. */}
-      {tiles.length > 0 && (
-        <TileBoard
-          tiles={tiles}
-          canEdit={!locked}
-          editOpen={open}
-          onToggleEdit={() => setOpen(!open)}
-        />
-      )}
-
-      {locked ? (
-        <p className="muted">Tiles are locked once the game is {statusLabel(game.status)}.</p>
-      ) : (
-        <>
-          {tiles.length === 0 && (
-            <button className="ghost" onClick={() => setOpen(!open)}>
-              {open ? 'Cancel' : 'Add tiles'}
-            </button>
-          )}
-          {open && (
-            <>
-              {/* Behind a disclosure. Four paragraphs of grammar -- points, sets,
-                  value targets, the :: note -- is longer than everything else
-                  in this card put together, and it is reference rather than
-                  instruction: read once, then in the way of the box it
-                  describes. Open by default on a board with no tiles, which is
-                  the one time it is being read rather than remembered. */}
-              <details
-                className="tile-syntax"
-                open={helpOpen}
-                onToggle={(e) => setHelpOpen(e.currentTarget.open)}
-              >
-                <summary>Format help</summary>
-              <p className="muted" style={{ marginTop: '.8rem' }}>
-                One line per tile, in board order (A1, B1 … J1, then A2 …).
-                <code>name | icon | amount</code>, where the icon names a file in{' '}
-                <code>web/public/icons</code> without the <code>.png</code>, and
-                amount is how many screenshots that tile needs before it fires
-                (1–30, default 1). Both are optional, but a tile with an amount
-                and no icon still needs the empty middle field —{' '}
-                <code>Tile || 3</code>. Needs exactly {need} lines.
-              </p>
-              <p className="muted">
-                For a tile whose drops are worth different amounts, price them
-                after a <code>&gt;</code>:{' '}
-                <code>Tile | icon | 6 &gt; Rare:6, Mid:3, Common:2</code>. The
-                amount is then a target in <em>points</em>, each screenshot is
-                worth the drop it shows, and the tile fires once the total
-                reaches the target. A team may hand in the same drop as many
-                times as it got it, so any mix that adds up counts.
-              </p>
-              <p className="muted">
-                Set rules use the amount field too. <code>set</code> completes
-                any one whole group, and <code>each</code> collects every listed
-                drop once; add a number for more than one per group. Group a
-                drop with a slash:{' '}
-                <code>Armour | icon | set &gt; Set A/Helm, Set A/Body, Set B/Helm, Set B/Body</code>
-                {' '}or <code>Raids | icon | each 2 &gt; Raid A/Drop 1, Raid A/Drop 2, Raid B/Drop 1, Raid B/Drop 2</code>.
-                A value target such as <code>250m</code> asks the player to enter
-                each submitted drop's value in millions.
-              </p>
-              <p className="muted">
-                Anything after <code>::</code> is the tile's explanation —{' '}
-                <code>Tile | icon | 2 :: Dupes allowed</code>. It shows behind a{' '}
-                <strong>?</strong> on the team's active-tile card, and only for
-                the team that has locked the tile in. Write it as prose: pipes,
-                colons and links are all safe there, because the rest of the line
-                stops at the <code>::</code>.
-              </p>
-              </details>
-              {/* The placeholder's examples are invented on purpose: this string
-                  ships in the public bundle, and the tile list is secret #2 — a
-                  placeholder is no place to publish three real squares. */}
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={'A task | some_icon\nA task needing five drops | some_icon | 5\nA task with a shorter route | some_icon | 19+\nA task with drops worth different amounts | some_icon | 6 > Rare:6, Mid:3, Common:2\nA complete set | armour | set > Set A/Helm, Set A/Body, Set B/Helm, Set B/Body\nDrops from every raid | raids | each 2 > Raid A/Drop 1, Raid A/Drop 2, Raid B/Drop 1, Raid B/Drop 2\nA value target | coins | 250m\nA task that needs explaining | some_icon | 2 :: Only the ones dropped by the boss count\n…'}
-              />
-              {tileErrors.length > 0 && (
-                <ul className="error">
-                  {tileErrors.map((message) => <li key={message}>{message}</li>)}
-                </ul>
-              )}
-              {/* Muted, and below the errors: a repeated tile is usually
-                  deliberate — a slayer tile across ten squares, a placeholder
-                  holding the undecided ones — so this reports what was noticed
-                  without implying anything is wrong. It does not block Save. */}
-              {tileWarnings.length > 0 && (
-                <ul className="muted tile-warnings">
-                  {tileWarnings.map((message) => <li key={message}>{message}</li>)}
-                </ul>
-              )}
-              <div className="row" style={{ marginTop: '.6rem' }}>
-                <button
-                  disabled={busy || rows.length !== need || tileErrors.length > 0}
-                  // Only cleared once the save actually landed. Wiping a
-                  // hundred pasted lines because the database refused them is
-                  // the worst possible response to an error.
-                  onClick={() => onSave(rows).then((ok) => {
-                    if (ok) { setText(''); setOpen(false); }
-                  })}
-                >
-                  Save {rows.length} tiles
-                </button>
-                <span className={rows.length === need ? 'muted' : 'error'}>
-                  {rows.length} / {need} lines
-                </span>
-              </div>
-            </>
-          )}
-        </>
-      )}
     </section>
   );
 }
