@@ -833,8 +833,13 @@ export default function Admin() {
                 + 'was never in the catalogue.'
                 + '\n\nThis cannot be undone.',
                 {
-                  title: `Re-deal the board for "${game.name}"?`,
-                  confirmLabel: 'Re-deal it',
+                  // Named for the button that opened it, not for what it does
+                  // under the hood -- a dialog whose title uses a word that is
+                  // nowhere on screen reads as a different action. The body
+                  // below still spells out the clearing and the re-drawing,
+                  // which is the part worth knowing before pressing.
+                  title: `Randomize the board for "${game.name}"?`,
+                  confirmLabel: 'Randomize it',
                   danger: true,
                 }
               ).then((ok) => ok && run(
@@ -856,7 +861,7 @@ export default function Admin() {
                   }
                 },
                 ({ cleared, deal }) =>
-                  `Board re-dealt — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
+                  `Board randomized — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
                   + `${deal.filled} filled at random.` + dealShortfall(deal),
                 { refresh: ['tiles', 'library'] }
               ));
