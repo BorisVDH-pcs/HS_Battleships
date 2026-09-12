@@ -156,6 +156,29 @@ export const adminTestTile = (tileId, picks) =>
   rpc('admin_test_tile', { p_tile_id: tileId, p_picks: picks });
 
 /**
+ * Saved boards.
+ *
+ * A whole board under a name, so a hundred hand-placed squares are not a thing
+ * that exists in one copy with `admin_clear_board` next to them. The snapshot
+ * is taken server-side and never travels through here — `admin_list_board_presets`
+ * deliberately returns a name and a count, not the tiles, because a board IS the
+ * tile list and that is secret #2.
+ *
+ * Applying REPLACES the board. Refused once a game is past placement, or if any
+ * tile on it has been claimed.
+ */
+export const adminSaveBoardPreset = (gameId, name) =>
+  rpc('admin_save_board_preset', { p_game_id: gameId, p_name: name });
+
+export const adminListBoardPresets = () => rpc('admin_list_board_presets');
+
+export const adminApplyBoardPreset = (gameId, presetId) =>
+  rpc('admin_apply_board_preset', { p_game_id: gameId, p_preset_id: presetId });
+
+export const adminDeleteBoardPreset = (presetId) =>
+  rpc('admin_delete_board_preset', { p_preset_id: presetId });
+
+/**
  * Empty every square on a board. Returns how many squares it removed. Refused
  * once the game is past preparation, like every other write to `tiles`.
  */

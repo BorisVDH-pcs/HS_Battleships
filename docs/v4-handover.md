@@ -249,9 +249,19 @@ card. `enforce_evidence_before_fire` is back to one route through it:
 ## The V4 board itself
 
 Built on the **Test** game, 100 squares, row-major (A1→J1, A2→J2, …). Every
-catalogue entry it uses carries the tag **`Battleships V4`**, which is what
-`admin_autofill_board` selects on — so the board can be rebuilt on another game
-from the tag alone.
+catalogue entry it uses carries the tag **`Battleships V4`** — 86 of them.
+
+> **Correction.** This section used to say the board could be rebuilt on another
+> game from the tag alone. It cannot, and could not once the repeats went in.
+> `admin_autofill_board` cannot place the same tile twice, and this board spends
+> **18 squares on 4 repeated tiles** (`15 Slayer Points` ×10, `Four different
+> raids purples` ×4, `3 Maggot King Uniques` ×2, `5 Colosseum Uniques` ×2). An
+> 86-entry pool into 100 squares also leaves 14 short, and `start_game` refuses
+> a board that is not exactly `grid_size²`. Autofill deals a *first draft*; it
+> does not reproduce a finished board.
+>
+> Saved boards (20260913000000) are what reproduce one. The V4 board is saved as
+> the preset **`Battleships V4`**.
 
 The board squares are **snapshots**, not links: `tiles` / `tile_options` are
 copied from `tile_library` / `tile_library_options` at placement time and do not

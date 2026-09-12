@@ -107,6 +107,14 @@ evidence and no shot survive it. It shows `tileProgress.js`'s answer alongside
 the database's, so the two copies of the rules are checked against each other
 every time the button is pressed.
 
+A whole board can be **saved under a name and laid down again** — the builder's
+*Saved boards* panel. A preset is a snapshot of all hundred squares, stored as
+JSONB rather than a third copy of the tile schema, so it survives
+`admin_clear_board`, carries repeats and hand-placed one-offs that the random
+deal cannot reproduce, and does not change when the catalogue is edited. Loading
+one replaces the board, and is refused once a game is past placement or any tile
+on it has been claimed.
+
 Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).

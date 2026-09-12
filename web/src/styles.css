@@ -2876,6 +2876,19 @@ button.danger.ghost:hover:not(:disabled) {
 .drop-max::placeholder { opacity: .6; }
 .drop-remove { flex: none; padding: .35rem .55rem; line-height: 1; }
 
+/* Saved boards. Fenced off below rather than above, because it sits at the top
+   of a panel whose every other control deals or clears the board in front of
+   you — and this one reaches past that game to something shared. */
+.builder-presets {
+  display: grid; gap: .45rem;
+  padding-bottom: .7rem; margin-bottom: .2rem;
+  border-bottom: 1px solid var(--line);
+}
+.builder-presets h4 { margin: 0; font-size: .8125rem; font-weight: 600; }
+.builder-presets .row { gap: .35rem; flex-wrap: wrap; }
+.builder-presets select { flex: 1 1 11rem; min-width: 0; }
+.builder-presets input { flex: 1 1 9rem; min-width: 0; }
+
 /* The builder's tile tester. Divided off from the preview above it because the
    two are different kinds of thing: that shows what a player would be asked,
    this asks the database a question. */

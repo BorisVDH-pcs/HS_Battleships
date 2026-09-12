@@ -7,6 +7,7 @@ import {
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminSetTile, adminClearTile, adminAutofillBoard,
   adminClearBoard, adminGameReadiness,
+  adminSaveBoardPreset, adminApplyBoardPreset, adminDeleteBoardPreset,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
 import AdminOverview from './AdminOverview.jsx';
@@ -684,6 +685,66 @@ export default function Admin() {
                 (n) => `${n} square${n === 1 ? '' : 's'} cleared — the board is empty.`,
                 { refresh: ['tiles'] }
               ))
+            }
+            // A whole board, kept under a name. Saving over one asks first —
+            // not because it is destructive to the board on screen, but because
+            // the thing it overwrites is somebody else's saved evening.
+            onSaveBoard={(name, existing) =>
+              (existing
+                ? confirm(
+                    `"${existing.name}" already holds a board of ${existing.squares} `
+                    + 'square' + (existing.squares === 1 ? '' : 's')
+                    + '. Saving replaces it with the board on screen.',
+                    { title: `Replace the saved board "${existing.name}"?`,
+                      confirmLabel: 'Replace it' }
+                  )
+                : Promise.resolve(true)
+              ).then((ok) => ok && run(
+                () => adminSaveBoardPreset(game.id, name),
+                (r) => `Saved "${r.name}" — ${r.squares} square${r.squares === 1 ? '' : 's'}.`,
+                { refresh: [] }
+              ).then(worked))
+            }
+            // Loading REPLACES the board, so it asks in the same shape the
+            // clear does — by name, typed out. The database refuses once a game
+            // is past placement or any tile has been claimed; this is the part
+            // that stops an organiser doing it to the right game by accident.
+            onLoadBoard={(preset) =>
+              confirm(
+                `Every square on "${game.name}" is replaced by the ${preset.squares} `
+                + `square${preset.squares === 1 ? '' : 's'} saved as "${preset.name}".`
+                + (tiles.length
+                    ? `\n\nThe ${tiles.length} tile${tiles.length === 1 ? '' : 's'} `
+                      + 'on the board now are removed. Save them first if you want them back.'
+                    : '')
+                + '\n\nThis cannot be undone.',
+                {
+                  title: `Load "${preset.name}" onto ${game.name}?`,
+                  confirmLabel: 'Load the board',
+                  danger: true,
+                  requireText: game.name,
+                }
+              ).then((ok) => ok && run(
+                () => adminApplyBoardPreset(game.id, preset.id),
+                (r) => `"${r.name}" loaded — ${r.placed} square${r.placed === 1 ? '' : 's'}.`,
+                { refresh: ['tiles'] }
+              ).then(worked))
+            }
+            onDeleteBoard={(preset) =>
+              confirm(
+                `The saved board "${preset.name}" is deleted. Any game already `
+                + 'built from it keeps its tiles — this only removes the saved copy.'
+                + '\n\nThis cannot be undone.',
+                {
+                  title: `Delete the saved board "${preset.name}"?`,
+                  confirmLabel: 'Delete it',
+                  danger: true,
+                }
+              ).then((ok) => ok && run(
+                () => adminDeleteBoardPreset(preset.id),
+                `"${preset.name}" deleted.`,
+                { refresh: [] }
+              ).then(worked))
             }
             // Resolves to the entry's id, or null if the save was refused. The
             // builder needs the id rather than just a yes: after saving it puts

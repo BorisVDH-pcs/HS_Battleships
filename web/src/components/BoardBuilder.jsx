@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GRID, colLetter, coordLabel, toPosition, fromPosition } from '../lib/board.js';
 import {
   newDraft, draftFromRow, payloadFromDraft, payloadFromRow, ruleSummary, nameKey,
@@ -11,7 +11,7 @@ import {
   tileGroups, replayTile, unavailableSetOptionIds, completedEachSetGroupNames,
   tileShowsPrices, pointsLabel,
 } from '../lib/tileProgress.js';
-import { adminTestTile } from '../lib/supabase.js';
+import { adminTestTile, adminListBoardPresets } from '../lib/supabase.js';
 
 /**
  * Building a board by pointing at it.
@@ -35,7 +35,26 @@ export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
   onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile,
   onAutofillBoard, onReshuffleBoard, onClearBoard,
+  onSaveBoard, onLoadBoard, onDeleteBoard,
 }) {
+  // Saved boards. Held here rather than in the console's own slices because
+  // nothing outside this panel reads them, and re-fetching a list of names
+  // after a save is cheaper than teaching the refresh machinery a sixth slice.
+  const [presets, setPresets] = useState([]);
+  const [presetId, setPresetId] = useState('');
+  const [saveName, setSaveName] = useState('');
+
+  const reloadPresets = useCallback(async () => {
+    try {
+      setPresets(await adminListBoardPresets());
+    } catch {
+      // A board that cannot list its saves is still a board worth building;
+      // the failure surfaces the moment anything is actually pressed.
+      setPresets([]);
+    }
+  }, []);
+
+  useEffect(() => { reloadPresets(); }, [reloadPresets]);
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
@@ -640,6 +659,100 @@ export default function BoardBuilder({
                   ? 'Empty so far. Import a board that already exists, or add tiles one at a time.'
                   : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
               </p>
+
+              {/* Saved boards.
+
+                  A board is an evening's work and, until this existed, a thing
+                  that lived in one place with "Remove all 100 tiles" beneath
+                  it. Nothing could rebuild one either: the random deal cannot
+                  repeat a tile, so a board that uses eighteen squares on four
+                  repeated tiles is not something any amount of re-dealing will
+                  produce again.
+
+                  Above the deal buttons because it outranks them: the first
+                  question on a fresh board is "do I already have one", and the
+                  answer being yes makes everything below it unnecessary. */}
+              <div className="builder-presets">
+                <h4>Saved boards</h4>
+
+                {presets.length > 0 && (
+                  <div className="row">
+                    <select
+                      value={presetId}
+                      onChange={(e) => setPresetId(e.target.value)}
+                      aria-label="Saved board"
+                    >
+                      <option value="">Choose a saved board…</option>
+                      {presets.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {p.squares} square{p.squares === 1 ? '' : 's'}
+                          {p.grid_size !== GRID ? ` (${p.grid_size}×${p.grid_size})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      disabled={busy || !presetId}
+                      onClick={async () => {
+                        const preset = presets.find((p) => p.id === presetId);
+                        setUndo(null);
+                        await onLoadBoard(preset);
+                      }}
+                    >
+                      Load
+                    </button>
+                    <button
+                      className="ghost danger"
+                      disabled={busy || !presetId}
+                      onClick={async () => {
+                        const preset = presets.find((p) => p.id === presetId);
+                        if (await onDeleteBoard(preset)) {
+                          setPresetId('');
+                          await reloadPresets();
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+
+                {/* Saving is offered only when there is something to save, and
+                    an existing name overwrites rather than making "V4 (2)" —
+                    which is what makes this usable as a running save while a
+                    board is being built, rather than a thing you do once. */}
+                {tiles.length > 0 && (
+                  <div className="row">
+                    <input
+                      value={saveName}
+                      onChange={(e) => setSaveName(e.target.value)}
+                      placeholder="Name this board"
+                      maxLength={80}
+                    />
+                    <button
+                      className="ghost"
+                      disabled={busy || !saveName.trim()}
+                      onClick={async () => {
+                        const name = saveName.trim();
+                        const existing = presets.find(
+                          (p) => p.name.trim().toLowerCase() === name.toLowerCase()
+                        );
+                        if (await onSaveBoard(name, existing)) {
+                          setSaveName('');
+                          await reloadPresets();
+                        }
+                      }}
+                    >
+                      Save these {tiles.length} square{tiles.length === 1 ? '' : 's'}
+                    </button>
+                  </div>
+                )}
+
+                {presets.length === 0 && tiles.length === 0 && (
+                  <p className="muted">
+                    No saved boards yet. Build one and it can be kept here.
+                  </p>
+                )}
+              </div>
 
               {/* The label the random deal draws from — a subset of the
                   catalogue for this game, same as the tag filter on the list
