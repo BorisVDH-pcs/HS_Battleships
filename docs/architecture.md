@@ -7,7 +7,15 @@ profiles ──< team_members >── teams ──< ships ──< ship_cells
                                 │
 games ──────────────────────────┤
   │                             │
-  ├──< tiles <── tile_claims >──┘
+  ├──< tiles ──< tile_options   │
+  │      ↑ │                    │
+  │      │ └──< tile_claims >───┘
+  │      │            └──< tile_evidence >── tile_options
+  │      │
+  │   (copied from, not linked to)
+  │      │
+  │   tile_library ──< tile_library_options
+  │
   ├──< game_events
   └──< score_events (via teams)
 ```
@@ -18,11 +26,30 @@ games ────────────────────────�
 | `games` | A single match: status, grid size, fleet composition, active-tile limit, winner |
 | `teams` | Exactly two per game (enforced by trigger), plus the Discord role to ping |
 | `team_members` | Who plays for whom, and who is captain (captains place the fleet) |
-| `tiles` | The 100 tasks — coordinate, name, and an optional icon slug |
-| `ships` / `ship_cells` | Each team's placement. **Secret from the opponent** |
+| `tiles` | The 100 tasks — coordinate, name, icon, target, and the **completion rule** |
+| `tile_options` | The drops a tile lists, their points, and the set (`grp`) each belongs to |
 | `tile_claims` | Claim → fire. A completed claim *is* a shot |
+| `tile_evidence` | One row per screenshot: which option it shows, what it scored |
+| `tile_library` / `..._options` | The reusable tile catalogue the board builder draws from |
+| `ships` / `ship_cells` | Each team's placement. **Secret from the opponent** |
 | `game_events` | Append-only feed: powers Realtime and the Discord relay |
 | `score_events` | Legacy manual-adjustment history, retained but no longer used by scoring |
+
+### The catalogue is copied onto a board, not joined to it
+`tiles.library_id` records where a square came from, and nothing more. The name,
+the target, the rule and every option are **copied** at placement time. A board
+that has started must not change under the players because someone tidied a
+catalogue entry — so editing a live board means writing both sides, and
+`library_id` is how you find the squares to write.
+
+### A tile says when it is finished, and the database decides
+`tiles.completion` picks between five rules (`points`, `one_set`, `each_set`,
+`points_per_set`, `value`) and `claim_is_complete()` is the sole authority on
+whether a claim may become `fired` — called by both `add_evidence` and the table
+trigger that guards the transition, so the two cannot drift. `tileProgress.js`
+mirrors the same logic client-side purely so the Submit button can say "Submit &
+fire" before the round trip; nothing it computes is trusted. The rules are
+tabulated in [v4-handover.md](v4-handover.md).
 
 ### The tile grid is shared
 Both teams see the same task at the same coordinate — that is how the original

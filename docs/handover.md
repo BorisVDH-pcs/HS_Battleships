@@ -1,7 +1,12 @@
 # Handover — HS_Battleships
 
-Current as of **2026-09-07**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
+Current as of **2026-09-12**, end of session. Latest work is in the session log at the bottom. Written to be picked up cold, by
 Boris or by another session with no memory of this one.
+
+> **Read the last session log first.** Everything about pasting a board is
+> obsolete — the paste box was removed on 2026-09-12 and the board builder
+> replaced it. Tile rules and the V4 board live in
+> [v4-handover.md](v4-handover.md).
 
 ---
 
@@ -1463,3 +1468,95 @@ rename is what commit `739da6f` had to clean up.
   4.17. Recommended against and not built: 4.11, 4.12 (grid semantics and
   tooltip roles — the audience is a clan Discord), 4.18 (team-wide evidence).
 - **Nothing here was checked on a real phone**, same as gap 8.
+
+---
+
+## Session log — 2026-09-10 to 09-12, the board builder era and a fourth rule
+
+**The paste box is gone and the board builder replaced it.** A board is now
+assembled square by square against the tile catalogue (`tile_library` /
+`tile_library_options`), and `admin_set_tiles` — the paste box's only caller —
+was dropped with it. `parseTileText` went too; `tileParser.js` survives only as
+`validateTileRow`, which the builder's form calls. Anything in this file or in
+[v4-handover.md](v4-handover.md) describing paste grammar is history, not
+instructions.
+
+**The V4 board is built, on the `Test` game.** 100 squares, row-major, 86
+catalogue entries tagged `Battleships V4` — which is what `admin_autofill_board`
+selects on, so the board can be rebuilt onto another game from the tag alone.
+29 catalogue entries were created for it.
+
+**Board squares are snapshots, not links.** `tiles` / `tile_options` are copied
+from the catalogue at placement time and do not follow later catalogue edits.
+Changing a drop list means writing both; `tiles.library_id` is how you find the
+squares belonging to an entry. This is the single most common way to make a
+change that appears to work and does nothing.
+
+**`is_admin()` is null under the Supabase MCP tool**, because it reads
+`auth.uid()` and there is no JWT in that context. So `admin_set_tile`,
+`admin_list_tiles` and every other admin RPC raise "Admins only" when called
+that way. Bulk board work through MCP has to replicate the RPC's own
+INSERT/UPDATE logic in raw SQL instead — and `"row"` needs quoting when it does.
+
+### The fourth completion rule
+
+`each_set` counts DISTINCT options per group, which is right for "two
+**different** purples from each raid" and wrong for "two uniques from each GWD
+boss", where two Bandos chestplates are two uniques. That tile had been faking
+it with an extra option per group, "any second Graardor unique (duplicate)" —
+a lie told to the picker.
+
+`points_per_set` groups identically and finishes a group on POINTS rather than
+distinct options, so a repeat counts. H2 and I2 use it; the raids-purples tiles
+stay on `each_set`. The rule table and the distinction are in
+[v4-handover.md](v4-handover.md); the reasoning is in
+`20260912184937_points_per_set.sql`.
+
+One piece of new plumbing: `tiles_for_me()` now returns `got` (how many times
+this team handed an option in) alongside `taken` (whether at all). The boolean
+cannot say "two chestplates".
+
+**`add_evidence` needed no change, and that is load-bearing.** Its `v_sets` flag
+does two jobs — refuse a repeat, flatten the award to 1 — and a `points_per_set`
+tile wants neither. It falls through to the `points` path and gets exactly the
+right behaviour. Do not "tidy" that flag to include the new rule.
+
+### Traps this stretch added to the list
+
+**`apply_migration` stamps its own timestamp, not your filename's.** It records
+`schema_migrations.version` as the time it ran. A local file named
+`20260912040000_x.sql` recorded as `20260912184732` is precisely the mismatch
+that broke `db-push` before — same lesson as `739da6f`, learned twice now. Apply
+first, read back the recorded version, rename the file to match, then commit.
+
+**`alter type … add value` needs its own migration.** The new value cannot be
+used in the transaction that adds it, so the enum goes in one file and
+everything built on it in the next.
+
+**Both tile self-tests were failing silently for two days.** The paste-box
+removal deleted `parseTileText` and left two files importing it, so
+`test:tile-rules` and `test:tile-draft` died on a `SyntaxError` — not an
+assertion failure, which is why nothing looked red. Repaired; the draft test now
+round-trips database rows, the only shape a tile still arrives in. **Run both
+before committing anything touching rules** — nothing in CI does.
+
+**A live function may have moved past the migration that created it.** The
+`tiles_for_me` body in `0049` is not the one deployed — later migrations added
+`claimed_by_name` / `claimed_at` and dropped `early_complete`. `create or
+replace` on the old text fails with "cannot change return type". Read
+`pg_get_functiondef` first and edit *that*, never the migration file's copy.
+
+**A destructive rule change can be rehearsed without touching data.** Insert a
+claim and evidence inside a `DO` block, call `claim_is_complete()`, collect the
+answers into a string, then `raise exception` with it. The whole transaction
+rolls back and the assertions arrive in the error message. That is how
+`points_per_set` was proved against the real function before H2 was switched.
+
+### Not done
+
+- **`points_per_set` has never gone through `add_evidence` as a player.** It is
+  proved against `claim_is_complete()` in a rolled-back transaction; the submit
+  path itself is unexercised.
+- **The migration table earlier in this file stops at `0032`.** There are 64
+  migrations. `ls` the directory, not the table.
+- Still nothing checked on a real phone.

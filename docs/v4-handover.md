@@ -1,6 +1,6 @@
 # V4 tile rules — handover
 
-Updated 2026-09-06. No tile text here: this repo is public and the tile list is
+Updated 2026-09-12. No tile text here: this repo is public and the tile list is
 secret #2.
 
 ## What is done
@@ -21,10 +21,36 @@ group, and `tiles.completion` picks the rule:
 | `points` | option points reach the target; repeats count *(pre-0049 behaviour, still the default)* |
 | `one_set` | any ONE group is fully collected |
 | `each_set` | EVERY group has `per_set` distinct options |
+| `points_per_set` | EVERY group has `per_set` points in it; **repeats count** *(added 2026-09-12)* |
 | `value` | submitter types what each drop was worth; the total reaches the target |
 
 `claim_is_complete()` is the single authority — the table trigger and
 `add_evidence` both call it, so they cannot drift.
+
+### `each_set` vs `points_per_set` — the distinction to keep straight
+
+These two group drops identically and differ in exactly one clause, and picking
+the wrong one is the easiest mistake on this board:
+
+- **"two DIFFERENT purples from each raid"** → `each_set`. Two of the same
+  purple is one purple; that is the tile.
+- **"two uniques from each GWD boss"** → `points_per_set`. Two Bandos
+  chestplates *are* two uniques; a team that got them has done what was asked.
+
+`each_set` counts DISTINCT options per group (`count(*) filter (where exists
+…)`). `points_per_set` sums the POINTS of the evidence rows, so the same option
+submitted twice is worth twice. `points_per_set` also has no `least(per_set,
+total)` cap — with repeats counting, a group of one drop can still reach any
+target, so capping would finish groups that were not finished.
+
+Before `points_per_set` existed, H2 faked it with an extra option per group
+("any second Graardor unique (duplicate)"). If you ever see an option like that
+again, the tile wants this rule, not another fake option.
+
+**`got` on each option.** `tiles_for_me()` returns both `taken` (a boolean: has
+this team handed this in at all) and `got` (how many times). The boolean cannot
+say "two chestplates", so `points_per_set` needs the count — to draw a group as
+2/2 on the card and to know when to close it in the picker.
 
 **UI.** `TileInfo.jsx` is the "?" beside a tile name: hover peeks, click pins,
 Escape or an outside click dismisses. It shows the description, and the drop
@@ -42,20 +68,33 @@ fires the shot.
 The always-open price list is gone from the card — on a slayer tile it was 38
 rows and pushed the drop zone off the bottom of the column.
 
-**Icons.** 103 in `web/public/icons`. Twelve added from the wiki this session.
-Every named V4 tile has one mapped.
+**Icons.** 274 in `web/public/icons`. `web/src/lib/icons.js` is GENERATED from
+that directory — add the `.png`, then run `npm run icons:manifest --prefix web`
+and commit both. Never hand-edit `icons.js`.
 
-**Admin parser and private generator.** The paste box now reads all four rule
-forms and reports line-numbered errors before it calls the database. The private
-generator imports that same parser and refuses to write an invalid board. All
-100 generated lines validate: 90 points, 3 one-set, 5 each-set and 2 value
-tiles. The ten tiles which needed 0049 have been rewritten.
+A tile whose `icon` is null renders the `dragon_warhammer` placeholder
+(`TileIcon.jsx`), which is deliberate for genuinely-undrawn tiles and looks like
+a bug on a tile that simply has no art yet. For wiki artwork, prefer the
+`File:X detail.png` variant — the plain `File:X.png` is a small inline sprite,
+and this repo's icons fill a 64x64 canvas nearly edge to edge.
 
-**Local verification.** `npm run test:tile-rules` exercises the paste grammar,
-all completion calculations and activity-feed wording. The private generator
-validates the entire board with the real parser, and `npm run build` completes.
-The migrations have been reviewed against the calling code but have not been
-executed against a database.
+**How a board gets built.** Through the **board builder** (`BoardBuilder.jsx`),
+square by square, against the tile catalogue (`tile_library` /
+`tile_library_options`). The paste box, its grammar, `parseTileText` and
+`admin_set_tiles` are all **gone** — the builder is the only route now, and
+`tileParser.js` survives only as `validateTileRow`, which the form calls.
+
+The builder also has a **"See it as a player does"** preview: the real
+`TileInfo` "?" panel and a live, browsable copy of the evidence dropdown, so a
+drop list can be proofread without claiming the tile. The dropdown is
+deliberately pickable but inert — no submit path, and it resets per square.
+
+**Local verification.** `npm run test:tile-rules --prefix web` covers every
+completion calculation, the tiles a rule refuses to describe, and activity-feed
+wording. `npm run test:tile-draft --prefix web` round-trips a database row
+through the form's draft shape and back, for every rule. Both must pass; both
+were silently broken between 2026-09-12's paste-box removal and its
+points_per_set commit, because they still imported the deleted `parseTileText`.
 
 **0052 — early completion removed.** `early_complete` existed for one reason
 (0025): a tile with several routes at different prices could only be counted in
@@ -77,15 +116,25 @@ tile form, the badge on the admin board, the guide step and the button on the
 card. `enforce_evidence_before_fire` is back to one route through it:
 `claim_is_complete()` agreed, or the claim does not become `fired`.
 
+## The V4 board itself
+
+Built on the **Test** game, 100 squares, row-major (A1→J1, A2→J2, …). Every
+catalogue entry it uses carries the tag **`Battleships V4`**, which is what
+`admin_autofill_board` selects on — so the board can be rebuilt on another game
+from the tag alone.
+
+The board squares are **snapshots**, not links: `tiles` / `tile_options` are
+copied from `tile_library` / `tile_library_options` at placement time and do not
+follow later catalogue edits. Changing a drop list means updating both, and the
+`library_id` column is how you find the squares to update.
+
 ## What is left
 
-1. **Merge to main.** Merging triggers `db-push`. 0052 has not been run against a
-   database; it drops three columns and a function, so it is the one to watch in
-   the push log.
-2. **Load the generated board** from the private paste file through the admin
-   screen.
-3. **Test in the live game** — claim a tile, submit against each rule, and
-   confirm the shot fires only when it should.
+1. **Test in the live game** — claim a tile, submit against each rule, and
+   confirm the shot fires only when it should. `points_per_set` has been proved
+   against `claim_is_complete()` in a rolled-back transaction but has never been
+   exercised through the real `add_evidence` path by a player.
+2. **Nothing has been checked on a real phone.**
 
 ## Decisions already taken (do not re-ask)
 
@@ -101,3 +150,11 @@ card. `enforce_evidence_before_fire` is back to one route through it:
 - 16 squares had no tile in the sheet and load as clearly-marked TBD.
 - Revenant artefacts use integer-million weights 1 / 2 / 4 / 8 / 16. The 0.5m
   Ancient emblem is excluded rather than rounded.
+- A tile named "N <boss> uniques" gets a drop list under `points`, 1 point each,
+  repeats counting. A tile named "two uniques from **each** <boss>" gets
+  `points_per_set`. A tile that says **different** gets `each_set`.
+- Drop lists are checked against the OSRS wiki, not recalled. An earlier session
+  put Skull of Vet'ion on the Dagannoth Kings list from memory and was corrected;
+  the wiki's own page, or `api.php?action=parse&prop=wikitext`, is the source.
+  WebFetch summaries of long drop tables have also come back wrong — read the
+  wikitext when the answer matters.

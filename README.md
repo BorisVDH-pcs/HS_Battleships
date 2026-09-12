@@ -39,7 +39,7 @@ teams and players, review evidence, and monitor progress.
 | Layer | Choice |
 |---|---|
 | Database | Supabase (Postgres) — schema in `supabase/migrations/` |
-| Game logic | Postgres `security definer` functions (`0002_rpc.sql`) |
+| Game logic | Postgres `security definer` functions, one migration per change |
 | Live updates | Supabase Realtime on `game_events` |
 | Frontend | Vite + React |
 | Notifications | Discord relay driven off the `game_events` feed |
@@ -53,23 +53,60 @@ the client would make both reachable. Instead, Row Level Security hides them and
 every mutation goes through an RPC that validates server-side — so there is no
 request a player can craft to peek or cheat.
 
-## Layout
+## Where things are
 
 ```
-docs/how-the-spreadsheet-worked.md   reference notes on the Sheets original
-docs/architecture.md                 schema + design decisions
-supabase/migrations/0001_init.sql    tables, views, RLS
-supabase/migrations/0002_rpc.sql     place_fleet / start_game / claim_tile / fire_tile
+docs/handover.md                  pick-it-up-cold notes; session log at the bottom
+docs/v4-handover.md               tile completion rules and the V4 board
+docs/architecture.md              schema + design decisions
+docs/how-the-spreadsheet-worked.md  reference notes on the Sheets original
+docs/website-review.md            the 2026-09-07 UI review and its triage
+supabase/migrations/              one file per change, applied in filename order
+supabase/admin/                   runbook SQL (player accounts, password resets)
 ```
 
-## Layout (frontend)
+Migrations are numbered `0001…0032` and then by timestamp. They are **not** a
+short list any more — `ls` the directory rather than trusting a table in a doc.
 
 ```
-web/src/lib/supabase.js       client + the four game RPCs
+web/src/lib/supabase.js       client + the game RPCs
 web/src/lib/board.js          coordinate helpers (A1..J10 <-> row/col <-> 1..100)
+web/src/lib/tileProgress.js   how far a claimed tile is, per completion rule
+web/src/lib/tileDraft.js      a tile in its three shapes: row, form draft, payload
+web/src/lib/icons.js          GENERATED — `npm run icons:manifest`, never by hand
 web/src/hooks/useGame.js      loads game state, refetches on Realtime events
-web/src/components/           EnemyGrid, MyFleet, ActiveTiles, EventFeed, Login
+web/src/components/           EnemyGrid, MyFleet, ActiveTiles, EventFeed, Login,
+                              BoardBuilder, TileForm, TileInfo, EvidenceUploader
 ```
+
+## How a tile is finished
+
+Each tile carries a **completion rule** deciding when its evidence is enough.
+`claim_is_complete()` in the database is the only authority; `tileProgress.js`
+mirrors it so the interface can predict the same answer.
+
+| rule | finishes when |
+|---|---|
+| `points` | option points reach the target; repeats count |
+| `one_set` | any one group is fully collected |
+| `each_set` | every group has N **distinct** options |
+| `points_per_set` | every group has N points; **repeats count** |
+| `value` | the submitter types what each drop was worth, and the total reaches the target |
+
+Boards are assembled in the **board builder** against a reusable tile catalogue.
+Details, and the `each_set` / `points_per_set` distinction that is easy to get
+wrong, are in [docs/v4-handover.md](docs/v4-handover.md).
+
+## Tests
+
+```bash
+npm run test:tile-rules --prefix web
+npm run test:tile-draft --prefix web
+```
+
+Nothing runs these in CI. Run both before committing anything that touches tile
+rules — they have been broken by an unrelated deletion before, and a `SyntaxError`
+does not look like a failing assertion.
 
 ## Setup
 
