@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { tileProgress } from '../lib/tileProgress.js';
+import { pointsLabel, tileProgress, tileShowsPrices } from '../lib/tileProgress.js';
 
 /** What the list behind the "?" is a list OF, per completion rule (0049). */
 const HEADINGS = {
@@ -59,6 +59,8 @@ export default function TileInfo({ tile }) {
   const options = tile.options ?? [];
   const rule = tile.completion ?? 'points';
   const { groups } = tileProgress(tile);
+  // Only where the tile's prices differ from one another — see tileShowsPrices.
+  const priced = tileShowsPrices(tile);
 
   const open = pinned || peeked;
   const hasText = Boolean(text);
@@ -219,17 +221,23 @@ export default function TileInfo({ tile }) {
                     {g.options.map((o) => (
                       <li key={o.id} className={o.taken ? 'taken' : undefined}>
                         <span>{o.taken ? '✓ ' : ''}{o.label}</span>
-                        {rule === 'points' && (
+                        {/* A price only where the tile's prices differ — on a
+                            list where every drop is worth the same one point,
+                            the column would repeat the counter above it on
+                            every line. The cap still earns its place there:
+                            it is small print, the same for every team, and
+                            this is the panel a team opens to ask what a tile
+                            actually costs. Shown as a count so it doubles as
+                            a tally — 2/4 says both "four allowed" and "two to
+                            go" — and it carries the word "used" when it is
+                            standing alone without a price beside it. */}
+                        {rule === 'points' && (priced || o.max_times != null) && (
                           <span className="tile-info-pts">
-                            {o.points} pts
-                            {/* The cap belongs here rather than in the picker:
-                                it is small print, it is the same for every
-                                team, and this is the panel a team opens to ask
-                                what the tile actually costs. Shown as a count
-                                so it doubles as a tally — 2/4 says both "four
-                                allowed" and "two to go". */}
+                            {priced && pointsLabel(o.points)}
+                            {priced && o.max_times != null && ' · '}
                             {o.max_times != null
-                              && ` · ${o.got ?? (o.taken ? 1 : 0)}/${o.max_times}`}
+                              && `${o.got ?? (o.taken ? 1 : 0)}/${o.max_times}`
+                                 + (priced ? '' : ' used')}
                           </span>
                         )}
                       </li>

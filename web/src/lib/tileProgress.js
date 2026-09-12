@@ -28,6 +28,31 @@
 // `points_per_set` is "two uniques from each boss" with no such qualifier. So
 // they group identically and diverge on one question — does a repeat count.
 
+/**
+ * Do this tile's prices say anything worth printing?
+ *
+ * Only when the drops are not all worth the same one point. A tile whose every
+ * drop is worth 1 is scored in screenshots wearing a points hat: the counter
+ * already reads "2 / 3", and hanging "— 1 pts" off every line of the list adds
+ * a number that is the same on every line and equal to the one above it.
+ *
+ * The question has to be asked of the TILE, never of the single option. On a
+ * mixed list "1 pt" is real information — it says this drop is the cheap one —
+ * and hiding it there would leave the reader to infer a price from the absence
+ * of a price. So: all the same and that same is one, or nothing is hidden.
+ *
+ * Asked in three places — the player's picker, the "?" panel and the builder's
+ * preview of both — which is exactly why it lives here rather than three times
+ * over as a condition each of them gets to word slightly differently.
+ */
+export function tileShowsPrices(tile) {
+  const options = tile.options ?? [];
+  return options.some((option) => (option.points ?? 1) !== 1);
+}
+
+/** "1 pt", "3 pts". */
+export const pointsLabel = (n) => `${n} pt${n === 1 ? '' : 's'}`;
+
 /** Options bucketed into their sets, with how many of each are in already. */
 export function tileGroups(options = []) {
   const byName = new Map();

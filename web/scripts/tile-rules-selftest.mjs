@@ -3,7 +3,9 @@ import { validateTileRow } from '../src/lib/tileParser.js';
 import {
   completedEachSetGroupNames,
   tileProgress,
+  pointsLabel,
   replayTile,
+  tileShowsPrices,
   tileProgressText,
   unavailableSetOptionIds,
 } from '../src/lib/tileProgress.js';
@@ -289,6 +291,46 @@ assert.equal(
     ] }),
     [],
   );
+}
+
+// ---- when a price is worth printing -----------------------------------------
+// Asked of the TILE, never of the one option: on a mixed list "1 pt" says this
+// drop is the cheap one, and hiding it there would leave a price to be inferred
+// from the absence of a price.
+
+{
+  // H1 and G3's shape: pick any one of these, nothing is worth more than
+  // anything else. The counter already reads 0/1; a column of "1 pt" repeats it.
+  assert.equal(tileShowsPrices({ options: [
+    { id: 'a', label: 'Sraracha', points: 1 },
+    { id: 'b', label: 'Jar of eyes', points: 1 },
+  ] }), false);
+
+  // Still nothing to tell apart when several are needed.
+  assert.equal(tileShowsPrices({ options: [
+    { id: 'a', points: 1 }, { id: 'b', points: 1 }, { id: 'c', points: 1 },
+  ] }), false);
+
+  // I9's shape: the prices are the whole point of the list.
+  assert.equal(tileShowsPrices({ options: [
+    { id: 'cape', points: 2 }, { id: 'vard', points: 7 },
+  ] }), true);
+
+  // A single 1 among larger prices keeps every price, itself included.
+  assert.equal(tileShowsPrices({ options: [
+    { id: 'cheap', points: 1 }, { id: 'dear', points: 6 },
+  ] }), true);
+
+  // A tile with no drops at all prices nothing.
+  assert.equal(tileShowsPrices({ options: [] }), false);
+  assert.equal(tileShowsPrices({}), false);
+
+  // An option with no price stated is worth 1, the same as the column default.
+  assert.equal(tileShowsPrices({ options: [{ id: 'a' }, { id: 'b' }] }), false);
+
+  assert.equal(pointsLabel(1), '1 pt');
+  assert.equal(pointsLabel(2), '2 pts');
+  assert.equal(pointsLabel(30), '30 pts');
 }
 
 // ---- the browser's half of the builder's tile tester -------------------------

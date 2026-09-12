@@ -76,6 +76,25 @@ option already in the database has, so nothing needed re-saving.
   once it has run out — rather than offering it, uploading, and being refused a
   round trip later.
 
+### When a price is worth printing
+
+`tileShowsPrices(tile)` — one judgement, asked by the picker, the `?` panel and
+the builder's preview of both, because all three used to word it slightly
+differently. A price is printed only where the tile's drops are **not all worth
+the same single point**.
+
+Twenty-six of the board's forty-one priced tiles list drops that are all worth 1
+— "any Inquisitor's piece", "Sarachnis pet or jar". There, points and
+screenshots are the same number, the counter already says it, and a column of
+"1 pt" repeats the target on every line. On the fifteen mixed tiles every price
+stays, the 1s most of all: on I9's list "1 pt" would mean *this is the cheap
+one*, and hiding it there would leave a price to be inferred from the absence of
+a price. Hence tile-wide, never per-option — the old `points_per_set` rule was
+per-option and is now folded into this one.
+
+The `?` panel's capped drops read `2 pts · 0/4`; where the price is hidden the
+tally stands alone and says `0/4 used`. `pointsLabel()` handles `1 pt` / `2 pts`.
+
 ### Trying a tile out before a team ever sees it
 
 **20260912230000 — the dry run.** A tile's rule only says what it means once

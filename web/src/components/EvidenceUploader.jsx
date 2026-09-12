@@ -2,7 +2,9 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
 import {
   completedEachSetGroupNames,
+  pointsLabel,
   tileProgress,
+  tileShowsPrices,
   unavailableSetOptionIds,
 } from '../lib/tileProgress.js';
 import { useConfirm } from './ConfirmDialog.jsx';
@@ -73,6 +75,9 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   const grouped = isSet || isPerSet;
   const isValue = rule === 'value';
   const picksDrop = options.length > 0;
+  // Whether a price is worth printing beside a drop — a whole-tile question,
+  // asked once. See tileShowsPrices.
+  const priced = tileShowsPrices(tile);
 
   function stage(files) {
     const images = [...files].filter((f) => f.type.startsWith('image/'));
@@ -198,10 +203,11 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
     /**
      * What each drop says after its name.
      *
-     * A points_per_set tile IS priced, so its prices are worth naming — but
-     * they are 1 on every one of them for the tiles that rule exists for, and
-     * thirty-two rows of "— 1 pts" is noise standing in for information. Named
-     * only where it says something.
+     * A price is named only where it says something — `tileShowsPrices` is the
+     * judgement, asked of the whole tile. On a list where every drop is worth
+     * the same single point there is nothing to tell apart, and thirty-two
+     * rows of "— 1 pt" would be noise standing in for information; on a mixed
+     * list every price is worth having, the 1s most of all.
      *
      * A cap is named the same way: only once it is doing something. "4 left"
      * before anything has been submitted is the drop's own small print, and
@@ -211,7 +217,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
     const note = (o) => {
       if (isSet) return spent.has(o.id) ? ' ✓' : '';
 
-      const price = (isPerSet && o.points === 1) ? '' : ` — ${o.points} pts`;
+      const price = priced ? ` — ${pointsLabel(o.points)}` : '';
       const left = timesLeft(o);
       if (left === null) return spent.has(o.id) ? `${price} ✓` : price;
       if (left <= 0) return `${price} — used up`;

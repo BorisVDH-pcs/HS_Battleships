@@ -9,6 +9,7 @@ import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
 import {
   tileGroups, replayTile, unavailableSetOptionIds, completedEachSetGroupNames,
+  tileShowsPrices, pointsLabel,
 } from '../lib/tileProgress.js';
 import { adminTestTile } from '../lib/supabase.js';
 
@@ -935,7 +936,9 @@ function EvidencePreview({ tile, shown = tile, onSession }) {
   // since the whole purpose of this preview is to show what the player sees:
   // set rules never price, and a points_per_set tile prices in ones, where
   // thirty-odd "— 1 pts" would be noise standing in for information.
-  const shows = (o) => !isSet && !(rule === 'points_per_set' && o.points === 1);
+  // The same judgement the real picker makes, through the same function: a
+  // price is printed only where the tile's prices differ from one another.
+  const priced = tileShowsPrices(tile);
 
   // What the real picker would refuse by now, asked of the SIMULATED row and
   // through the same two functions EvidenceUploader asks. This preview used to
@@ -948,7 +951,8 @@ function EvidencePreview({ tile, shown = tile, onSession }) {
 
   const rows = (o) => (
     <option key={o.id} value={o.id} disabled={spent.has(o.id)}>
-      {o.label}{shows(o) ? ` — ${o.points} pts` : ''}{spent.has(o.id) ? ' ✓' : ''}
+      {o.label}{!isSet && priced ? ` — ${pointsLabel(o.points)}` : ''}
+      {spent.has(o.id) ? ' ✓' : ''}
     </option>
   );
   const groups = tileGroups(shown.options ?? options);
