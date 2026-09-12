@@ -1,3 +1,4 @@
+import { PER_MILLION, millionsToTenths } from '../lib/millions.js';
 import { RULES, validateDraft, ruleSummary } from '../lib/tileDraft.js';
 import IconPicker from './IconPicker.jsx';
 
@@ -45,7 +46,11 @@ export default function TileForm({
    */
   const summary = ruleSummary({
     completion: rule,
-    required_evidence: Number(draft.amount) || 1,
+    // A row's units, not the form's: `ruleSummary` reads a value target as
+    // tenths of a million, which is what the box above is typing in millions.
+    required_evidence: rule === 'value'
+      ? (millionsToTenths(draft.amount) ?? PER_MILLION)
+      : Number(draft.amount) || 1,
     per_set: Number(draft.perSet) || 1,
     options: (draft.options ?? []).filter((o) => (o.label ?? '').trim()),
   });
@@ -111,8 +116,14 @@ export default function TileForm({
       {(rule === 'points' || rule === 'value') && (
         <label className="field">
           <span>{rule === 'value' ? 'Target in millions' : priced ? 'Target in points' : 'Screenshots needed'}</span>
+          {/* Text for a value target, so a decimal target can be typed with
+              either separator — the same reason the player's own box is text.
+              Everything else is a count and stays a spinner. */}
           <input
-            type="number" min="1" max={rule === 'value' ? 1000 : 30}
+            type={rule === 'value' ? 'text' : 'number'}
+            {...(rule === 'value'
+              ? { inputMode: 'decimal', placeholder: 'e.g. 15' }
+              : { min: '1', max: '30' })}
             value={draft.amount}
             onChange={(e) => set({ amount: e.target.value })}
           />

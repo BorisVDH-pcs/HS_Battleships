@@ -55,7 +55,8 @@ const cases = [
     name: 'Mixed', required_evidence: 12,
     options: [capped('Once only', 7, 1), drop('As often as you like', 1)],
   })],
-  ['a value target', asRow({ name: 'Coins', completion: 'value', required_evidence: 250 })],
+  // 2500 tenths of a million is the 250m the form types (lib/millions.js).
+  ['a value target', asRow({ name: 'Coins', completion: 'value', required_evidence: 2500 })],
   ['prose', asRow({ name: 'Prose', required_evidence: 2, description: 'Only boss drops count' })],
 ];
 
@@ -198,7 +199,18 @@ for (const [what, row] of cases) {
 
 // ---- what the picker prints -------------------------------------------------
 
-assert.equal(ruleSummary({ completion: 'value', required_evidence: 250 }), '250m total');
+assert.equal(ruleSummary({ completion: 'value', required_evidence: 2500 }), '250m total');
+assert.equal(ruleSummary({ completion: 'value', required_evidence: 5 }), '0.5m total');
+
+// The form says millions, the payload says tenths, and a decimal comma
+// survives the trip — the whole reason the unit changed.
+{
+  const draft = { ...EMPTY_DRAFT, name: 'Artefacts', rule: 'value', amount: '0,5' };
+  assert.equal(payloadFromDraft(draft).amount, 5);
+  assert.equal(draftFromRow(asRow({
+    name: 'Artefacts', completion: 'value', required_evidence: 150,
+  })).amount, '15');
+}
 assert.equal(ruleSummary({ completion: 'one_set', options: [] }), 'any one full set');
 assert.equal(ruleSummary({ completion: 'each_set', per_set: 2 }), '2 different from every set');
 assert.equal(ruleSummary({ completion: 'each_set', per_set: 1 }), 'one from every set');

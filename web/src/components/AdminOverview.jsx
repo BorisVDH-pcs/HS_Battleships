@@ -3,6 +3,7 @@ import { supabase, adminListShipCells, adminReleaseClaim } from '../lib/supabase
 import EvidencePanel from './EvidencePanel.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { GRID, colLetter, coordLabel, cellKey, fromPosition } from '../lib/board.js';
+import { millionsLabel } from '../lib/millions.js';
 
 /**
  * One board per team, with everything on it.
@@ -354,7 +355,10 @@ function adminProgress(cell) {
   if (rule === 'one_set' || rule === 'each_set') {
     return `${cell.evidence_count} submission${cell.evidence_count === 1 ? '' : 's'}`;
   }
-  if (rule === 'value') return `${cell.evidence_points}/${cell.required_evidence}m`;
+  // Tenths of a million in the row, millions on the screen (lib/millions.js).
+  if (rule === 'value') {
+    return `${millionsLabel(cell.evidence_points)}/${millionsLabel(cell.required_evidence)}m`;
+  }
   if (cell.option_count > 0) return `${cell.evidence_points}/${cell.required_evidence} pts`;
   return `${cell.evidence_count}/${cell.required_evidence} submitted`;
 }

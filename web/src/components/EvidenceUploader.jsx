@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { uploadEvidence } from '../lib/evidence.js';
+import { MAX_VALUE, MIN_VALUE, millionsToTenths } from '../lib/millions.js';
 import {
   completedEachSetGroupNames,
   pointsLabel,
@@ -99,7 +100,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   // number for the rules that sum, a set of option ids for the rules that
   // collect.
   const stagedPoints = isValue
-    ? staged.reduce((sum, s) => sum + (parseInt(s.amount, 10) || 0), 0)
+    ? staged.reduce((sum, s) => sum + (millionsToTenths(s.amount) ?? 0), 0)
     : picksDrop
       ? staged.reduce((sum, s) => sum + pointsOf(s.optionId), 0)
       : staged.length;
@@ -125,8 +126,8 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
 
   const allAssigned = staged.every((s) => {
     if (isValue) {
-      const n = parseInt(s.amount, 10);
-      return Number.isFinite(n) && n >= 1 && n <= 1000;
+      const n = millionsToTenths(s.amount);
+      return n !== null && n >= MIN_VALUE && n <= MAX_VALUE;
     }
     return !picksDrop || Boolean(s.optionId);
   });
@@ -148,7 +149,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
         last = await uploadEvidence({
           gameId, teamId, claimId, file: item.file,
           optionId: item.optionId,
-          amount: isValue ? parseInt(item.amount, 10) : null,
+          amount: isValue ? millionsToTenths(item.amount) : null,
         });
         // The database fires as soon as this submission completes the rule.
         // Anything after it belongs to a claim that is now closed and would
@@ -173,13 +174,20 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   /** The per-file control: which drop, or how much it was worth. */
   function assign(item, i) {
     if (isValue) {
+      // Text rather than number, and deliberately: `type="number"` rejects a
+      // decimal comma in most browsers by silently reporting an empty value,
+      // so "0,5" would look like nothing was typed at all. Taking the text and
+      // parsing it here is what lets both separators work — see
+      // lib/millions.js.
+      const tenths = millionsToTenths(item.amount);
+      const bad = item.amount !== '' && tenths === null;
       return (
         <input
-          type="number"
-          min="1"
-          max="1000"
-          inputMode="numeric"
+          type="text"
+          inputMode="decimal"
           placeholder="Worth, in millions"
+          aria-invalid={bad || undefined}
+          title={bad ? 'A number in millions — 0.5, 1, 12.5' : undefined}
           value={item.amount}
           disabled={busy}
           onChange={(e) => {
@@ -327,7 +335,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
           {!allAssigned && (
             <p className="muted">
               {isValue
-                ? 'Type what each drop was worth, in whole millions.'
+                ? 'Type what each drop was worth, in millions — 0.5 and 0,5 both work.'
                 : 'Say which drop each screenshot shows before submitting.'}
             </p>
           )}

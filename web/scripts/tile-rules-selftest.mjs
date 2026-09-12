@@ -10,6 +10,7 @@ import {
   unavailableSetOptionIds,
 } from '../src/lib/tileProgress.js';
 import { evidenceEventText } from '../src/lib/eventText.js';
+import { millionsLabel, millionsToTenths } from '../src/lib/millions.js';
 
 // ---- the tiles a rule refuses to describe -----------------------------------
 // Each of these is also refused by the database, in assert_tile_rule_ok() or
@@ -25,7 +26,7 @@ for (const [what, row, part] of [
                 { grp: 'B', label: 'One', points: 1 },
                 { grp: 'B', label: 'Two', points: 1 }] }, 'fewer than 2'],
   ['a value tile that also lists drops',
-    { rule: 'value', amount: 250, options: [{ label: 'Drop', points: 2 }] },
+    { rule: 'value', amount: 2500, options: [{ label: 'Drop', points: 2 }] },
     'cannot also list drops'],
   ['a priced drop with no price',
     { rule: 'points', amount: 6, options: [{ label: 'Drop' }] },
@@ -171,10 +172,25 @@ assert.equal(
 );
 
 {
-  const tile = { completion: 'value', required_evidence: 250, evidence_points: 190 };
-  assert.equal(tileProgress(tile, { points: 59 }).done, false);
-  assert.equal(tileProgress(tile, { points: 60 }).done, true);
+  // Value tiles count in TENTHS of a million (lib/millions.js): 2500 is the
+  // 250m target, 1900 is 190m banked. The counter divides it back, and a
+  // whole number of millions must not sprout a ".0".
+  const tile = { completion: 'value', required_evidence: 2500, evidence_points: 1900 };
+  assert.equal(tileProgress(tile, { points: 599 }).done, false);
+  assert.equal(tileProgress(tile, { points: 600 }).done, true);
   assert.equal(tileProgressText(tile), '190/250m');
+  // The half million this unit exists for.
+  assert.equal(
+    tileProgressText({ completion: 'value', required_evidence: 150, evidence_points: 5 }),
+    '0.5/15m'
+  );
+  assert.equal(millionsToTenths('0,5'), 5);
+  assert.equal(millionsToTenths('0.5'), 5);
+  assert.equal(millionsToTenths('15'), 150);
+  assert.equal(millionsToTenths('0.55'), null);
+  assert.equal(millionsToTenths(''), null);
+  assert.equal(millionsLabel(5), '0.5');
+  assert.equal(millionsLabel(2500), '250');
 }
 
 assert.equal(
@@ -187,7 +203,7 @@ assert.equal(
 assert.equal(
   evidenceEventText({
     completion: 'value', uploaded_by_name: 'Boris', tile_name: 'Boss uniques',
-    required_evidence: 250, points_awarded: 60, points_total: 190,
+    required_evidence: 2500, points_awarded: 600, points_total: 1900,
   }),
   'Boris submitted a drop worth 60m for Boss uniques (190/250m).'
 );
@@ -440,9 +456,10 @@ assert.equal(
   assert.equal(replayTile(tile, [{}, {}, {}]).completedAtStep, 3);
 
   // A value tile sums what was typed, and refuses what is out of range.
-  const value = { completion: 'value', required_evidence: 250, options: [] };
-  assert.equal(replayTile(value, [{ amount: 100 }, { amount: 150 }]).complete, true);
-  assert.equal(replayTile(value, [{ amount: 0 }, { amount: 250 }]).skipped, 1);
+  // Picks are in stored tenths, the shape admin_test_tile() takes.
+  const value = { completion: 'value', required_evidence: 2500, options: [] };
+  assert.equal(replayTile(value, [{ amount: 1000 }, { amount: 1500 }]).complete, true);
+  assert.equal(replayTile(value, [{ amount: 0 }, { amount: 2500 }]).skipped, 1);
 }
 
 console.log('Tile parser and completion-rule self-test passed.');
