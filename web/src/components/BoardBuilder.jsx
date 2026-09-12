@@ -7,7 +7,9 @@ import TileIcon from './TileIcon.jsx';
 import TileInfo from './TileInfo.jsx';
 import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
-import { tileGroups, replayTile } from '../lib/tileProgress.js';
+import {
+  tileGroups, replayTile, unavailableSetOptionIds, completedEachSetGroupNames,
+} from '../lib/tileProgress.js';
 import { adminTestTile } from '../lib/supabase.js';
 
 /**
@@ -792,6 +794,15 @@ export default function BoardBuilder({
  */
 function PlayerSquarePreview({ at, tile, onClose }) {
   const label = coordLabel(at.row, at.col);
+
+  // The test session lives here rather than inside the uploader, because a
+  // player's card, "?" panel and picker are all drawn from ONE `tiles_for_me`
+  // row and move together as evidence lands. Holding the simulated row at the
+  // level all three can see is what reproduces that: tick a drop off in the
+  // panel and it closes in the picker, because they are the same object.
+  const [session, setSession] = useState(null);
+  const shown = session?.state ?? tile;
+
   return (
     <>
       <div className="row builder-head">
@@ -809,10 +820,13 @@ function PlayerSquarePreview({ at, tile, onClose }) {
           </div>
           <div className="slot-head">
             <strong>{tile.name}</strong>
-            <TileInfo tile={tile} />
+            {/* The simulated row, so the price list fills in its ticks and its
+                per-set counters as the test session goes on — the same panel
+                the player would be reading at that point in the tile. */}
+            <TileInfo tile={shown} />
             <span className="coord">{label}</span>
           </div>
-          <EvidencePreview key={tile.id} tile={tile} />
+          <EvidencePreview key={tile.id} tile={tile} shown={shown} onSession={setSession} />
         </article>
       ) : (
         <p className="muted">Empty. A player sees nothing here yet.</p>
@@ -843,7 +857,7 @@ function PlayerSquarePreview({ at, tile, onClose }) {
  * beside it and the choice lives only in this component's own state, gone
  * the moment a different square is selected.
  */
-function EvidencePreview({ tile }) {
+function EvidencePreview({ tile, shown = tile, onSession }) {
   const options = tile.options ?? [];
   const rule = tile.completion ?? 'points';
   const isSet = rule === 'one_set' || rule === 'each_set';
@@ -882,7 +896,17 @@ function EvidencePreview({ tile }) {
         ...(p.optionId ? { option_id: p.optionId } : {}),
         ...(p.amount ? { amount: Number(p.amount) } : {}),
       })));
-      setResult({ server, client: replayTile(tile, next) });
+      const client = replayTile(tile, next);
+      setResult({ server, client });
+      // Hand the simulated row up, so the "?" panel beside the tile's name
+      // shows what the player would be reading at this point in the session.
+      onSession?.(client);
+      // A drop that has just closed cannot stay selected: the real picker
+      // would have disabled it, and leaving it there invites a second press
+      // that only earns a refusal.
+      if (pick.optionId && unavailableSetOptionIds(client.state).has(pick.optionId)) {
+        setValue('');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -895,10 +919,22 @@ function EvidencePreview({ tile }) {
   // set rules never price, and a points_per_set tile prices in ones, where
   // thirty-odd "— 1 pts" would be noise standing in for information.
   const shows = (o) => !isSet && !(rule === 'points_per_set' && o.points === 1);
+
+  // What the real picker would refuse by now, asked of the SIMULATED row and
+  // through the same two functions EvidenceUploader asks. This preview used to
+  // offer every drop unconditionally, which made it more permissive than the
+  // interface it was previewing: on H2 you could pick a third Bandos hilt into
+  // a General Graardor that was already finished, and watch the tile not move.
+  // The player's own card has never allowed that.
+  const spent = unavailableSetOptionIds(shown);
+  const doneGroups = completedEachSetGroupNames(shown);
+
   const rows = (o) => (
-    <option key={o.id} value={o.id}>{o.label}{shows(o) ? ` — ${o.points} pts` : ''}</option>
+    <option key={o.id} value={o.id} disabled={spent.has(o.id)}>
+      {o.label}{shows(o) ? ` — ${o.points} pts` : ''}{spent.has(o.id) ? ' ✓' : ''}
+    </option>
   );
-  const groups = tileGroups(options);
+  const groups = tileGroups(shown.options ?? options);
 
   return (
     <div className="evidence">
@@ -923,11 +959,16 @@ function EvidencePreview({ tile }) {
       {!isValue && !picksNothing && (
         <select value={value} onChange={(e) => setValue(e.target.value)}>
           <option value="">Which drop?</option>
+          {/* A finished set collapses to one disabled line, exactly as the
+              real picker collapses it — the drops inside it are not choices
+              any more, and listing them greyed out just makes the list long. */}
           {groups.some((g) => g.named)
             ? groups.map((g) => (
-                <optgroup key={g.name} label={g.name}>{g.options.map(rows)}</optgroup>
+                doneGroups.has(g.name)
+                  ? <option key={g.name} disabled>{g.name} — ✓ Done</option>
+                  : <optgroup key={g.name} label={g.name}>{g.options.map(rows)}</optgroup>
               ))
-            : options.map(rows)}
+            : (shown.options ?? options).map(rows)}
         </select>
       )}
 
@@ -947,7 +988,10 @@ function EvidencePreview({ tile }) {
         busy={busy}
         result={result}
         error={error}
-        onReset={() => { setPicks([]); setResult(null); setError(null); setValue(''); }}
+        onReset={() => {
+          setPicks([]); setResult(null); setError(null); setValue('');
+          onSession?.(null);
+        }}
       />
     </div>
   );
@@ -1030,9 +1074,11 @@ function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, on
             <p className="met"><strong>Submit &amp; fire</strong> — that shot goes off.</p>
           ) : (
             <p className="muted">
-              Accepted{last && last.awarded > 0 ? ` — worth ${last.awarded}` : ''}
-              {last && last.awarded > 0 && server.rule === 'value' ? 'm' : ''}
-              {last && last.awarded > 0 && server.rule !== 'value' ? ' pts' : ''}.
+              Accepted{last && last.awarded > 0
+                ? ` — worth ${last.awarded}${server.rule === 'value'
+                    ? 'm'
+                    : ` pt${last.awarded === 1 ? '' : 's'}`}`
+                : ''}.
             </p>
           )}
 

@@ -350,6 +350,48 @@ assert.equal(
 }
 
 {
+  // H2's shape: two uniques from each boss, repeats counting. A THIRD drop
+  // into a boss that already has its two is worth nothing and cannot be
+  // submitted — the picker closes the whole group, and since 20260912235000
+  // `evidence_refusal()` turns it away server-side as well. This was found by
+  // playing the tile in the builder, where the preview had been offering it.
+  const tile = {
+    completion: 'points_per_set', per_set: 2,
+    options: [
+      { id: 'hilt', grp: 'General Graardor', label: 'Bandos hilt', points: 1 },
+      { id: 'tass', grp: 'General Graardor', label: 'Bandos tassets', points: 1 },
+      { id: 'acp',  grp: "Kree'arra", label: 'Armadyl chestplate', points: 1 },
+      { id: 'ahilt', grp: "Kree'arra", label: 'Armadyl hilt', points: 1 },
+    ],
+  };
+
+  const thrice = replayTile(tile, [
+    { optionId: 'hilt' }, { optionId: 'hilt' }, { optionId: 'hilt' },
+  ]);
+  assert.equal(thrice.accepted, 2, 'the third hilt cannot be submitted');
+  assert.equal(thrice.skipped, 1);
+  assert.equal(thrice.complete, false, "Kree'arra is still empty");
+
+  // Nor can a DIFFERENT drop from the same finished boss.
+  const sibling = replayTile(tile, [
+    { optionId: 'hilt' }, { optionId: 'hilt' }, { optionId: 'tass' },
+  ]);
+  assert.equal(sibling.accepted, 2);
+  assert.deepEqual(
+    [...unavailableSetOptionIds(sibling.state)].sort(), ['hilt', 'tass'],
+    'the whole group closes, not just the drop that filled it',
+  );
+
+  // And the tile finishes when the second boss is served, repeats included.
+  const both = replayTile(tile, [
+    { optionId: 'hilt' }, { optionId: 'hilt' },
+    { optionId: 'acp' }, { optionId: 'acp' },
+  ]);
+  assert.equal(both.complete, true);
+  assert.equal(both.completedAtStep, 4);
+}
+
+{
   // A plain screenshot tile: no drops to pick, so every entry is worth one.
   const tile = { completion: 'points', required_evidence: 3, options: [] };
   assert.equal(replayTile(tile, [{}, {}]).complete, false);

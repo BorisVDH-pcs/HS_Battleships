@@ -317,6 +317,12 @@ export function replayTile(tile, picks = []) {
     // the same line the player would be looking at rather than inventing a
     // second wording for the same numbers.
     progress: tileProgress(state),
+    // The tile as `tiles_for_me()` would have returned it after those
+    // submissions — `got` and `taken` filled in on every option. A real
+    // player's card, "?" panel and drop picker all read one row like this, so
+    // handing the builder the same shape is what lets its preview behave like
+    // the interface rather than like a description of it.
+    state,
   };
 }
 

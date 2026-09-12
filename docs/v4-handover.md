@@ -113,6 +113,27 @@ completion, and `fire_tile` wants ships placed and a game under way, neither of
 which is true of a board still being built. So it plays the parts that are about
 the *tile* and leaves the parts that are about the *game* alone.
 
+**The preview is the interface, not a description of it.** The session's
+simulated row — `replayTile().state`, shaped exactly like a `tiles_for_me()`
+row — is held in `PlayerSquarePreview` and handed to the card, the `?` panel and
+the drop picker alike, because that is how a real player's three views stay in
+step: they are one row. So the panel's sets fill in as you submit, and a
+finished group collapses to *"General Graardor — ✓ Done"* in the picker.
+
+Before that, the preview listed every drop unconditionally and was **more
+permissive than the interface it previewed** — on H2 you could submit a third
+Bandos hilt into a General Graardor that was already full and watch the tile not
+move. Which is how **20260912235000** was found.
+
+**20260912235000 — a full group takes no more.** `points_per_set` closed the
+group in `unavailableSetOptionIds()` but nowhere in the database, so the browser
+was the only thing stopping a third hilt from being banked as a point that
+bought nothing. `each_set` already refused this through its group-quota check;
+the two rules differ on whether a REPEAT counts, not on whether a finished group
+stays open. So the refusal is in `evidence_refusal()` for both, measuring the
+group the way each rule measures it — distinct options for `each_set`, banked
+points for `points_per_set`.
+
 **`evidence_refusal()`** was extracted from `add_evidence` rather than copied, so
 the tester and the real submit path cannot disagree about why a screenshot is
 turned away. It also folds in `each_set`'s group quota, which `add_evidence`
