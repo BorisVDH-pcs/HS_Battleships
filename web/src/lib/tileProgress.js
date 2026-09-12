@@ -7,13 +7,20 @@
 // goes off — but the interface has to predict it correctly or the button lies.
 //
 // The rules, mirroring the migration:
-//   points   sum the points of what was submitted; repeats count.
-//   value    same sum, except the numbers were typed by the submitter.
-//   one_set  finished when any ONE group is complete.
-//   each_set finished when EVERY group has `per_set` distinct options.
+//   points         sum the points of what was submitted; repeats count.
+//   value          same sum, except the numbers were typed by the submitter.
+//   one_set        finished when any ONE group is complete.
+//   each_set       finished when EVERY group has `per_set` distinct options.
+//   points_per_set finished when EVERY group has `per_set` points in it, and
+//                  the same drop handed in twice is worth twice.
 //
 // An option with no `grp` is its own group, which is what makes "one from each
 // of five bosses" and "two different pieces of one set" the same mechanism.
+//
+// The last two rules are a pair, and the difference between them is the only
+// thing either is for: `each_set` is "two DIFFERENT uniques from each boss",
+// `points_per_set` is "two uniques from each boss" with no such qualifier. So
+// they group identically and diverge on one question — does a repeat count.
 
 /** Options bucketed into their sets, with how many of each are in already. */
 export function tileGroups(options = []) {
@@ -43,8 +50,49 @@ export function tileProgress(tile, staged = {}) {
   const options = tile.options ?? [];
   const need = tile.required_evidence ?? 1;
   const perSet = tile.per_set ?? 1;
-  const stagedIds = new Set(staged.optionIds ?? []);
+  const stagedList = staged.optionIds ?? [];
+  const stagedIds = new Set(stagedList);
   const stagedPoints = staged.points ?? 0;
+
+  // Points banked into one group, counting repeats: what `points_per_set`
+  // measures and the one number no boolean `taken` can carry. `got` is the
+  // per-option submission count from tiles_for_me(); the fallback keeps this
+  // honest for any caller still handing over the older boolean-only shape.
+  if (rule === 'points_per_set') {
+    const worth = (o) => o.points ?? 1;
+    const groups = tileGroups(options).map((g) => {
+      const banked = g.options.reduce(
+        (sum, o) => sum + (o.got ?? (o.taken ? 1 : 0)) * worth(o), 0
+      );
+      const adding = g.options.reduce(
+        (sum, o) => sum + stagedList.filter((id) => id === o.id).length * worth(o), 0
+      );
+      return { ...g, taken: banked + adding, need: perSet };
+    });
+    const complete = groups.filter((g) => g.taken >= g.need);
+
+    // One group means "this many points from this list", and calling that
+    // 0/1 sets would hide the target the tile is actually about — the same
+    // reason each_set special-cases a lone group.
+    if (groups.length === 1) {
+      const [group] = groups;
+      return {
+        rule, groups,
+        done: group.taken >= group.need,
+        unit: 'Points',
+        have: group.taken,
+        need: group.need,
+      };
+    }
+
+    return {
+      rule, groups,
+      done: groups.length > 0 && complete.length === groups.length,
+      unit: 'Sets complete',
+      have: complete.length,
+      need: groups.length,
+    };
+  }
 
   if (rule === 'one_set' || rule === 'each_set') {
     // A staged option counts toward its group, but only once: two screenshots
@@ -121,6 +169,20 @@ export function tileProgress(tile, staged = {}) {
  */
 export function unavailableSetOptionIds(tile, staged = {}) {
   const rule = tile.completion ?? 'points';
+
+  // Under `points_per_set` a repeat is the whole feature, so nothing closes
+  // except a group that has reached its target — at which point further drops
+  // from that boss cannot move the tile and offering them would only mislead.
+  if (rule === 'points_per_set') {
+    const unavailable = new Set();
+    for (const group of tileProgress(tile, staged).groups) {
+      if (group.taken >= group.need) {
+        for (const option of group.options) unavailable.add(option.id);
+      }
+    }
+    return unavailable;
+  }
+
   if (rule !== 'one_set' && rule !== 'each_set') return new Set();
 
   const unavailable = new Set([
@@ -139,9 +201,10 @@ export function unavailableSetOptionIds(tile, staged = {}) {
   return unavailable;
 }
 
-/** Names of each-set groups whose persisted evidence already meets the quota. */
+/** Names of per-group sets whose persisted evidence already meets the quota. */
 export function completedEachSetGroupNames(tile) {
-  if ((tile.completion ?? 'points') !== 'each_set') return new Set();
+  const rule = tile.completion ?? 'points';
+  if (rule !== 'each_set' && rule !== 'points_per_set') return new Set();
 
   return new Set(
     tileProgress(tile).groups
@@ -159,6 +222,11 @@ export function tileProgressText(tile) {
   if (progress.rule === 'each_set') {
     return progress.unit === 'Items'
       ? `${progress.have}/${progress.need} items collected`
+      : `${progress.have}/${progress.need} sets complete`;
+  }
+  if (progress.rule === 'points_per_set') {
+    return progress.unit === 'Points'
+      ? `${progress.have}/${progress.need} pts`
       : `${progress.have}/${progress.need} sets complete`;
   }
   if (progress.rule === 'value') {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { parseTileText } from '../src/lib/tileParser.js';
+import { validateTileRow } from '../src/lib/tileParser.js';
 import {
   completedEachSetGroupNames,
   tileProgress,
@@ -8,63 +8,32 @@ import {
 } from '../src/lib/tileProgress.js';
 import { evidenceEventText } from '../src/lib/eventText.js';
 
-const parse = (line) => parseTileText(line, 10);
+// ---- the tiles a rule refuses to describe -----------------------------------
+// Each of these is also refused by the database, in assert_tile_rule_ok() or
+// claim_is_complete()'s own guards. The form asks first so the answer does not
+// arrive as a Postgres exception halfway through building a board.
 
-{
-  const { rows, errors } = parse('Kill > 50 creatures | icon | 2 :: URL: https://example.test/a|b');
-  assert.deepEqual(errors, []);
-  assert.deepEqual(rows[0], {
-    row: 1, col: 1, name: 'Kill > 50 creatures', icon: 'icon', amount: 2,
-    description: 'URL: https://example.test/a|b',
-  });
-}
-
-{
-  const { rows, errors } = parse('Weighted | icon | 6 > Rare:6, Common:2');
-  assert.deepEqual(errors, []);
-  assert.equal(rows[0].amount, 6);
-  assert.deepEqual(rows[0].options, [
-    { label: 'Rare', points: 6 },
-    { label: 'Common', points: 2 },
-  ]);
-}
-
-{
-  const { rows, errors } = parse(
-    'Armour | icon | set > A/Helm, A/Body, B/Helm, B/Body, Instant win'
-  );
-  assert.deepEqual(errors, []);
-  assert.equal(rows[0].rule, 'one_set');
-  assert.deepEqual(rows[0].options[0], { grp: 'A', label: 'Helm', points: 1 });
-  assert.deepEqual(rows[0].options[4], { label: 'Instant win', points: 1 });
-}
-
-{
-  const { rows, errors } = parse(
-    'Raids | icon | each 2 > CoX/One, CoX/Two, ToB/One, ToB/Two'
-  );
-  assert.deepEqual(errors, []);
-  assert.equal(rows[0].rule, 'each_set');
-  assert.equal(rows[0].perSet, 2);
-}
-
-{
-  const { rows, errors } = parse('Value | coins | 250m');
-  assert.deepEqual(errors, []);
-  assert.deepEqual(rows[0], {
-    row: 1, col: 1, name: 'Value', icon: 'coins', amount: 250, rule: 'value',
-  });
-}
-
-for (const [line, part] of [
-  ['Bad | icon | surprise', 'unknown completion rule'],
-  ['Bad | icon | set', 'lists no drops'],
-  ['Bad | icon | each 2 > A/Only, B/One, B/Two', 'fewer than 2'],
-  ['Bad | icon | 250m > Drop:2', 'cannot also list drops'],
-  ['Bad | icon | 6 > Drop', 'without a name or points'],
+for (const [what, row, part] of [
+  ['a set rule with no drops',
+    { rule: 'one_set', options: [] }, 'lists no drops'],
+  ['each_set with a group too small to ever fill',
+    { rule: 'each_set', perSet: 2,
+      options: [{ grp: 'A', label: 'Only', points: 1 },
+                { grp: 'B', label: 'One', points: 1 },
+                { grp: 'B', label: 'Two', points: 1 }] }, 'fewer than 2'],
+  ['a value tile that also lists drops',
+    { rule: 'value', amount: 250, options: [{ label: 'Drop', points: 2 }] },
+    'cannot also list drops'],
+  ['a priced drop with no price',
+    { rule: 'points', amount: 6, options: [{ label: 'Drop' }] },
+    'without a name or points'],
+  ['a per-set quota out of range',
+    { rule: 'points_per_set', perSet: 99,
+      options: [{ grp: 'A', label: 'Drop', points: 1 }] }, 'outside 1–30'],
 ]) {
-  const { errors } = parse(line);
-  assert.ok(errors.some((error) => error.includes(part)), `${line}: ${errors.join(' ')}`);
+  const errors = validateTileRow(row);
+  assert.ok(errors.some((error) => error.includes(part)),
+    `${what}: ${errors.join(' ') || 'no errors at all'}`);
 }
 
 {
@@ -126,6 +95,77 @@ for (const [line, part] of [
   assert.equal(tileProgress(tile, { optionIds: ['part-a', 'part-a'] }).done, false);
   assert.equal(tileProgress(tile, { optionIds: ['part-a', 'part-d'] }).done, true);
 }
+
+// points_per_set: grouped like each_set, but a repeat counts. Two of the same
+// Bandos piece finishes Graardor, which is the entire reason the rule exists.
+{
+  const options = [
+    { id: 'g1', grp: 'Graardor', label: 'Chestplate', points: 1, got: 2 },
+    { id: 'g2', grp: 'Graardor', label: 'Tassets', points: 1, got: 0 },
+    { id: 'z1', grp: 'Zilyana', label: 'Hilt', points: 1, got: 0 },
+    { id: 'z2', grp: 'Zilyana', label: 'Crossbow', points: 1, got: 0 },
+  ];
+  const tile = { completion: 'points_per_set', per_set: 2, options };
+
+  const now = tileProgress(tile);
+  assert.equal(now.done, false);
+  assert.equal(now.groups.find((g) => g.name === 'Graardor').taken, 2);
+  assert.equal(tileProgressText(tile), '1/2 sets complete');
+
+  // Graardor is full, so its drops close; Zilyana's stay pickable, repeats
+  // included — `z1` twice is a legitimate way to finish it.
+  assert.deepEqual([...completedEachSetGroupNames(tile)], ['Graardor']);
+  assert.deepEqual([...unavailableSetOptionIds(tile)].sort(), ['g1', 'g2']);
+  assert.equal(tileProgress(tile, { optionIds: ['z1'] }).done, false);
+  assert.equal(tileProgress(tile, { optionIds: ['z1', 'z1'] }).done, true);
+  assert.equal(tileProgress(tile, { optionIds: ['z1', 'z2'] }).done, true);
+
+  // The same shape under each_set: a repeat is worth nothing there.
+  const strict = { ...tile, completion: 'each_set' };
+  assert.equal(tileProgress(strict, { optionIds: ['z1', 'z1'] }).done, false);
+}
+
+// A lone group is "this many points from this list", not "0/1 sets".
+{
+  const tile = {
+    completion: 'points_per_set', per_set: 3,
+    options: [
+      { id: 'r1', grp: 'Rings', label: 'Berserker', points: 1, got: 1 },
+      { id: 'r2', grp: 'Rings', label: 'Warrior', points: 2, got: 0 },
+    ],
+  };
+  assert.equal(tileProgressText(tile), '1/3 pts');
+  assert.equal(tileProgress(tile, { optionIds: ['r2'] }).done, true);
+  assert.equal(tileProgress(tile, { optionIds: ['r1'] }).done, false);
+  assert.equal(tileProgress(tile, { optionIds: ['r1', 'r1'] }).done, true);
+}
+
+// A group of one can be finished under points_per_set and must not be
+// rejected by the validator the way each_set rightly rejects it.
+{
+  const row = {
+    rule: 'points_per_set', perSet: 2,
+    options: [{ grp: 'Solo', label: 'Only drop', points: 1 }],
+  };
+  assert.deepEqual(validateTileRow(row), []);
+  assert.ok(
+    validateTileRow({ ...row, rule: 'each_set' })
+      .some((error) => error.includes('fewer than 2'))
+  );
+  assert.ok(
+    validateTileRow({ rule: 'points_per_set', perSet: 2, options: [] })
+      .some((error) => error.includes('lists no drops'))
+  );
+}
+
+assert.equal(
+  evidenceEventText({
+    completion: 'points_per_set', uploaded_by_name: 'Boris', tile_name: 'GWD',
+    option_label: 'Bandos chestplate', required_evidence: 2,
+    points_awarded: 1, points_total: 3,
+  }),
+  'Boris submitted Bandos chestplate for GWD.'
+);
 
 {
   const tile = { completion: 'value', required_evidence: 250, evidence_points: 190 };

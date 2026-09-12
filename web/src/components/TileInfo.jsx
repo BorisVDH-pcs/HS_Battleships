@@ -7,6 +7,7 @@ const HEADINGS = {
   points: 'Drops that count — any mix adding up to the target',
   one_set: 'Complete any one of these sets',
   each_set: 'Collect from each of these',
+  points_per_set: 'Collect from each of these',
 };
 
 /** Breathing room between the panel and the edge of the window. */
@@ -194,6 +195,12 @@ export default function TileInfo({ tile }) {
                 {HEADINGS[rule] ?? HEADINGS.points}
                 {rule === 'each_set' && (tile.per_set ?? 1) > 1
                   && ` — ${tile.per_set} different from each`}
+                {/* "Repeats count" is the one thing that distinguishes this
+                    rule from the one above it, and the question a team asks
+                    first — so it is said here rather than left to be inferred
+                    from the absence of the word "different". */}
+                {rule === 'points_per_set' && (tile.per_set ?? 1) > 1
+                  && ` — ${tile.per_set} from each, repeats counting`}
               </span>
 
               {/* One flat list when nothing is grouped, a sub-list per set when

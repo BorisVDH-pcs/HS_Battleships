@@ -65,7 +65,12 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
   const tileName = tile.name;
   const options = tile.options ?? [];
   const rule = tile.completion ?? 'points';
+  // `isSet` means "a repeat is worth nothing here", which is what the picker
+  // and the counter branch on. points_per_set groups like a set and is scored
+  // like points, so it is deliberately not one of them.
   const isSet = rule === 'one_set' || rule === 'each_set';
+  const isPerSet = rule === 'points_per_set';
+  const grouped = isSet || isPerSet;
   const isValue = rule === 'value';
   const picksDrop = options.length > 0;
 
@@ -105,8 +110,10 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
 
   // An option already handed in cannot be picked again on a set tile — the
   // server refuses it, so offering it would only produce an error after the
-  // upload had already cost the player a round trip.
-  const spent = isSet ? unavailableSetOptionIds(tile, pending) : new Set();
+  // upload had already cost the player a round trip. On a points_per_set tile
+  // the same call returns only the drops of a group that is already full,
+  // since there a repeat is a legitimate submission.
+  const spent = grouped ? unavailableSetOptionIds(tile, pending) : new Set();
 
   const allAssigned = staged.every((s) => {
     if (isValue) {
@@ -181,7 +188,14 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
     const rows = (o) => (
       <option key={o.id} value={o.id} disabled={spent.has(o.id) && o.id !== item.optionId}>
         {o.label}
-        {spent.has(o.id) ? ' ✓' : (isSet ? '' : ` — ${o.points} pts`)}
+        {/* A points_per_set tile IS priced, so its prices are worth naming —
+            but they are 1 on every one of them for the tiles that rule exists
+            for, and thirty-two rows of "— 1 pts" is noise standing in for
+            information. Named only where it says something. */}
+        {spent.has(o.id) ? ' ✓'
+          : isSet ? ''
+          : (isPerSet && o.points === 1) ? ''
+          : ` — ${o.points} pts`}
       </option>
     );
 
@@ -221,7 +235,7 @@ const EvidenceUploader = forwardRef(function EvidenceUploader({
         <strong className={now.done ? 'met' : ''}>
           {now.have} / {now.need}{now.suffix ?? ''}
         </strong>
-        {!now.done && stagedPoints > 0 && !isSet && (
+        {!now.done && stagedPoints > 0 && !grouped && (
           <span className="muted"> (+{stagedPoints} staged)</span>
         )}
         {!now.done && <span className="muted"> — needed before you can fire</span>}

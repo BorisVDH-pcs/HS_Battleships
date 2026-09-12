@@ -850,8 +850,13 @@ function EvidencePreview({ tile }) {
   const [value, setValue] = useState('');
   if (!isValue && options.length === 0) return null;
 
+  // Matching EvidenceUploader's own rule for when a price is worth printing,
+  // since the whole purpose of this preview is to show what the player sees:
+  // set rules never price, and a points_per_set tile prices in ones, where
+  // thirty-odd "— 1 pts" would be noise standing in for information.
+  const shows = (o) => !isSet && !(rule === 'points_per_set' && o.points === 1);
   const rows = (o) => (
-    <option key={o.id} value={o.id}>{o.label}{isSet ? '' : ` — ${o.points} pts`}</option>
+    <option key={o.id} value={o.id}>{o.label}{shows(o) ? ` — ${o.points} pts` : ''}</option>
   );
   const groups = tileGroups(options);
 

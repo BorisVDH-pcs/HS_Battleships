@@ -1,69 +1,70 @@
-// The builder writes tiles through the same validation the paste box does, and
-// the whole point of `validateTileRow` living in tileParser.js is that the two
-// cannot drift. That is only true if something checks it, so this asserts the
-// round trip: a line of paste grammar, parsed, is the same payload the form
-// produces from the row that line would create.
+// A tile goes out of the database as a row, into the form as a draft, and back
+// as a payload — and the builder is the only way a board gets built, so a tile
+// that changes shape on that trip changes on every edit anybody makes. This
+// asserts the trip is lossless for every rule, and that `validateTileRow`
+// agrees with the database about what is savable.
+//
+// (This used to start from lines of paste grammar. The paste box is gone and
+// `parseTileText` with it; the row is the only shape a tile now arrives in.)
 
 import assert from 'node:assert/strict';
-import { parseTileText, validateTileRow } from '../src/lib/tileParser.js';
+import { validateTileRow } from '../src/lib/tileParser.js';
 import {
   EMPTY_DRAFT, draftFromRow, payloadFromDraft, payloadFromRow,
   validateDraft, ruleSummary, groupsOf,
 } from '../src/lib/tileDraft.js';
 
-/** The database row a pasted line becomes, as admin_list_tiles would return it. */
-function asRow(payload) {
-  return {
-    name: payload.name,
-    icon: payload.icon || null,
-    description: payload.description ?? null,
-    required_evidence: payload.amount ?? 1,
-    completion: payload.rule ?? 'points',
-    per_set: payload.perSet ?? 1,
-    options: (payload.options ?? []).map((o) => ({
-      label: o.label, points: o.points, grp: o.grp ?? null,
-    })),
-  };
-}
-
-// ---- paste grammar in, identical payload out --------------------------------
-
-const cases = [
-  'A plain tile | some_icon',
-  'Five drops | some_icon | 5',
-  'Nineteen drops | some_icon | 19',
-  'Priced drops | some_icon | 6 > Rare:6, Mid:3, Common:2',
-  'One full set | armour | set > A/Helm, A/Body, B/Helm, B/Body',
-  'From every raid | raids | each 2 > R1/D1, R1/D2, R2/D1, R2/D2',
-  'A value target | coins | 250m',
-  'With prose | some_icon | 2 :: Only boss drops count',
-];
-
-/**
- * The payload as the database will read it.
- *
- * The two producers disagree about one harmless thing: the parser omits
- * `amount` when a line carries no amount field, the form always states it. Both
- * land on `required_evidence = 1`, because that is the column default and
- * `admin_set_tile` coalesces to it either way — so the comparison is made on
- * what gets stored rather than on which keys were spelled out.
- */
-const stored = (payload) => ({
-  amount: 1, rule: 'points', perSet: 1,
-  icon: '', description: '', options: [],
-  ...payload,
+/** A tile as admin_list_tiles / admin_list_library return it. */
+const asRow = (over) => ({
+  name: 'A tile', icon: null, description: null,
+  required_evidence: 1, completion: 'points', per_set: 1, options: [],
+  ...over,
 });
 
-for (const line of cases) {
-  const { rows, errors } = parseTileText(line, 10);
-  assert.deepEqual(errors, [], `${line} should parse cleanly`);
+const drop = (label, points = 1, grp = null) => ({ label, points, grp });
 
-  const { row: _r, col: _c, ...pasted } = rows[0];
-  const rebuilt = payloadFromRow(asRow(pasted));
+// ---- a row, edited and saved, is the same tile -------------------------------
 
-  assert.deepEqual(stored(rebuilt), stored(pasted), `round trip differs for: ${line}`);
-  assert.deepEqual(validateDraft(draftFromRow(asRow(pasted)), 'A1'), [],
-    `round trip should stay valid for: ${line}`);
+const cases = [
+  ['a plain tile', asRow({ name: 'Plain', icon: 'some_icon' })],
+  ['a count of screenshots', asRow({ name: 'Five', required_evidence: 5 })],
+  ['a priced tile', asRow({
+    name: 'Priced', required_evidence: 6,
+    options: [drop('Rare', 6), drop('Mid', 3), drop('Common', 2)],
+  })],
+  ['one full set', asRow({
+    name: 'Armour', completion: 'one_set',
+    options: [drop('Helm', 1, 'A'), drop('Body', 1, 'A'), drop('Helm', 1, 'B')],
+  })],
+  ['different drops from every set', asRow({
+    name: 'Raids', completion: 'each_set', per_set: 2,
+    options: [drop('D1', 1, 'R1'), drop('D2', 1, 'R1'),
+              drop('D1', 1, 'R2'), drop('D2', 1, 'R2')],
+  })],
+  ['points from every set, repeats counting', asRow({
+    name: 'GWD', completion: 'points_per_set', per_set: 2,
+    options: [drop('Hilt', 1, 'Graardor'), drop('Tassets', 1, 'Graardor'),
+              drop('Hilt', 1, 'Zilyana')],
+  })],
+  ['a value target', asRow({ name: 'Coins', completion: 'value', required_evidence: 250 })],
+  ['prose', asRow({ name: 'Prose', required_evidence: 2, description: 'Only boss drops count' })],
+];
+
+for (const [what, row] of cases) {
+  const once = payloadFromRow(row);
+  // Round-tripped a second time through the row shape the first payload would
+  // be stored as: a field that survives one trip but not two is still lost.
+  const twice = payloadFromRow(asRow({
+    ...row,
+    required_evidence: once.amount ?? row.required_evidence,
+    completion: once.rule ?? 'points',
+    per_set: once.perSet ?? 1,
+    options: once.options ?? [],
+  }));
+
+  assert.deepEqual(twice, once, `round trip differs for ${what}`);
+  assert.deepEqual(validateDraft(draftFromRow(row), 'A1'), [],
+    `round trip should stay valid for ${what}`);
 }
 
 // ---- the form can produce what the paste box rejects, and is told so --------
@@ -84,10 +85,27 @@ for (const line of cases) {
 }
 
 {
-  // A blank name is an empty line to the parser and simply skipped; a form can
-  // be submitted blank, so validateDraft has to catch it where the parser does not.
+  // A form can be submitted blank, and `validateTileRow` has nothing to say
+  // about a missing name — so `validateDraft` is the only thing standing
+  // between an empty form and a tile called "Tile".
   assert.deepEqual(validateDraft({ ...EMPTY_DRAFT }, 'C3'), ['C3 needs a name.']);
   assert.deepEqual(validateTileRow({ name: '', rule: 'points', amount: 1 }, 'C3'), []);
+}
+
+{
+  // points_per_set needs its drops like the other grouped rules, and unlike
+  // each_set it accepts a group too small to yield that many DIFFERENT ones.
+  assert.deepEqual(
+    validateDraft({ ...EMPTY_DRAFT, name: 'Sets', rule: 'points_per_set' }, 'E5'),
+    ['E5 uses a set rule but lists no drops.']
+  );
+  assert.deepEqual(
+    validateDraft({
+      ...EMPTY_DRAFT, name: 'Solo boss', rule: 'points_per_set', perSet: '2',
+      options: [{ label: 'Only drop', points: '1', grp: 'Boss' }],
+    }, 'F6'),
+    []
+  );
 }
 
 {
@@ -111,12 +129,25 @@ for (const line of cases) {
   assert.equal('perSet' in payload, false, 'one_set does not use perSet');
 }
 
+{
+  const payload = payloadFromDraft({
+    ...EMPTY_DRAFT, name: 'GWD', rule: 'points_per_set', amount: '7', perSet: '2',
+    options: [{ label: 'Hilt', points: '3', grp: 'Graardor' }],
+  });
+  assert.equal('amount' in payload, false, 'a per-set tile has no whole-tile target');
+  assert.equal(payload.perSet, 2);
+  // Its prices are read by claim_is_complete, unlike every other set rule's.
+  assert.equal(payload.options[0].points, 3);
+}
+
 // ---- what the picker prints -------------------------------------------------
 
 assert.equal(ruleSummary({ completion: 'value', required_evidence: 250 }), '250m total');
 assert.equal(ruleSummary({ completion: 'one_set', options: [] }), 'any one full set');
 assert.equal(ruleSummary({ completion: 'each_set', per_set: 2 }), '2 different from every set');
 assert.equal(ruleSummary({ completion: 'each_set', per_set: 1 }), 'one from every set');
+assert.equal(ruleSummary({ completion: 'points_per_set', per_set: 2 }), '2 from every set');
+assert.equal(ruleSummary({ completion: 'points_per_set', per_set: 1 }), 'one from every set');
 assert.equal(
   ruleSummary({ completion: 'points', required_evidence: 6, options: [{ label: 'A', points: 6 }] }),
   '6 pts'

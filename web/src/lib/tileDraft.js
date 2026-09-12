@@ -23,6 +23,10 @@ export const RULES = [
   { value: 'each_set',
     label: 'Something from every set',
     hint: 'Finishes when every group has the required number of different drops.' },
+  { value: 'points_per_set',
+    label: 'A number from every set',
+    hint: 'Like the above, except the same drop counts again — "two uniques from '
+        + 'each boss" rather than "two different uniques from each boss".' },
   { value: 'value',
     label: 'Total value in millions',
     hint: 'The team types what each drop was worth; finishes when the total reaches the target.' },
@@ -85,10 +89,15 @@ export function payloadFromDraft(draft, extra = {}) {
   const rule = draft.rule ?? 'points';
   const amount = Number(draft.amount);
   const perSet = Number(draft.perSet);
+  // The two rules that actually read an option's price keep it; the ones that
+  // count options rather than points would only be storing a number nothing
+  // looks at, and a stored number invites the reader to believe it means
+  // something.
+  const priced = rule === 'points' || rule === 'points_per_set';
   const options = (draft.options ?? [])
     .map((o) => ({
       label: (o.label ?? '').trim(),
-      points: rule === 'points' ? Number(o.points) : 1,
+      points: priced ? Number(o.points) : 1,
       ...((o.grp ?? '').trim() ? { grp: (o.grp ?? '').trim() } : {}),
     }))
     .filter((o) => o.label);
@@ -100,7 +109,9 @@ export function payloadFromDraft(draft, extra = {}) {
     ...(rule === 'points' || rule === 'value'
       ? { amount: Number.isFinite(amount) ? amount : 1 }
       : {}),
-    ...(rule === 'each_set' ? { perSet: Number.isFinite(perSet) ? perSet : 1 } : {}),
+    ...(rule === 'each_set' || rule === 'points_per_set'
+      ? { perSet: Number.isFinite(perSet) ? perSet : 1 }
+      : {}),
     ...(options.length ? { options } : {}),
     ...((draft.description ?? '').trim() ? { description: draft.description.trim() } : {}),
     ...extra,
@@ -137,6 +148,10 @@ export function ruleSummary(row) {
   if (rule === 'each_set') {
     const per = row.per_set ?? 1;
     return per > 1 ? `${per} different from every set` : 'one from every set';
+  }
+  if (rule === 'points_per_set') {
+    const per = row.per_set ?? 1;
+    return per > 1 ? `${per} from every set` : 'one from every set';
   }
   if (options.length > 0) return `${row.required_evidence} pts`;
   const count = row.required_evidence ?? 1;

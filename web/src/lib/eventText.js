@@ -5,7 +5,12 @@ export function evidenceEventText(payload = {}, fallbackWho = 'Someone') {
   const need = payload.required_evidence;
   const rule = payload.completion ?? 'points';
 
-  if ((rule === 'one_set' || rule === 'each_set') && payload.option_label) {
+  // Every per-group rule stops at naming the drop. The running total below is
+  // a fraction of the tile's target, and a tile whose target is per-group does
+  // not have one to be a fraction of.
+  const perGroup = rule === 'one_set' || rule === 'each_set' || rule === 'points_per_set';
+
+  if (perGroup && payload.option_label) {
     return `${by} submitted ${payload.option_label} for ${tile}.`;
   }
   if (rule === 'value') {

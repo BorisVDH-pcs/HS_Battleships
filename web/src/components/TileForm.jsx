@@ -119,9 +119,14 @@ export default function TileForm({
         </label>
       )}
 
-      {rule === 'each_set' && (
+      {(rule === 'each_set' || rule === 'points_per_set') && (
         <label className="field">
-          <span>Different drops per set</span>
+          {/* Same field, and the wording is the whole difference between the
+              two rules — so it says which one this is rather than leaving the
+              reader to remember. */}
+          <span>
+            {rule === 'each_set' ? 'Different drops per set' : 'Points per set'}
+          </span>
           <input
             type="number" min="1" max="30"
             value={draft.perSet}
@@ -136,6 +141,7 @@ export default function TileForm({
             Drops
             {rule === 'points' && <em className="muted"> — priced, optional</em>}
             {(rule === 'one_set' || rule === 'each_set') && <em className="muted"> — grouped into sets</em>}
+            {rule === 'points_per_set' && <em className="muted"> — grouped into sets, priced</em>}
           </h4>
           {rule !== 'value' && (
             <button
@@ -177,7 +183,7 @@ export default function TileForm({
                   placeholder="Drop"
                   maxLength={80}
                 />
-                {rule === 'points' && (
+                {(rule === 'points' || rule === 'points_per_set') && (
                   <input
                     className="drop-points"
                     type="number" min="1" max="30"
