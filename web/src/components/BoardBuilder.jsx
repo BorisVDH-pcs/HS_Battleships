@@ -69,7 +69,22 @@ export default function BoardBuilder({
   //          it is not read as taking a name the catalogue has spoken for.
   const [editing, setEditing] = useState(null);
 
-  const locked = game.status !== 'setup' && game.status !== 'placement';
+  // Three states, not two.
+  //
+  //   before  — setup/placement: the whole board is yours, and so are the
+  //             board-level tools that deal, clear and load one.
+  //   live    — active: a square nobody has locked in can still be fixed, which
+  //             is what makes a wrong drop list spotted in the second hour
+  //             something other than permanent. A claimed square cannot: the
+  //             database refuses it, and would silently reset a set tile's
+  //             collected evidence if it did not (see 20260913010000).
+  //             Whole-board tools are gone here — every one of them is refused
+  //             mid-game, and offering a button that cannot work is worse than
+  //             not offering it.
+  //   after   — finished: nothing to fix, and rewriting a tile would only make
+  //             the record of the match lie.
+  const live = game.status === 'active';
+  const locked = !live && game.status !== 'setup' && game.status !== 'placement';
   const need = game.grid_size * game.grid_size;
 
   const byPosition = useMemo(
@@ -404,9 +419,18 @@ export default function BoardBuilder({
     <section className="card">
       <h2>Board builder</h2>
       <p className="muted">
-        {tiles.length} of {need} squares filled.
-        {tiles.length < need && ' Click an empty square, then a tile to put in it.'}
-        {' Arrow keys move around the board; Enter opens the square.'}
+        {live ? (
+          <>
+            The game is running. A square no team has locked in can still be
+            fixed; a claimed one is marked and cannot be changed.
+          </>
+        ) : (
+          <>
+            {tiles.length} of {need} squares filled.
+            {tiles.length < need && ' Click an empty square, then a tile to put in it.'}
+            {' Arrow keys move around the board; Enter opens the square.'}
+          </>
+        )}
       </p>
 
       {tiles.length > 0 && (
@@ -452,6 +476,7 @@ export default function BoardBuilder({
       <div className="builder">
         <BuilderGrid
           tiles={byPosition}
+          live={live}
           playerView={playerView}
           at={at}
           onPick={(row, col) => { setAt({ row, col }); setEditing(null); }}
@@ -567,9 +592,24 @@ export default function BoardBuilder({
                       )}
                     </div>
                   </div>
+
+                  {/* The one thing this square cannot do, said before the
+                      buttons rather than after a refused save. Both kinds of
+                      claim count: a fired one means a team has already played
+                      this square, and rewriting it would rewrite what they
+                      played. */}
+                  {live && current.claimed && (
+                    <p className="muted">
+                      A team has locked this square in, so it cannot be changed
+                      while the game runs. Release the claim on the Track tab if
+                      it really has to move.
+                    </p>
+                  )}
+
                   <div className="row">
                     <button
                       className="ghost"
+                      disabled={live && current.claimed}
                       onClick={() => setEditing({
                         what: 'square',
                         id: current.library_id,
@@ -579,27 +619,37 @@ export default function BoardBuilder({
                     >
                       Edit
                     </button>
-                    <button
-                      className="ghost danger"
-                      disabled={busy}
-                      onClick={() => { remember(at.row, at.col); onClearTile(at.row, at.col); }}
-                    >
-                      Clear square
-                    </button>
+                    {/* Emptying a square is refused for the whole of a live
+                        game, claimed or not: `start_game` requires exactly
+                        grid_size² tiles, so a hole in a running board is a
+                        square the grid draws and nobody can ever claim. */}
+                    {!live && (
+                      <button
+                        className="ghost danger"
+                        disabled={busy}
+                        onClick={() => { remember(at.row, at.col); onClearTile(at.row, at.col); }}
+                      >
+                        Clear square
+                      </button>
+                    )}
                   </div>
-                  <p className="muted">Or pick a replacement below.</p>
+                  {!(live && current.claimed) && (
+                    <p className="muted">Or pick a replacement below.</p>
+                  )}
                 </div>
               ) : (
                 <p className="muted">Empty. Pick a tile for it.</p>
               )}
 
-              <LibrarySearch
-                query={query} setQuery={setQuery}
-                tag={tag} setTag={setTag} tags={tags}
-                count={matches.length} total={library.length}
-              />
+              {!(live && current?.claimed) && (
+                <LibrarySearch
+                  query={query} setQuery={setQuery}
+                  tag={tag} setTag={setTag} tags={tags}
+                  count={matches.length} total={library.length}
+                />
+              )}
 
-              <ul className="library-list">
+              <ul className="library-list" hidden={live && current?.claimed}>
                 {matches.map((entry) => {
                   // Where this task already is, if it is — said, not enforced.
                   //
@@ -644,6 +694,7 @@ export default function BoardBuilder({
 
               <button
                 className="ghost"
+                hidden={live && current?.claimed}
                 onClick={() => setEditing({
                   what: 'square', id: null, was: '', draft: newDraft(),
                 })}
@@ -655,9 +706,12 @@ export default function BoardBuilder({
             <>
               <h3>The catalogue</h3>
               <p className="muted">
-                {library.length === 0
-                  ? 'Empty so far. Import a board that already exists, or add tiles one at a time.'
-                  : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
+                {live
+                  ? 'Pick a square to fix it. Dealing, clearing and loading a '
+                    + 'whole board are for before the game starts.'
+                  : library.length === 0
+                    ? 'Empty so far. Import a board that already exists, or add tiles one at a time.'
+                    : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
               </p>
 
               {/* Saved boards.
@@ -672,7 +726,7 @@ export default function BoardBuilder({
                   Above the deal buttons because it outranks them: the first
                   question on a fresh board is "do I already have one", and the
                   answer being yes makes everything below it unnecessary. */}
-              <div className="builder-presets">
+              <div className="builder-presets" hidden={live}>
                 <h4>Saved boards</h4>
 
                 {presets.length > 0 && (
@@ -760,7 +814,7 @@ export default function BoardBuilder({
                   buttons so it reads as scoping them, not as part of the
                   browse list further down. All labels by default, which deals
                   from the whole catalogue exactly as before this existed. */}
-              {tags.length > 0 && (
+              {!live && tags.length > 0 && (
                 <label className="field builder-deal-tag">
                   <span>Deal only tiles labelled</span>
                   <select value={tag} onChange={(e) => setTag(e.target.value)}>
@@ -775,7 +829,7 @@ export default function BoardBuilder({
                   it needs no confirmation. It is the first draft of a board,
                   not the finished one: the point is to spend the evening on the
                   dozen squares worth arguing about instead of all hundred. */}
-              {tiles.length < need && (
+              {!live && tiles.length < need && (
                 <button
                   disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
                   onClick={() => { setUndo(null); onAutofillBoard(tag); }}
@@ -807,7 +861,7 @@ export default function BoardBuilder({
                   a second bar the same size reads as a second primary action.
                   Sized to its text, it sits with the other secondary buttons
                   instead. */}
-              {tiles.length > 0 && (
+              {!live && tiles.length > 0 && (
                 <div className="row">
                   <button
                     className="ghost"
@@ -848,7 +902,7 @@ export default function BoardBuilder({
                   destructive one is the last thing that should sit under a
                   cursor already moving. Hidden on an empty board, where it has
                   nothing to do and would only be a red button to misread. */}
-              {tiles.length > 0 && (
+              {!live && tiles.length > 0 && (
                 <div className="row builder-clear">
                   <button
                     className="ghost danger"
@@ -1289,7 +1343,7 @@ function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
  * so it is a real button with a pressed state, and an empty one reads as an
  * invitation rather than as the error TileBoard correctly calls it.
  */
-function BuilderGrid({ tiles, at, onPick, playerView = false }) {
+function BuilderGrid({ tiles, at, onPick, playerView = false, live = false }) {
   const gridRef = useRef(null);
   // Which cell the Tab key lands on — a roving tabindex, so the board is one
   // stop on the way through the page rather than a hundred. Without it,
@@ -1381,9 +1435,15 @@ function BuilderGrid({ tiles, at, onPick, playerView = false }) {
                     tile ? '' : 'empty',
                     here ? 'on' : '',
                     playerView ? 'as-player' : '',
+                    // Only while a game is live, because before one starts
+                    // every square is editable and a marked-up board would be
+                    // ninety-nine squares of noise around nothing.
+                    live && tile?.claimed ? 'claimed' : '',
                   ].filter(Boolean).join(' ')}
                   onClick={() => onPick(row, col)}
-                  title={tile ? tile.name : `${coordLabel(row, col)} — empty`}
+                  title={live && tile?.claimed
+                    ? `${tile.name} — locked in by a team`
+                    : tile ? tile.name : `${coordLabel(row, col)} — empty`}
                 >
                   {/* In the player view the artwork is the whole cell, the
                       way it is on the enemy board: no caption to read the

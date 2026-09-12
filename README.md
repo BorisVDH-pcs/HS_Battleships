@@ -115,6 +115,14 @@ deal cannot reproduce, and does not change when the catalogue is edited. Loading
 one replaces the board, and is refused once a game is past placement or any tile
 on it has been claimed.
 
+A square can be **fixed while the game runs**, as long as no team has locked it
+in — a wrong drop list spotted in the second hour is no longer unfixable. A
+claimed square stays frozen, and not only for fairness: `admin_set_tile`
+replaces a tile's drops wholesale and `tile_evidence.option_id` is
+`on delete set null`, so editing one mid-progress would silently reset a set
+tile's collected evidence to zero. Release the claim first if it really has to
+change. Whole-board tools (clear, autofill, load a preset) stay pre-game only.
+
 Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).

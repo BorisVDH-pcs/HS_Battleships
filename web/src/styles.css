@@ -2876,6 +2876,22 @@ button.danger.ghost:hover:not(:disabled) {
 .drop-max::placeholder { opacity: .6; }
 .drop-remove { flex: none; padding: .35rem .55rem; line-height: 1; }
 
+/* `hidden` means hidden.
+   The attribute is only `display: none` in the UA stylesheet, so any rule here
+   that sets `display` on the same element silently beats it — which is exactly
+   what happened when `.library-list { display: grid }` kept a hidden list on
+   screen. Stated once, with the weight to win, rather than remembered at each
+   call site. */
+[hidden] { display: none !important; }
+
+/* A square a team has locked in, on a running board. Marked rather than
+   disabled: it is still worth opening to read, it just cannot be changed. */
+.builder-cell.claimed {
+  outline: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  outline-offset: -1px;
+  opacity: .72;
+}
+
 /* Saved boards. Fenced off below rather than above, because it sits at the top
    of a panel whose every other control deals or clears the board in front of
    you — and this one reaches past that game to something shared. */
