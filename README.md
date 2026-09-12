@@ -115,6 +115,16 @@ deal cannot reproduce, and does not change when the catalogue is edited. Loading
 one replaces the board, and is refused once a game is past placement or any tile
 on it has been claimed.
 
+Two different things are meant by "randomize the board", and the builder now
+offers both. **Shuffle** moves the tiles already on the board between the squares
+they occupy: the catalogue is never consulted, so no square can come out empty, a
+task placed three times stays placed three times, and a one-off typed straight
+onto a square survives. **Re-deal** clears the board and draws a new one, which
+is the only route to different *tiles* rather than different *places* — but
+`admin_autofill_board` uses each catalogue entry at most once, so dealing a
+hundred squares from an eighty-six entry label leaves fourteen holes. The dialog
+now says how many before you press it.
+
 A square can be **fixed while the game runs**, as long as no team has locked it
 in — a wrong drop list spotted in the second hour is no longer unfixable. A
 claimed square stays frozen, and not only for fairness: `admin_set_tile`

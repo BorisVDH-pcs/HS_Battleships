@@ -5,7 +5,7 @@ import {
   adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
-  adminSetTile, adminClearTile, adminAutofillBoard,
+  adminSetTile, adminClearTile, adminAutofillBoard, adminShuffleBoard,
   adminClearBoard, adminGameReadiness,
   adminSaveBoardPreset, adminApplyBoardPreset, adminDeleteBoardPreset,
 } from '../lib/supabase.js';
@@ -779,6 +779,20 @@ export default function Admin() {
                          + dealShortfall(r),
                   { refresh: ['tiles', 'library'] })
             }
+            // Re-arrange what is on the board rather than drawing a new one.
+            //
+            // No dialog, and that is the point of it rather than an oversight:
+            // it adds nothing, removes nothing and asks the catalogue nothing,
+            // so the hundred tiles that come out are the hundred that went in.
+            // The only thing a stray press costs is the arrangement, which is
+            // the one thing the button says it changes. Its neighbour below,
+            // which can cost the board, keeps its dialog.
+            onShuffleBoard={() =>
+              run(() => adminShuffleBoard(game.id),
+                  (r) => `Board shuffled — ${r.moved} of ${r.tiles} tile`
+                         + `${r.tiles === 1 ? '' : 's'} moved to a new square.`,
+                  { refresh: ['tiles'] })
+            }
             // Deal a board, read it, dislike it, roll again. The autofill
             // above cannot do this on its own: it only ever fills empty
             // squares, so on a board that is already full it is not offered,
@@ -791,19 +805,36 @@ export default function Admin() {
             // is the one thing they would not expect. No type-the-name guard
             // though: that belongs to "remove every tile", where what makes it
             // frightening is that nothing comes back. Here a board does.
-            onReshuffleBoard={(tag) =>
-              confirm(
+            onReshuffleBoard={(tag) => {
+              // What the deal can actually produce, said before it happens
+              // rather than counted afterwards. `admin_autofill_board` deals
+              // each catalogue entry at most once, so a label with fewer
+              // entries than the board has squares comes back with holes in
+              // it — which is exactly the surprise this dialog exists to
+              // prevent, and the reason Shuffle sits next to this button.
+              const pool = (tag
+                ? library.filter((e) => (e.tags ?? []).includes(tag))
+                : library).length;
+              const short = tiles.length - pool;
+              return confirm(
                 `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and filled `
                 + 'again at random from the catalogue, so the board comes back different.'
                 + (tag ? ` Only tiles labelled "${tag}" are dealt.` : '')
+                + '\n\nThe deal never uses a catalogue tile twice'
+                + (short > 0
+                  ? `, and there ${pool === 1 ? 'is' : 'are'} only ${pool} tile`
+                    + `${pool === 1 ? '' : 's'} it can draw from — so about ${short} square`
+                    + `${short === 1 ? '' : 's'} will come back empty. To keep these tiles `
+                    + 'and only move them around, use the shuffle button beside this one.'
+                  : ', so any task this board holds more than once comes back only once.')
                 + '\n\nSquares placed by hand go with them — a square does not '
                 + 'record whether it was dealt or chosen — and a one-off tile '
                 + 'typed straight onto the board cannot come back, because it '
                 + 'was never in the catalogue.'
                 + '\n\nThis cannot be undone.',
                 {
-                  title: `Re-randomize the board for "${game.name}"?`,
-                  confirmLabel: 'Re-randomize',
+                  title: `Re-deal the board for "${game.name}"?`,
+                  confirmLabel: 'Re-deal it',
                   danger: true,
                 }
               ).then((ok) => ok && run(
@@ -825,11 +856,11 @@ export default function Admin() {
                   }
                 },
                 ({ cleared, deal }) =>
-                  `Board re-randomized — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
+                  `Board re-dealt — ${cleared} square${cleared === 1 ? '' : 's'} cleared, `
                   + `${deal.filled} filled at random.` + dealShortfall(deal),
                 { refresh: ['tiles', 'library'] }
-              ))
-            }
+              ));
+            }}
           />
 
           <section className="card">

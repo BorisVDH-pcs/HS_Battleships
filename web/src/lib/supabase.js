@@ -199,6 +199,21 @@ export const adminClearBoard = (gameId) =>
 export const adminAutofillBoard = (gameId, tag = null) =>
   rpc('admin_autofill_board', { p_game_id: gameId, p_tag: tag || null });
 
+/**
+ * Move the tiles already on a board between the squares they occupy.
+ *
+ * The counterpart to dealing rather than a version of it: the catalogue is
+ * never consulted, so no square can come out empty, a task placed more than
+ * once stays placed more than once, and a one-off tile that exists nowhere but
+ * on its square survives. Returns `{ tiles, moved }` — `moved` is how many
+ * landed somewhere new, which on a real board is all but one or two of them.
+ *
+ * Refused once the game is past preparation: a square's coordinates are what a
+ * team previewed, claimed and fired at.
+ */
+export const adminShuffleBoard = (gameId) =>
+  rpc('admin_shuffle_board', { p_game_id: gameId });
+
 export const adminDeleteGame = (gameId) =>
   rpc('admin_delete_game', { p_game_id: gameId });
 

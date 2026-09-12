@@ -34,7 +34,7 @@ import { adminTestTile, adminListBoardPresets } from '../lib/supabase.js';
 export default function BoardBuilder({
   game, tiles, library, libraryError, busy,
   onSetTile, onClearTile, onSaveLibraryTile, onDeleteLibraryTile,
-  onAutofillBoard, onReshuffleBoard, onClearBoard,
+  onAutofillBoard, onShuffleBoard, onReshuffleBoard, onClearBoard,
   onSaveBoard, onLoadBoard, onDeleteBoard,
 }) {
   // Saved boards. Held here rather than in the console's own slices because
@@ -843,36 +843,54 @@ export default function BoardBuilder({
                 </button>
               )}
 
-              {/* The same feature from the other end: deal a board, read it,
-                  dislike it, roll again. It sits with the autofill because that
-                  is where somebody who has just dealt a board looks, and
-                  because on a full board the autofill is gone and this is the
-                  only thing here that deals at all.
+              {/* Two ways to want a different board, and they are not the same
+                  question.
 
-                  It is the one button in this group that takes something away,
-                  so unlike its neighbour it asks first. That is also why it can
-                  sit above the additive row without the separator the clear
-                  button gets below: a stray press costs a dialog, not a
-                  board.
+                  SHUFFLE re-arranges the tiles that are on the board already.
+                  It never consults the catalogue, so it cannot leave a square
+                  empty, it keeps a task that is deliberately placed three
+                  times, and a one-off typed straight onto a square survives it.
+                  Nothing it does is recoverable from the catalogue and nothing
+                  it does needs to be: the hundred tiles coming out are the
+                  hundred that went in. Hence no dialog -- rearranging is the
+                  whole of what the button says it does.
+
+                  RE-DEAL throws the board away and draws a new one. On a
+                  hundred-square board from an eighty-six entry label that is
+                  eighty-six tiles and fourteen holes, because the deal will not
+                  repeat an entry. Worth having -- it is the only way to
+                  different TILES rather than different places -- and worth a
+                  dialog, which it has.
 
                   In a .row rather than bare in the panel, which is a grid and
-                  would stretch it edge to edge. The full width belongs to the
+                  would stretch them edge to edge. The full width belongs to the
                   autofill above -- the press this panel is built around -- and
                   a second bar the same size reads as a second primary action.
-                  Sized to its text, it sits with the other secondary buttons
+                  Sized to their text, they sit with the other secondary buttons
                   instead. */}
               {!live && tiles.length > 0 && (
                 <div className="row">
+                  {tiles.length > 1 && (
+                    <button
+                      className="ghost"
+                      disabled={busy}
+                      onClick={() => { setUndo(null); onShuffleBoard(); }}
+                      title={'Moves the tiles already on the board between the '
+                             + 'squares they occupy. Nothing is added or removed.'}
+                    >
+                      Shuffle the {tiles.length} tiles on the board
+                    </button>
+                  )}
                   <button
                     className="ghost"
                     disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
                     onClick={() => { setUndo(null); onReshuffleBoard(tag); }}
                     title={tagPool.length === 0
                       ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
-                      : undefined}
+                      : 'Clears the board and draws a new one from the catalogue.'}
                   >
-                    Re-randomize the board
-                    {tag && ` from "${tag}"`}
+                    Re-deal from the catalogue
+                    {tag && ` "${tag}"`}
                   </button>
                 </div>
               )}
