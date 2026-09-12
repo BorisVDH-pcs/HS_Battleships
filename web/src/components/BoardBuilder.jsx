@@ -7,6 +7,7 @@ import TileIcon from './TileIcon.jsx';
 import TileInfo from './TileInfo.jsx';
 import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
+import { tileGroups } from '../lib/tileProgress.js';
 
 /**
  * Building a board by pointing at it.
@@ -810,11 +811,58 @@ function PlayerSquarePreview({ at, tile, onClose }) {
             <TileInfo tile={tile} />
             <span className="coord">{label}</span>
           </div>
+          <EvidencePreview tile={tile} />
         </article>
       ) : (
         <p className="muted">Empty. A player sees nothing here yet.</p>
       )}
     </>
+  );
+}
+
+/**
+ * The one part of submitting evidence that differs from tile to tile: what a
+ * screenshot has to say beyond itself. `EvidenceUploader` asks this only once
+ * a file is staged, which a preview with nothing to upload never reaches — so
+ * this shows the same control up front instead, disabled, for reading rather
+ * than for use.
+ *
+ * A plain screenshot tile — no options, not priced by value — asks nothing
+ * beyond the image, so there is no control to show and this renders nothing,
+ * the same way the real uploader's per-file picker never appears for one.
+ *
+ * Grouped through the same `tileGroups` the live picker and the "?" panel
+ * both use, so a set tile's dropdown here has exactly the optgroups a player
+ * would get — nothing here is a second copy of that logic to drift from it.
+ */
+function EvidencePreview({ tile }) {
+  const options = tile.options ?? [];
+  const rule = tile.completion ?? 'points';
+  const isSet = rule === 'one_set' || rule === 'each_set';
+  const isValue = rule === 'value';
+  if (!isValue && options.length === 0) return null;
+
+  const rows = (o) => (
+    <option key={o.id} value={o.id}>{o.label}{isSet ? '' : ` — ${o.points} pts`}</option>
+  );
+  const groups = tileGroups(options);
+
+  return (
+    <div className="evidence">
+      <p className="evidence-count muted">What submitting evidence would ask:</p>
+      {isValue ? (
+        <input type="number" min="1" max="1000" placeholder="Worth, in millions" disabled />
+      ) : (
+        <select disabled defaultValue="">
+          <option value="">Which drop?</option>
+          {groups.some((g) => g.named)
+            ? groups.map((g) => (
+                <optgroup key={g.name} label={g.name}>{g.options.map(rows)}</optgroup>
+              ))
+            : options.map(rows)}
+        </select>
+      )}
+    </div>
   );
 }
 
