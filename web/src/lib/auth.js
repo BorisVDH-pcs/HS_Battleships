@@ -5,8 +5,9 @@
 // ever sent to. Players never see or type it.
 //
 // Consequence, accepted deliberately: there is no self-service password reset,
-// because there is no real mailbox to send a link to. An admin resets a
-// password from the Supabase dashboard (Authentication > Users) instead.
+// because there is no real mailbox to send a link to. An admin sets a new one
+// instead, from Admin > Accounts in the console (or the SQL in
+// supabase/admin/player-accounts.sql).
 //
 // The display name keeps the username exactly as typed (RuneScape names contain
 // spaces and capitals); only the derived address is normalised.

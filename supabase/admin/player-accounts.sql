@@ -1,8 +1,13 @@
 -- HS_Battleships — admin snippets for player accounts
 --
--- Run these in the Supabase SQL Editor (service role). They are NOT functions
--- exposed to the app: creating accounts and resetting passwords must never be
--- reachable from the browser.
+-- Run these in the Supabase SQL Editor (service role). Creating an account is
+-- NOT exposed to the app and must stay that way.
+--
+-- Resetting a password no longer belongs on that list: Admin > Accounts does it
+-- from the console, through the admin_reset_password RPC, which uses the same
+-- pgcrypto call as the snippet below, refuses anyone but an admin, and logs
+-- every reset. The snippet stays as the way in when nobody can reach the
+-- console — an admin locked out of their own account, most of all.
 --
 -- Players sign in with a username only. The address stored in auth.users is
 -- synthetic and derived from that username — see web/src/lib/auth.js:

@@ -11,11 +11,11 @@ import { usernameToEmail, validateUsername, friendlyAuthError } from '../lib/aut
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  // Sign-up only. There is no password reset in this app -- the addresses are
-  // synthetic, so there is no mailbox to send a link to -- which makes a typo
-  // here the one mistake on this screen that cannot be undone by the person
-  // who made it. Two independent guards against that: type it twice, and be
-  // able to read what you typed.
+  // Sign-up only. The addresses are synthetic, so there is no mailbox to send a
+  // reset link to: a typo here is the one mistake on this screen the person who
+  // made it cannot undo alone -- it takes an admin (Admin > Accounts). Two
+  // independent guards against that: type it twice, and be able to read what
+  // you typed.
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState('signin');

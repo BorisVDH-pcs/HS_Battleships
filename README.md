@@ -197,9 +197,11 @@ address at `@players.hs-battleships.invalid` that players never see or type
 real domain.
 
 The trade-off, accepted deliberately: **there is no self-service password reset**,
-because there is no mailbox to send a link to. An admin resets passwords — see
-`supabase/admin/player-accounts.sql`, which also covers creating accounts and
-putting players on teams.
+because there is no mailbox to send a link to. An admin resets a password from
+the console instead — **Admin → Accounts**, which lists every player, sets a new
+password on the one you pick, and logs who did it. `supabase/admin/player-accounts.sql`
+still covers the same job in SQL, plus creating accounts and putting players on
+teams.
 
 > **Required setting:** turn **off** Authentication → Sign In / Providers → Email →
 > "Confirm email" in the Supabase dashboard. Otherwise Supabase tries to send a
