@@ -70,7 +70,22 @@ export default function App() {
       setSession(data.session);
       setReady(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    // Handing setSession a new object only when the session actually changed.
+    //
+    // supabase-js re-emits SIGNED_IN for the *same* session every few seconds --
+    // same access token, same expires_at, a fresh object each time. `session` is
+    // a dependency of `load` in useGame, so every one of those rebuilt `load`,
+    // which rebuilt the Realtime channel effect keyed on it, which resubscribed,
+    // which drew another emit: a loop throttled only by how long ten queries take.
+    // Idle, that cost ~19 requests a second per player. Comparing the token and
+    // the user id keeps the previous object when nothing moved, so the effects
+    // downstream stay still. A real sign-in, sign-out or token refresh changes one
+    // of the two and still propagates.
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
+      setSession((prev) =>
+        prev?.access_token === s?.access_token && prev?.user?.id === s?.user?.id
+          ? prev
+          : s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
