@@ -1913,7 +1913,10 @@ label {
   text-align: center;
   vertical-align: middle;
 }
-.roster { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: 0; }
+.roster {
+  list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: 0;
+  max-height: 16.5rem; overflow-y: auto;
+}
 .roster li {
   display: flex; justify-content: space-between; align-items: center; gap: .6rem;
   font-size: .9375rem; padding: .5rem .1rem;
