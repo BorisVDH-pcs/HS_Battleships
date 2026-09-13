@@ -1,5 +1,3 @@
-import { statusLabel } from '../lib/status.js';
-
 /**
  * Switches which game the board is showing.
  *
@@ -12,6 +10,9 @@ import { statusLabel } from '../lib/status.js';
  *
  * With one game there is no choice to offer, so it renders as the plain title
  * it has always been -- no select, no chrome.
+ *
+ * Options used to also print each game's status (active / finished /
+ * preparing), dropped as not telling a player anything they act on.
  */
 export default function GamePicker({ games, gameId, onPick, fallbackName }) {
   if (games.length <= 1) {
@@ -27,7 +28,7 @@ export default function GamePicker({ games, gameId, onPick, fallbackName }) {
     >
       {games.map((g) => (
         <option key={g.gameId} value={g.gameId}>
-          {g.gameName} — {g.teamName} · {statusLabel(g.status)}
+          {g.gameName} — {g.teamName}
         </option>
       ))}
     </select>

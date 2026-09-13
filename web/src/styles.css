@@ -227,8 +227,13 @@ body {
 h1, h2, h3 { font-family: var(--display); }
 
 .top {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 1rem; flex-wrap: wrap;
+  /* Three columns rather than space-between's two: with a middle item
+     (.header-status) space-between only centers it when the outer two
+     columns happen to match in width, which they don't here (the crest+
+     wordmark is wider than the sign-out cluster). A grid with a 1fr middle
+     column centers it for real regardless of what the outer columns weigh. */
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: 1rem;
   padding-bottom: 1rem;
   /* A hairline, not a rule. It marks where the chrome ends without drawing a
      line across the page. */
@@ -249,11 +254,16 @@ h1, h2, h3 { font-family: var(--display); }
 .top h1.wordmark { color: var(--text); }
 
 /* The logo is a stacked two-line wordmark, not a single line, so it needs
-   real height: at 38px each line would land under 20px. */
-.wordmark > img:first-child { height: 54px; width: auto; display: block; }
+   real height: at 38px each line would land under 20px.
+   PROTOTYPE: the crest grew from 54px to 76px and the "Battleships" subtitle
+   shrank from 166px to 140px wide -- at the old sizes the subtitle's bounding
+   box (166x55) was actually larger than the crest's (96x54), so the clan mark
+   read as the smaller of the two. This flips that: crest ~130x76, subtitle
+   140x46. */
+.wordmark > img:first-child { height: 76px; width: auto; display: block; }
 .wordmark .wordmark-subtitle {
   display: block;
-  width: 166px;
+  width: 140px;
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 0 12px rgba(242, 193, 78, .22));
@@ -308,20 +318,24 @@ h1, h2, h3 { font-family: var(--display); }
     drop-shadow(0 0 26px rgba(255, 146, 26, .28));
 }
 .login .wordmark { flex-direction: column; align-items: center; gap: .35rem; margin: 0; }
-.login .wordmark > img:first-child { height: 126px; }
+/* PROTOTYPE: crest 126px -> 190px, subtitle 340px -> 280px -- same rebalance
+   as the header (crest was the smaller bounding box of the two), plus an
+   overall size bump since this is the one screen with room to let the mark
+   be a mark. */
+.login .wordmark > img:first-child { height: 190px; }
 .login .wordmark .wordmark-subtitle {
-  width: min(340px, 78vw);
+  width: min(280px, 72vw);
   filter: drop-shadow(0 0 13px rgba(242, 193, 78, .34));
 }
-/* Under a 126px mark the fallback header reads as a real part of the lockup,
+/* Under a 190px mark the fallback header reads as a real part of the lockup,
    not as a caption for the artwork above it. */
 .login .wordmark .sub { font-size: 2rem; letter-spacing: .02em; }
 @media (max-width: 520px) {
-  .wordmark > img:first-child { height: 42px; }
-  .wordmark .wordmark-subtitle { width: 132px; }
+  .wordmark > img:first-child { height: 56px; }
+  .wordmark .wordmark-subtitle { width: 112px; }
   .wordmark .sub { font-size: 1.05rem; }
-  .login .wordmark > img:first-child { height: 106px; }
-  .login .wordmark .wordmark-subtitle { width: min(300px, 82vw); }
+  .login .wordmark > img:first-child { height: 152px; }
+  .login .wordmark .wordmark-subtitle { width: min(224px, 76vw); }
   .login .wordmark .sub { font-size: 1.5rem; }
 }
 /* A gradient clipped to the glyphs is exactly the sort of low-contrast
@@ -373,6 +387,15 @@ h3 {
 
 .status { color: var(--label-2); margin: 1.25rem 0 0; }
 .status strong { color: var(--text); font-weight: 600; letter-spacing: -.008em; }
+/* The same line, relocated into the header: no top margin (the header row
+   centers it instead), sized to the grid's middle column (styles.css ~229)
+   rather than to its own content, and its text centered within that column
+   so it sits in the middle of the bar rather than hugging the wordmark. */
+.top .header-status {
+  margin: 0; min-width: 0;
+  font-size: .95rem;
+  text-align: center;
+}
 
 /* "This board has stopped hearing about the game."
  *
@@ -713,8 +736,25 @@ button.cell.pet-target:active { transform: scale(.93); transition-duration: .09s
    board's top edge lands level with the first line of content inside the side
    panels rather than with their outer edge. */
 .tabs.board-tabs { align-items: center; margin: 0 0 .7rem; }
-.board-tabs .fleet-status { margin-left: auto; }
-.fleet-status { color: var(--label-2); font-size: .875rem; margin: 0; }
+/* PROTOTYPE: the next-move prompt that used to be its own card above the
+   whole boards section (.next-move below), condensed to one line and moved
+   here -- same row as the tabs, which already had empty space to the right
+   of them. A pill rather than plain text: without the "Your next move:"
+   label that used to carry the emphasis, the instruction needs to read as
+   a called-out action on its own, not blend into the row as another tab.
+   Gold border/fill echoes the crest's own colour rather than introducing a
+   new one. */
+.board-tabs .next-move-tab {
+  margin-left: auto;
+  padding: .3rem .75rem;
+  border: 1px solid rgba(242, 193, 78, .4);
+  border-radius: var(--r-lg);
+  background: rgba(242, 193, 78, .12);
+  color: var(--gold-lit);
+  font-size: .8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* Board centered, activity feed to its left, score + active tiles to its
    right. The side columns are `fr`-based rather than a fixed pixel width, so
@@ -1593,8 +1633,8 @@ label {
 @media (max-height: 760px) and (min-width: 521px) {
   .login { padding-block: 1rem; }
   .login-content { gap: .7rem; }
-  .login .wordmark > img:first-child { height: 76px; }
-  .login .wordmark .wordmark-subtitle { width: 230px; }
+  .login .wordmark > img:first-child { height: 108px; }
+  .login .wordmark .wordmark-subtitle { width: 194px; }
   .login-card { padding: 1.1rem 1.5rem; }
   .login-intro h2 { font-size: 1.65rem; }
   .login-intro p { margin-top: .15rem; }

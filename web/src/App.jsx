@@ -4,7 +4,7 @@ import NextMove from './components/NextMove.jsx';
 import { supabase, isSupabaseConfigured, claimTile, spendPetJar } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
 import { subscribeToGameEvents } from './lib/gameEvents.js';
-import { coordLabel, fromPosition, sunkShipIds } from './lib/board.js';
+import { coordLabel, fromPosition } from './lib/board.js';
 import Login from './components/Login.jsx';
 import EnemyGrid from './components/EnemyGrid.jsx';
 import MyFleet from './components/MyFleet.jsx';
@@ -24,7 +24,6 @@ import { useConfirm } from './components/ConfirmDialog.jsx';
 import GamePicker from './components/GamePicker.jsx';
 import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
 import { readMuted, writeMuted } from './lib/sound.js';
-import { statusLabel } from './lib/status.js';
 import { REVEAL_DELAY_MS, SHOT_RESULT_DURATION_MS } from './lib/fireEffect.js';
 import { tileProgressText } from './lib/tileProgress.js';
 
@@ -352,17 +351,21 @@ export default function App() {
   const isPreparation = game.game?.status === 'placement';
   const isFinished = game.game?.status === 'finished';
   const canClaim = isActive && Boolean(myTeamId) && activeCount < maxActive;
+  // PROTOTYPE: the short form of NextMove's title, for the tab-row label —
+  // same three states, same wording, kept in sync with components/NextMove.jsx
+  // by hand since the inline spot only ever wants the title, never the eyebrow
+  // or the longer detail sentence.
+  const nextMoveTitle = activeCount >= maxActive
+    ? 'Finish an active tile'
+    : activeCount > 0
+      ? 'Continue an active tile, or claim another'
+      : 'Claim a square in enemy waters';
   const myTeam = teams.find((t) => t.id === myTeamId) ?? null;
   // Derived rather than trusted: the last charge can be spent in another tab,
   // or the game can finish, while the mode is armed. Reading it from the count
   // means the board cannot be left offering a preview there is nothing to pay
   // for, without a second effect to switch it off.
   const petPicking = petPick && !isFinished && (myTeam?.pet_jar_count ?? 0) > 0;
-  // ship_status.sunk is always false when a player reads it, so this counted
-  // an intact fleet however much of it was on the bottom - see sunkShipIds.
-  // myFleet is still the source of how many hulls there are; only its damage
-  // columns are unreadable from here.
-  const sunkCount = sunkShipIds(myShipCells, enemyShots, tiles).size;
   // Re-read from `tiles` so the panel's counts follow a refresh rather than
   // freezing at whatever they were when the square was pressed.
   const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
@@ -371,6 +374,35 @@ export default function App() {
     <main className={`app game-app${waitingForTeam ? ' waiting-app' : ''}`}>
       <header className="top" id="app-header">
         <Wordmark />
+        {!isAdmin && game.game && !waitingForTeam && (
+          <p className="status header-status">
+            <GamePicker
+              games={myGames}
+              gameId={gameId}
+              onPick={switchGame}
+              fallbackName={game.game.name}
+            />
+            {/* GamePicker's own dropdown already prints "name — team" per
+                option once there is more than one game (GamePicker.jsx), so
+                repeating the team out here would just say the same thing
+                twice. With exactly one game, GamePicker renders a bare name
+                and this is the only place the team appears. Status (active /
+                finished / preparing) used to print here too; dropped as not
+                telling a player anything they act on. */}
+            {myGames.length <= 1 && myTeamId && (
+              ` — you play for ${teams.find((t) => t.id === myTeamId)?.name}`
+            )}
+            {/* Only when something is wrong. A board that is working says so by
+                working, and a permanent green "live" badge is a light nobody
+                reads until the day it matters — by which time it has been
+                furniture for a week. */}
+            {live === 'offline' && (
+              <span className="live-warning" role="status">
+                ⚠ Reconnecting — the board may be out of date
+              </span>
+            )}
+          </p>
+        )}
         <div className="who">
           <span className="name">{displayName || 'Signed in'}</span>
           {/* Beside the sign-out, not buried in the guide: the moment someone
@@ -431,25 +463,8 @@ export default function App() {
 
       {game.game && !waitingForTeam && (
         <>
-          <p className="status">
-            <GamePicker
-              games={myGames}
-              gameId={gameId}
-              onPick={switchGame}
-              fallbackName={game.game.name}
-            />{' '}
-            — {statusLabel(game.game.status)}
-            {myTeamId && ` · you play for ${teams.find((t) => t.id === myTeamId)?.name}`}
-            {/* Only when something is wrong. A board that is working says so by
-                working, and a permanent green "live" badge is a light nobody
-                reads until the day it matters — by which time it has been
-                furniture for a week. */}
-            {live === 'offline' && (
-              <span className="live-warning" role="status">
-                ⚠ Reconnecting — the board may be out of date
-              </span>
-            )}
-          </p>
+          {/* The name/status/team line and its "reconnecting" warning moved up
+              into the sticky header (#app-header) — see the GamePicker there. */}
 
           {game.game.status === 'finished' && (
             <p className="banner">
@@ -491,12 +506,19 @@ export default function App() {
               the one thing a captain has to do off the top. */}
           {!isPreparation && (
           <>
-          <NextMove
-            activeCount={activeCount}
-            maxActive={maxActive}
-            canClaim={canClaim}
-            isFinished={isFinished}
-          />
+          {/* PROTOTYPE: the live prompt (claim / continue / finish) moved into
+              the tab row below as a one-line label — see .next-move-tab. The
+              full card stays only for "finished", which the tab-row label
+              doesn't cover and which already reads as an event, not an
+              ongoing prompt. */}
+          {isFinished && (
+            <NextMove
+              activeCount={activeCount}
+              maxActive={maxActive}
+              canClaim={canClaim}
+              isFinished={isFinished}
+            />
+          )}
           <section className="boards">
             <div className="board-layout">
               {/* Stats sit above the activity feed in the same left-hand
@@ -524,10 +546,8 @@ export default function App() {
                   >
                     Your fleet
                   </button>
-                  {boardTab === 'fleet' && (
-                    <span className="fleet-status">
-                      {myFleet.length - sunkCount} afloat, {sunkCount} sunk
-                    </span>
+                  {!isFinished && (
+                    <span className="next-move-tab">{nextMoveTitle}</span>
                   )}
                 </div>
 
