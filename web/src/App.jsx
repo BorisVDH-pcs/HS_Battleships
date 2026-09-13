@@ -701,7 +701,7 @@ export default function App() {
           )}
         </>
       )}
-      {!waitingScreen && (
+      {game.game && !waitingScreen && (
         <footer className="player-credits">
           <span>
             High Society platform created by{' '}
@@ -709,8 +709,9 @@ export default function App() {
             and{' '}
             <span className="credit-creator">Soft Papi</span>
           </span>
-          <a href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
-            View on GitHub
+          <a className="credit-star" href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
+            <span aria-hidden="true">★</span>
+            Star on GitHub
           </a>
         </footer>
       )}
