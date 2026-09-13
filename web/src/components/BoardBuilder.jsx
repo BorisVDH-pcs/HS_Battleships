@@ -59,7 +59,6 @@ export default function BoardBuilder({
   useEffect(() => { reloadPresets(); }, [reloadPresets]);
   const [at, setAt] = useState(null);           // { row, col } | null
   const [query, setQuery] = useState('');
-  const [tag, setTag] = useState('');
   // Show the board the way a team will see it once they lock a square in:
   // artwork only, no captions. Off by default — the names are what you build
   // with, this is what you check with.
@@ -94,21 +93,6 @@ export default function BoardBuilder({
     [tiles]
   );
   const current = at ? byPosition.get(toPosition(at.row, at.col)) : null;
-
-  const tags = useMemo(() => {
-    const all = new Set();
-    for (const entry of library) for (const t of entry.tags ?? []) all.add(t);
-    return [...all].sort();
-  }, [library]);
-
-  // What the random deal is allowed to draw from — the same label a board is
-  // built from by hand, so "only raids" means the same thing to both. Ignores
-  // the text search: a stray word left in that box would otherwise silently
-  // block a deal that has nothing to do with it.
-  const tagPool = useMemo(
-    () => (tag ? library.filter((e) => (e.tags ?? []).includes(tag)) : library),
-    [library, tag]
-  );
 
   /**
    * Where each task already sits on this board, by name.
@@ -164,7 +148,7 @@ export default function BoardBuilder({
   /**
    * The catalogue, filtered and then ordered by how well it answers.
    *
-   * Filtering searches drops and tags as well as the name, because the way an
+   * Filtering searches the drops as well as the name, because the way an
    * organiser remembers a tile is often the loot on it rather than the wording
    * of the task. That is what makes the ordering necessary: a search for a
    * tile by name would return it alongside every tile that merely lists the
@@ -173,7 +157,7 @@ export default function BoardBuilder({
    *
    * Four tiers, name first — an exact name, then a name that starts with what
    * was typed, then one that contains it, then everything matched only by its
-   * drops, tags or description.
+   * drops or description.
    *
    * The sort is stable, so within a tier the catalogue's most-used-first order
    * survives untouched. That matters more than it looks: most-used-first is
@@ -186,12 +170,10 @@ export default function BoardBuilder({
 
     const scored = [];
     for (const entry of library) {
-      if (tag && !(entry.tags ?? []).includes(tag)) continue;
       if (words.length === 0) { scored.push({ entry, rank: 0 }); continue; }
 
       const haystack = [
         entry.name, entry.icon ?? '', entry.description ?? '',
-        ...(entry.tags ?? []),
         ...(entry.options ?? []).map((o) => `${o.grp ?? ''} ${o.label}`),
       ].join(' ').toLowerCase();
       if (!words.every((word) => haystack.includes(word))) continue;
@@ -208,7 +190,7 @@ export default function BoardBuilder({
     }
 
     return scored.sort((a, b) => a.rank - b.rank).map((s) => s.entry);
-  }, [library, query, tag]);
+  }, [library, query]);
 
   /**
    * The catalogue entry this draft would collide with, if any.
@@ -260,7 +242,7 @@ export default function BoardBuilder({
    * index on it -- and admin_save_library_tile refuses a second entry under a
    * name it already holds. Leaving that entry alone is also the right answer
    * on its own terms, and the one admin_import_board_to_library already takes:
-   * an entry may have been tidied, tagged or re-priced since, and one square's
+   * an entry may have been tidied, reworded or re-priced since, and one square's
    * copy of it is not the authority on any of that.
    *
    * Keyed on the name alone rather than on the entry the square came from, so
@@ -451,11 +433,7 @@ export default function BoardBuilder({
   async function saveSquare() {
     let libraryId = catalogued?.id ?? null;
     if (!libraryId) {
-      // Tags belong to the catalogue and the square form does not show them,
-      // so a tile filed this way starts untagged.
-      libraryId = await onSaveLibraryTile(
-        null, payloadFromDraft(editing.draft, { tags: [] })
-      );
+      libraryId = await onSaveLibraryTile(null, payloadFromDraft(editing.draft));
       if (!libraryId) return;
     }
     const payload = payloadFromDraft(editing.draft, { libraryId });
@@ -470,7 +448,7 @@ export default function BoardBuilder({
    * entry produce a second one: the list hands the form a copy of a tile rather
    * than the tile, so "this task but five screenshots" stops being a choice
    * between the old wording and the new one. Passing the original's id is the
-   * deliberate exception, for fixing a typo or adding tags.
+   * deliberate exception, for fixing a typo or a wording.
    *
    * Placing afterwards is the other half. Editing an entry from the list almost
    * always starts with a square in mind — that is why the square was selected —
@@ -478,14 +456,11 @@ export default function BoardBuilder({
    * again was a step that knew the answer already.
    */
   async function saveLibrary(targetId = editing.id ?? null) {
-    const payload = payloadFromDraft(editing.draft, {
-      tags: editing.draft.tags.split(',').map((t) => t.trim()).filter(Boolean),
-    });
+    const payload = payloadFromDraft(editing.draft);
     const id = await onSaveLibraryTile(targetId, payload);
     if (!id) return;
     setEditing(null);
-    // Tags belong to the catalogue, not to a board, so the square gets the
-    // entry without them — and the id, so the square knows where it came from.
+    // The id goes with it, so the square knows which entry it came from.
     if (at) await placePayload(payloadFromDraft(editing.draft, { libraryId: id }));
   }
 
@@ -680,22 +655,6 @@ export default function BoardBuilder({
            * being about the save. A control that changes what a button does has
            * to be beside that button. */}
           <div className="builder-deals">
-            {/* The label the random deal draws from — a subset of the
-                catalogue for this game, same as the tag filter on the list
-                below does for picking by hand. Shown above the two deal
-                buttons so it reads as scoping them, not as part of the
-                browse list further down. All labels by default, which deals
-                from the whole catalogue exactly as before this existed. */}
-            {tags.length > 0 && (
-              <label className="field builder-deal-tag">
-                <span>Include only tiles labelled</span>
-                <select value={tag} onChange={(e) => setTag(e.target.value)}>
-                  <option value="">All labels</option>
-                  {tags.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-            )}
-
             {/* Deals into the empty squares only, which is what makes it safe
                 to press on a board somebody has already worked on -- and why
                 it needs no confirmation. It is the first draft of a board,
@@ -703,15 +662,14 @@ export default function BoardBuilder({
                 dozen squares worth arguing about instead of all hundred. */}
             {tiles.length < need && (
               <button
-                disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
-                onClick={() => { setUndo(null); onAutofillBoard(tag); }}
-                title={tagPool.length === 0
-                  ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
+                disabled={busy || library.length === 0 || Boolean(libraryError)}
+                onClick={() => { setUndo(null); onAutofillBoard(); }}
+                title={library.length === 0
+                  ? 'The catalogue has no tiles to deal'
                   : undefined}
               >
                 Fill the {need - tiles.length} empty square
                 {need - tiles.length === 1 ? '' : 's'} at random
-                {tag && ` from "${tag}"`}
               </button>
             )}
 
@@ -755,10 +713,10 @@ export default function BoardBuilder({
                 )}
                 <button
                   className="ghost"
-                  disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
-                  onClick={() => { setUndo(null); onReshuffleBoard(tag); }}
-                  title={tagPool.length === 0
-                    ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
+                  disabled={busy || library.length === 0 || Boolean(libraryError)}
+                  onClick={() => { setUndo(null); onReshuffleBoard(); }}
+                  title={library.length === 0
+                    ? 'The catalogue has no tiles to deal'
                     : 'Clears the board and draws a new one from the catalogue.'}
                 >
                   Randomize
@@ -893,7 +851,6 @@ export default function BoardBuilder({
 
               <LibrarySearch
                 query={query} setQuery={setQuery}
-                tag={tag} setTag={setTag} tags={tags}
                 count={matches.length} total={library.length}
               />
               <CatalogueList
@@ -938,7 +895,6 @@ export default function BoardBuilder({
                 draft={editing.draft}
                 onChange={(draft) => setEditing({ ...editing, draft })}
                 at={editing.what === 'square' ? coordLabel(at.row, at.col) : 'This tile'}
-                showTags={editing.what === 'library'}
                 busy={busy}
                 saveLabel={
                   editing.what === 'square' ? 'Save square'
@@ -951,10 +907,9 @@ export default function BoardBuilder({
                 extraActions={editing.from ? (
                   <>
                     {/* The way back to editing in place. Kept because the
-                        entries imported from old boards carry no tags and some
-                        carry the wording of a hurried spreadsheet, and a
-                        catalogue you can only ever add to is one that fills up
-                        with near-duplicates. */}
+                        entries imported from old boards carry the wording of a
+                        hurried spreadsheet, and a catalogue you can only ever
+                        add to is one that fills up with near-duplicates. */}
                     <button
                       className="ghost"
                       disabled={busy}
@@ -1065,7 +1020,6 @@ export default function BoardBuilder({
                 <>
                   <LibrarySearch
                     query={query} setQuery={setQuery}
-                    tag={tag} setTag={setTag} tags={tags}
                     count={matches.length} total={library.length}
                   />
                   <CatalogueList
@@ -1124,7 +1078,6 @@ export default function BoardBuilder({
                 <>
                   <LibrarySearch
                     query={query} setQuery={setQuery}
-                    tag={tag} setTag={setTag} tags={tags}
                     count={matches.length} total={library.length}
                   />
                   <CatalogueList
@@ -1623,7 +1576,7 @@ function CatalogueList({
   );
 }
 
-function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
+function LibrarySearch({ query, setQuery, count, total }) {
   return (
     <div className="library-search">
       <input
@@ -1632,12 +1585,6 @@ function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search the catalogue"
       />
-      {tags.length > 0 && (
-        <select value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
-          <option value="">All tags</option>
-          {tags.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      )}
       {count !== total && <span className="muted">{count} of {total}</span>}
     </div>
   );

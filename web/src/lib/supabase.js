@@ -120,7 +120,7 @@ export const adminListLibrary = () => rpc('admin_list_library');
 /**
  * Insert (`id` null) or update one catalogue entry. `tile` is the shape the
  * board builder's form emits — name, icon, amount, rule, perSet, description,
- * options[] — plus an optional `tags` array. Returns the entry's id.
+ * options[]. Returns the entry's id.
  */
 export const adminSaveLibraryTile = (id, tile) =>
   rpc('admin_save_library_tile', { p_id: id ?? null, p_tile: tile });
@@ -193,11 +193,13 @@ export const adminClearBoard = (gameId) =>
  * how many squares it found, `filled` how many it could fill, and `similar` how
  * many of those had to be a near-duplicate of another task to get there.
  *
- * `tag`, when given, narrows the deal to catalogue entries carrying that tag —
- * the same filter the tile list above the button already offers.
+ * Draws from the whole catalogue. It used to take a label to narrow that, and
+ * the labels are gone: the only pool anyone ever scoped to was the one a saved
+ * board already describes, and a random arrangement of exactly those tiles is
+ * Load followed by Shuffle.
  */
-export const adminAutofillBoard = (gameId, tag = null) =>
-  rpc('admin_autofill_board', { p_game_id: gameId, p_tag: tag || null });
+export const adminAutofillBoard = (gameId) =>
+  rpc('admin_autofill_board', { p_game_id: gameId });
 
 /**
  * Move the tiles already on a board between the squares they occupy.

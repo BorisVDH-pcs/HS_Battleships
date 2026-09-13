@@ -2671,7 +2671,6 @@ button.builder-cell.empty:hover { border-style: solid; }
 
 .library-search { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .library-search input[type="search"] { flex: 1 1 9rem; }
-.library-search select { flex: 0 1 8rem; }
 
 .library-list {
   list-style: none; margin: 0; padding: 0;
@@ -2758,15 +2757,6 @@ button.builder-cell.empty:hover { border-style: solid; }
   margin: 0 0 .8rem;
 }
 .builder-view-toggle b { color: var(--label); font-weight: 600; }
-
-/* Scopes the two deal buttons below it, so it sits with them rather than with
-   the browse list further down that has its own copy of the same filter. */
-.builder-deal-tag {
-  display: flex; align-items: center; gap: .5rem;
-  margin: 0;
-  font-size: .8125rem; color: var(--label-2);
-}
-.builder-deal-tag select { flex: 0 1 10rem; }
 
 /* The board as a team meets it: artwork filling the cell, nothing to read.
  *

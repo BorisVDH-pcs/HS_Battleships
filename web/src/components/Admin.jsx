@@ -774,8 +774,8 @@ export default function Admin() {
                 { refresh: ['library'] }
               ).then(worked))
             }
-            onAutofillBoard={(tag) =>
-              run(() => adminAutofillBoard(game.id, tag),
+            onAutofillBoard={() =>
+              run(() => adminAutofillBoard(game.id),
                   (r) => `${r.filled} square${r.filled === 1 ? '' : 's'} filled.`
                          + dealShortfall(r),
                   { refresh: ['tiles', 'library'] })
@@ -806,21 +806,18 @@ export default function Admin() {
             // is the one thing they would not expect. No type-the-name guard
             // though: that belongs to "remove every tile", where what makes it
             // frightening is that nothing comes back. Here a board does.
-            onReshuffleBoard={(tag) => {
+            onReshuffleBoard={() => {
               // What the deal can actually produce, said before it happens
               // rather than counted afterwards. `admin_autofill_board` deals
-              // each catalogue entry at most once, so a label with fewer
-              // entries than the board has squares comes back with holes in
-              // it — which is exactly the surprise this dialog exists to
-              // prevent, and the reason Shuffle sits next to this button.
-              const pool = (tag
-                ? library.filter((e) => (e.tags ?? []).includes(tag))
-                : library).length;
+              // each catalogue entry at most once, so a catalogue smaller than
+              // the board comes back with holes in it — which is exactly the
+              // surprise this dialog exists to prevent, and the reason Shuffle
+              // sits next to this button.
+              const pool = library.length;
               const short = tiles.length - pool;
               return confirm(
                 `All ${tiles.length} square${tiles.length === 1 ? '' : 's'} are cleared and filled `
                 + 'again at random from the catalogue, so the board comes back different.'
-                + (tag ? ` Only tiles labelled "${tag}" are dealt.` : '')
                 + '\n\nThe deal never uses a catalogue tile twice'
                 + (short > 0
                   ? `, and there ${pool === 1 ? 'is' : 'are'} only ${pool} tile`
@@ -852,7 +849,7 @@ export default function Admin() {
                   // board under a bare Postgres message reads as a bug.
                   const cleared = await adminClearBoard(game.id);
                   try {
-                    return { cleared, deal: await adminAutofillBoard(game.id, tag) };
+                    return { cleared, deal: await adminAutofillBoard(game.id) };
                   } catch (err) {
                     throw new Error(
                       `The board was cleared, but dealing the new one failed: ${err.message} `

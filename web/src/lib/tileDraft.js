@@ -36,7 +36,7 @@ export const RULES = [
 export const EMPTY_DRAFT = Object.freeze({
   name: '', icon: '', description: '',
   rule: 'points', amount: '1', perSet: '1',
-  options: [], tags: '',
+  options: [],
 });
 
 /**
@@ -84,7 +84,6 @@ export function draftFromRow(row) {
       // make every existing drop single-use the next time a tile was saved.
       maxTimes: o.max_times == null ? '' : String(o.max_times),
     })),
-    tags: (row.tags ?? []).join(', '),
   };
 }
 

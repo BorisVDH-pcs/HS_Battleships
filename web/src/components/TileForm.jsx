@@ -6,9 +6,8 @@ import IconPicker from './IconPicker.jsx';
  * The one editor for a tile, wherever the tile lives.
  *
  * A catalogue entry and a square on a board are the same fields — the square
- * just also has a coordinate — so they get the same form, and `showTags` is the
- * only thing that differs: tags are how the catalogue is searched and mean
- * nothing on a board.
+ * just also has a coordinate — so one form serves both, with nothing to differ
+ * over since the labels went.
  *
  * It is deliberately not a wizard. The rule picker changes which fields apply,
  * and the ones the rule does not use are hidden rather than disabled, because a
@@ -16,7 +15,7 @@ import IconPicker from './IconPicker.jsx';
  * would have meant.
  */
 export default function TileForm({
-  draft, onChange, at = 'This tile', showTags = false,
+  draft, onChange, at = 'This tile',
   busy = false, saveLabel = 'Save', onSave, onCancel, extraActions = null,
   extraErrors = [],
 }) {
@@ -286,17 +285,6 @@ export default function TileForm({
           </>
         )}
       </div>
-
-      {showTags && (
-        <label className="field">
-          <span>Tags <em className="muted">optional, comma separated</em></span>
-          <input
-            value={draft.tags}
-            onChange={(e) => set({ tags: e.target.value })}
-            placeholder="raids, barrows, slayer"
-          />
-        </label>
-      )}
 
       {errors.length > 0 && (
         <ul className="error">
