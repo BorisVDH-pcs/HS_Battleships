@@ -1769,6 +1769,60 @@ label {
 .row > label { flex: 1 1 10rem; }
 .row > button { flex: none; }
 
+/* ---- task guidance ---- */
+
+.eyebrow {
+  display: block;
+  margin-bottom: .25rem;
+  color: var(--gold);
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.next-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+  padding: .95rem 1.15rem;
+  border: 1px solid rgba(242, 193, 78, .28);
+  border-radius: var(--r-xl);
+  background: linear-gradient(105deg, rgba(242, 193, 78, .12), rgba(28, 28, 30, .72) 48%);
+  box-shadow: var(--shadow-sm);
+}
+.next-move h2 { margin: 0; font-size: 1.08rem; letter-spacing: -.01em; }
+.next-move p { max-width: 38rem; margin: 0; color: var(--label-2); font-size: .875rem; line-height: 1.4; }
+.next-move-finished { border-color: rgba(48, 209, 88, .3); background: linear-gradient(105deg, rgba(48, 209, 88, .1), rgba(28, 28, 30, .72) 48%); }
+.next-move-finished .eyebrow { color: var(--strike-lit); }
+
+/* The admin header keeps phase, scope and blockers visible while the selected
+   pane changes. It is deliberately a strip rather than another large card. */
+.admin-overview-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: .9rem 1.1rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--shadow-sm);
+}
+.admin-overview-strip h2 { margin: 0; font-size: 1.15rem; }
+.admin-overview-strip p { margin: .2rem 0 0; color: var(--label-2); font-size: .8125rem; }
+.admin-overview-metrics { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem .9rem; color: var(--label-2); font-size: .8125rem; }
+.admin-overview-metrics strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.admin-overview-blocked strong { color: var(--hit-lit); }
+.admin-overview-hint { color: var(--label-2); font-size: .8125rem; }
+@media (max-width: 760px) {
+  .next-move, .admin-overview-strip { align-items: flex-start; flex-direction: column; }
+  .admin-overview-metrics { justify-content: flex-start; }
+}
+
 .team-name-editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

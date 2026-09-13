@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Guide from './components/Guide.jsx';
+import NextMove from './components/NextMove.jsx';
 import { supabase, isSupabaseConfigured, claimTile, spendPetJar } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
 import { coordLabel, fromPosition, sunkShipIds } from './lib/board.js';
@@ -480,6 +481,13 @@ export default function App() {
               screen with two boards that could only say "not yet", and pushed
               the one thing a captain has to do off the top. */}
           {!isPreparation && (
+          <>
+          <NextMove
+            activeCount={activeCount}
+            maxActive={maxActive}
+            canClaim={canClaim}
+            isFinished={isFinished}
+          />
           <section className="boards">
             <div className="board-layout">
               {/* Stats sit above the activity feed in the same left-hand
@@ -623,6 +631,7 @@ export default function App() {
               </div>
             </div>
           </section>
+          </>
           )}
         </>
       )}
