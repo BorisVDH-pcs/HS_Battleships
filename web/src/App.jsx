@@ -485,6 +485,7 @@ export default function App() {
       {waitingScreen && (
         <NoTeamWaiting
           displayName={displayName}
+          gameName={game.game?.name}
           startsAt={game.game?.starts_at}
           assigned={notYetOpen}
           teamName={myTeam?.name}

@@ -2133,6 +2133,7 @@ label {
 .waiting-radar span { position: absolute; width: .4rem; height: .4rem; top: 37%; left: 66%; border-radius: 50%; background: var(--gold-lit); box-shadow: 0 0 12px var(--gold); }
 .waiting-kicker { margin: 0 0 .7rem; color: var(--gold); font-size: .7rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
 .waiting h1 { position: relative; margin: 0; color: var(--text); font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.04em; }
+.waiting-game { margin: .55rem 0 0; color: var(--gold-lit); font-size: .95rem; font-weight: 600; }
 .waiting-lead { max-width: 34rem; margin: .75rem auto 1.8rem; color: var(--label-2); font-size: 1rem; }
 .countdown { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; max-width: 35rem; margin: 0 auto; }
 .countdown-unit { padding: .75rem .35rem .65rem; border: 1px solid rgba(242, 193, 78, .2); border-radius: var(--r-lg); background: rgba(0, 0, 0, .3); }

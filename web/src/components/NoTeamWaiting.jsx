@@ -11,7 +11,7 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
  * the countdown itself is identical, because neither case has anything to
  * click on the board yet.
  */
-export default function NoTeamWaiting({ displayName, startsAt, assigned = false, teamName }) {
+export default function NoTeamWaiting({ displayName, gameName, startsAt, assigned = false, teamName }) {
   const remaining = useCountdown(startsAt);
 
   const units = [
@@ -26,6 +26,7 @@ export default function NoTeamWaiting({ displayName, startsAt, assigned = false,
       <div className="waiting-radar" aria-hidden="true"><span /></div>
       <p className="waiting-kicker">Fleet assembly in progress</p>
       <h1 id="waiting-title">Please await orders</h1>
+      {gameName && <p className="waiting-game">{gameName}</p>}
       <p className="waiting-lead">
         {assigned
           ? `You're aboard ${teamName ?? 'your team'}. Keep this channel open — the board opens once an admin gives the order.`
