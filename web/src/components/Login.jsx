@@ -190,6 +190,19 @@ export default function Login() {
             </p>
           )}
         </section>
+
+        <footer className="login-credits">
+          <span>
+            High Society platform created by{' '}
+            <span className="credit-creator">BludgenMaker</span>{' '}
+            and{' '}
+            <span className="credit-creator">Soft Papi</span>
+          </span>
+          <a href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
+            View on GitHub
+          </a>
+        </footer>
+
       </div>
     </div>
   );
