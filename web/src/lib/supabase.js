@@ -78,7 +78,7 @@ async function rpc(name, args) {
 export const renameTeam = (teamId, name) =>
   rpc('rename_team', { p_team_id: teamId, p_name: name });
 
-export const adminCreateGame = (name, teamA, teamB, gridSize = 10, maxActive = 2) =>
+export const adminCreateGame = (name, teamA, teamB, gridSize = 10, maxActive = 3) =>
   rpc('admin_create_game', {
     p_name: name, p_team_a: teamA, p_team_b: teamB,
     p_grid_size: gridSize, p_max_active: maxActive,
