@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # Allow the workflow to publish Pages.
@@ -29,6 +31,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - run: npm ci --prefix web
+
+      - name: Test
+        run: npm test --prefix web
 
       # The project URL and anon key are public by design — Vite inlines them into
       # the bundle either way — so they are committed in web/.env.production and no
