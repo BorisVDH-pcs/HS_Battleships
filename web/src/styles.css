@@ -2652,9 +2652,12 @@ button.builder-cell.empty:hover { border-style: solid; }
 
 /* Set apart from the row of additive buttons above it by a rule and a gap, so
    the destructive one is reached deliberately rather than in passing. */
+/* Alone under the board, which is the whole point of where it sits: every other
+   control on this screen adds something, and the one that throws away an
+   evening should not be reachable by a cursor already moving between deals. */
 .builder-clear {
-  margin-top: .4rem;
-  padding-top: .8rem;
+  margin-top: 1rem;
+  padding-top: .9rem;
   border-top: 1px solid var(--hairline);
 }
 
@@ -2760,7 +2763,7 @@ button.builder-cell.empty:hover { border-style: solid; }
    the browse list further down that has its own copy of the same filter. */
 .builder-deal-tag {
   display: flex; align-items: center; gap: .5rem;
-  margin: 0 0 .5rem;
+  margin: 0;
   font-size: .8125rem; color: var(--label-2);
 }
 .builder-deal-tag select { flex: 0 1 10rem; }
@@ -2783,6 +2786,54 @@ button.builder-cell.empty:hover { border-style: solid; }
   margin: 0 0 .8rem;
 }
 .builder-undo b { color: var(--label); font-weight: 600; }
+
+/* The tile in your hand.
+ *
+ * Gold hairline and a tinted ground, at the full width of the board: while this
+ * is up, a click on a square means something it does not otherwise mean, and
+ * the cost of not noticing is a board quietly filled with one tile. Every other
+ * notice in this app is a muted paragraph; this one is deliberately not. */
+.builder-holding {
+  display: flex; flex-wrap: wrap; gap: .6rem; align-items: center;
+  margin: 0 0 .8rem; padding: .55rem .8rem;
+  background: rgba(242, 193, 78, .10);
+  border: 1px solid var(--gold);
+  border-radius: var(--r-md);
+}
+.builder-holding .tile-icon { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.builder-holding > span:first-of-type { flex: 1 1 12rem; min-width: 0; }
+.builder-holding b { color: var(--gold); font-weight: 600; }
+
+/* Every square is a target now, so say so on the way in. */
+.builder.is-holding .builder-cell { cursor: copy; }
+
+/* The board-wide tools, above the grid rather than inside the panel.
+ *
+ * A rule under it rather than a box around it: it is the top of the builder,
+ * not a thing within it, and a second bordered panel above a bordered panel
+ * reads as two competing cards. */
+/* The board-wide tools: saved boards and the two deals. What acts on the BOARD,
+ * above the board.
+ *
+ * A strip, deliberately, and not the stack this started as. These are the
+ * low-frequency controls -- a board is loaded once and dealt once -- and the
+ * first cut gave them six stacked blocks at the top of the screen, which is the
+ * most valuable space there is and pushed the grid itself below the fold on a
+ * laptop. The panel beside the board is where a hundred squares actually get
+ * filled; this is scaffolding, and scaffolding should be a band, not a wall.
+ *
+ * What left: "New tile" went back beside the catalogue it writes to, and
+ * "Remove all" went below the board on its own. Neither was ever about the
+ * board-level question this row answers. */
+.builder-tools {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: .55rem 1.1rem;
+  padding-bottom: .85rem; margin-bottom: .9rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.builder-tools .row { gap: .35rem; flex-wrap: wrap; }
+/* Sized to their text: a full-width primary here would read as the point of the
+   screen, which the board is. */
+.builder-tools > button { flex: 0 0 auto; }
 
 .library-pick {
   flex: 1 1 auto;
@@ -2941,6 +2992,25 @@ button.danger.ghost:hover:not(:disabled) {
 .drop-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
 .drop-rows li { display: flex; gap: .3rem; align-items: center; }
 .drop-rows input { padding: .4rem .5rem; font-size: .8125rem; }
+/* Column headings for the drop rows.
+ *
+ * The four boxes on a row carry no labels of their own -- there is no width for
+ * them -- and they used to be explained by a sentence above the list, which
+ * asks you to hold "worth, then how many times" in your head all the way down a
+ * list of ten. Same flex bases as the row beneath, so each heading sits over
+ * its own box. */
+.drop-heads {
+  display: flex; gap: .3rem; align-items: center;
+  padding: 0 0 .1rem;
+}
+.drop-heads span {
+  font-size: .6875rem; color: var(--label-2);
+  letter-spacing: .02em; text-transform: uppercase;
+}
+/* Stands in for the remove button, so the headings do not drift right of the
+   boxes they name. */
+.drop-heads .drop-remove { visibility: hidden; }
+
 .drop-grp    { flex: 0 1 7rem; min-width: 0; }
 .drop-label  { flex: 1 1 8rem; min-width: 0; }
 .drop-points { flex: 0 0 4rem; }
@@ -2970,10 +3040,11 @@ button.danger.ghost:hover:not(:disabled) {
 /* Saved boards. Fenced off below rather than above, because it sits at the top
    of a panel whose every other control deals or clears the board in front of
    you — and this one reaches past that game to something shared. */
+/* No longer fenced off by a rule: it is one group in a strip now, not a block
+   at the top of a panel that needed separating from the deals beneath it. */
 .builder-presets {
-  display: grid; gap: .45rem;
-  padding-bottom: .7rem; margin-bottom: .2rem;
-  border-bottom: 1px solid var(--line);
+  display: grid; gap: .3rem;
+  flex: 1 1 30rem; min-width: 0;
 }
 .builder-presets h4 { margin: 0; font-size: .8125rem; font-weight: 600; }
 .builder-presets .row { gap: .35rem; flex-wrap: wrap; }
@@ -3027,3 +3098,10 @@ button.danger.ghost:hover:not(:disabled) {
    is a to-do rather than a fault: none of these games is broken, they are
    just not ready yet, and the console's one red is reserved for refusals. */
 .game-gaps { color: var(--gold-dim); }
+
+/* The deals and the label that scopes them, kept together in the strip. */
+.builder-deals {
+  display: grid; gap: .4rem; justify-items: start;
+  flex: 0 1 auto; min-width: 0;
+}
+.builder-deals .row { gap: .35rem; flex-wrap: wrap; }

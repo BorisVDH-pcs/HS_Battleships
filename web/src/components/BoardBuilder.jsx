@@ -309,6 +309,29 @@ export default function BoardBuilder({
   const [undo, setUndo] = useState(null);   // { row, col, label, prev } | null
 
   /**
+   * The tile in your hand, if there is one.
+   *
+   * A slayer tile across ten squares was ten rounds of: click the square, find
+   * the tile in a list of a hundred and fifty, click it. The finding was the
+   * expensive part and it was the part being repeated -- the answer had not
+   * changed between one square and the next.
+   *
+   * So a tile can be picked up. While one is held, a square is not something
+   * you select but something you fill, and the panel stops being about a square
+   * at all. That is a mode, and modes lie unless they are loud: this one says
+   * what it is holding in a banner across the top of the board, marks every
+   * square as a target, and puts itself down on Escape, on the banner's own
+   * button, or by picking the tile up again.
+   *
+   * `lastPlaced` is what makes it discoverable without costing the rows a third
+   * button. You place one tile the old way and the offer to keep placing it is
+   * right there next to the undo, at the moment it has become obvious that you
+   * are about to do it again.
+   */
+  const [held, setHeld] = useState(null);          // catalogue entry | null
+  const [lastPlaced, setLastPlaced] = useState(null);
+
+  /**
    * Bring the panel into view when it is underneath the board rather than
    * beside it.
    *
@@ -338,6 +361,16 @@ export default function BoardBuilder({
       behavior: reducedMotion ? 'auto' : 'smooth',
     });
   }
+
+  // Escape is the way out of every mode this app has. Bound while something is
+  // held and not while the form is open, which has its own Cancel and would
+  // otherwise lose a half-typed tile to a stray key.
+  useEffect(() => {
+    if (!held || editing) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setHeld(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [held, editing]);
 
   function remember(row, col) {
     setUndo({
@@ -374,8 +407,29 @@ export default function BoardBuilder({
     return ok;
   }
 
-  const place = (entry) =>
-    placePayload(payloadFromRow(entry, { libraryId: entry.id }));
+  const place = (entry) => {
+    setLastPlaced(entry);
+    return placePayload(payloadFromRow(entry, { libraryId: entry.id }));
+  };
+
+  /**
+   * Fill one square with the tile being held.
+   *
+   * Deliberately not `placePayload`: that one advances to the next empty square
+   * because it is answering "what shall I fill next", and here your hand has
+   * already answered that -- the next square is the one you click. Advancing
+   * would move a selection nobody is looking at.
+   *
+   * A claimed square is refused rather than skipped quietly, the same as
+   * everywhere else: the database would refuse it anyway, and the cell is
+   * already marked as one that cannot move.
+   */
+  async function paint(row, col) {
+    const existing = byPosition.get(toPosition(row, col));
+    if (live && existing?.claimed) return;
+    remember(row, col);
+    await onSetTile(row, col, payloadFromRow(held, { libraryId: held.id }));
+  }
 
   /**
    * Put the tile on the square, and keep it.
@@ -489,6 +543,253 @@ export default function BoardBuilder({
         </p>
       )}
 
+
+      {/* The board-wide tools: saved boards, the deals, and the way back to an
+          empty board.
+       *
+       * Above the grid, and always here, because they used to live inside the
+       * panel's no-square-selected state -- so reaching them from a square you
+       * were working on meant pressing a button called "Done", which reads as
+       * leaving the builder rather than as going back, and then watching the
+       * whole panel become something else. Nothing about loading a saved board
+       * was ever about the square under the cursor.
+       *
+       * What that leaves behind is the better half of the trade: the panel now
+       * only ever means "the square you are pointing at", or "the catalogue"
+       * when you are pointing at nothing. One thing at a time.
+       *
+       * Hidden once the game is live, exactly as before -- every one of these
+       * is refused mid-game, and a button that cannot work is worse than no
+       * button. */}
+      {!live && (
+        <div className="builder-tools">
+          {/* Saved boards.
+
+              A board is an evening's work and, until this existed, a thing
+              that lived in one place with "Remove all 100 tiles" beneath
+              it. Nothing could rebuild one either: the random deal cannot
+              repeat a tile, so a board that uses eighteen squares on four
+              repeated tiles is not something any amount of re-dealing will
+              produce again.
+
+              Above the deal buttons because it outranks them: the first
+              question on a fresh board is "do I already have one", and the
+              answer being yes makes everything below it unnecessary. */}
+          {/* Saved boards.
+
+              A board is an evening's work, and nothing could rebuild one: the
+              random deal cannot repeat a tile, so a board that spends eighteen
+              squares on four repeated tiles is not something any amount of
+              re-dealing will produce again.
+
+              First in the strip because it outranks everything beside it. The
+              opening question on a fresh board is "do I already have one", and
+              the answer being yes makes the rest of this row unnecessary.
+
+              Choosing and naming share one wrapping row rather than stacking:
+              they are two halves of the same question and, at any width worth
+              building on, they sit on a line. */}
+          <div className="builder-presets">
+            <h4>Saved boards</h4>
+
+            <div className="row">
+              {presets.length > 0 && (
+                <>
+                  <select
+                    value={presetId}
+                    onChange={(e) => setPresetId(e.target.value)}
+                    aria-label="Saved board"
+                  >
+                    <option value="">Choose a saved board…</option>
+                    {presets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name} — {preset.squares} square{preset.squares === 1 ? '' : 's'}
+                        {preset.grid_size !== GRID ? ` (${preset.grid_size}×${preset.grid_size})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={busy || !presetId}
+                    onClick={async () => {
+                      const preset = presets.find((x) => x.id === presetId);
+                      setUndo(null);
+                      await onLoadBoard(preset);
+                    }}
+                  >
+                    Load
+                  </button>
+                  <button
+                    className="ghost danger"
+                    disabled={busy || !presetId}
+                    onClick={async () => {
+                      const preset = presets.find((x) => x.id === presetId);
+                      if (await onDeleteBoard(preset)) {
+                        setPresetId('');
+                        await reloadPresets();
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+
+              {/* Offered only when there is something to save, and an existing
+                  name overwrites rather than making "V4 (2)" -- which is what
+                  makes this usable as a running save while a board is being
+                  built, rather than a thing you do once at the end. */}
+              {tiles.length > 0 && (
+                <>
+                  <input
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    placeholder="Name this board"
+                    maxLength={80}
+                  />
+                  <button
+                    className="ghost"
+                    disabled={busy || !saveName.trim()}
+                    onClick={async () => {
+                      const name = saveName.trim();
+                      const existing = presets.find(
+                        (x) => x.name.trim().toLowerCase() === name.toLowerCase()
+                      );
+                      if (await onSaveBoard(name, existing)) {
+                        setSaveName('');
+                        await reloadPresets();
+                      }
+                    }}
+                  >
+                    Save these {tiles.length} square{tiles.length === 1 ? '' : 's'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {presets.length === 0 && tiles.length === 0 && (
+              <p className="muted">
+                No saved boards yet. Build one and it can be kept here.
+              </p>
+            )}
+          </div>
+
+          {/* The deals, and the label they draw from, as one group.
+           *
+           * Together because the filter scopes the buttons: loose in the strip
+           * it drifted next to "Save these 100 squares", where it reads as
+           * being about the save. A control that changes what a button does has
+           * to be beside that button. */}
+          <div className="builder-deals">
+            {/* The label the random deal draws from — a subset of the
+                catalogue for this game, same as the tag filter on the list
+                below does for picking by hand. Shown above the two deal
+                buttons so it reads as scoping them, not as part of the
+                browse list further down. All labels by default, which deals
+                from the whole catalogue exactly as before this existed. */}
+            {tags.length > 0 && (
+              <label className="field builder-deal-tag">
+                <span>Include only tiles labelled</span>
+                <select value={tag} onChange={(e) => setTag(e.target.value)}>
+                  <option value="">All labels</option>
+                  {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            )}
+
+            {/* Deals into the empty squares only, which is what makes it safe
+                to press on a board somebody has already worked on -- and why
+                it needs no confirmation. It is the first draft of a board,
+                not the finished one: the point is to spend the evening on the
+                dozen squares worth arguing about instead of all hundred. */}
+            {tiles.length < need && (
+              <button
+                disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
+                onClick={() => { setUndo(null); onAutofillBoard(tag); }}
+                title={tagPool.length === 0
+                  ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
+                  : undefined}
+              >
+                Fill the {need - tiles.length} empty square
+                {need - tiles.length === 1 ? '' : 's'} at random
+                {tag && ` from "${tag}"`}
+              </button>
+            )}
+
+            {/* Two ways to want a different board, and they are not the same
+                question.
+
+                SHUFFLE re-arranges the tiles that are on the board already.
+                It never consults the catalogue, so it cannot leave a square
+                empty, it keeps a task that is deliberately placed three
+                times, and a one-off typed straight onto a square survives it.
+                Nothing it does is recoverable from the catalogue and nothing
+                it does needs to be: the hundred tiles coming out are the
+                hundred that went in. Hence no dialog -- rearranging is the
+                whole of what the button says it does.
+
+                RE-DEAL throws the board away and draws a new one. On a
+                hundred-square board from an eighty-six entry label that is
+                eighty-six tiles and fourteen holes, because the deal will not
+                repeat an entry. Worth having -- it is the only way to
+                different TILES rather than different places -- and worth a
+                dialog, which it has.
+
+                In a .row rather than bare in the panel, which is a grid and
+                would stretch them edge to edge. The full width belongs to the
+                autofill above -- the press this panel is built around -- and
+                a second bar the same size reads as a second primary action.
+                Sized to their text, they sit with the other secondary buttons
+                instead. */}
+            {tiles.length > 0 && (
+              <div className="row">
+                {tiles.length > 1 && (
+                  <button
+                    className="ghost"
+                    disabled={busy}
+                    onClick={() => { setUndo(null); onShuffleBoard(); }}
+                    title={'Moves the tiles already on the board between the '
+                           + 'squares they occupy. Nothing is added or removed.'}
+                  >
+                    Shuffle the {tiles.length} tiles on the board
+                  </button>
+                )}
+                <button
+                  className="ghost"
+                  disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
+                  onClick={() => { setUndo(null); onReshuffleBoard(tag); }}
+                  title={tagPool.length === 0
+                    ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
+                    : 'Clears the board and draws a new one from the catalogue.'}
+                >
+                  Randomize
+                </button>
+              </div>
+            )}
+          </div>
+
+
+        </div>
+      )}
+
+      {/* What is in your hand, said across the whole width of the board.
+       *
+       * Loud on purpose. While this is up, clicking a square fills it instead
+       * of selecting it, which is not what the rest of this screen has taught
+       * you -- and a mode you can forget you are in is how a board gets twelve
+       * copies of one tile. Three ways out, all of them named here. */}
+      {held && (
+        <p className="builder-holding">
+          <TileIcon slug={held.icon} fallback={null} />
+          <span>
+            Holding <b>{held.name}</b> — every square you click gets it.
+          </span>
+          <button className="ghost" onClick={() => setHeld(null)}>
+            Put it down
+          </button>
+          <span className="muted">or press Escape</span>
+        </p>
+      )}
+
       {/* Above the board rather than in the panel, because the panel changes
           shape three ways and the offer must not move or vanish with it. It
           says what it will put back, since "Undo" alone cannot be told apart
@@ -503,16 +804,41 @@ export default function BoardBuilder({
               ? <>Puts <b>{undo.prev.name}</b> back on {undo.label}.</>
               : <>Empties {undo.label} again.</>}
           </span>
+          {/* The way into holding a tile, offered where it becomes obvious:
+              you have just placed one, and the next thing you do is often
+              place it again. Costs the catalogue rows nothing -- a third
+              button on a row of a hundred and fifty would be read a hundred
+              and fifty times to be used once. */}
+          {lastPlaced && !held && (
+            <button className="ghost" onClick={() => setHeld(lastPlaced)}>
+              Keep placing {lastPlaced.name}
+            </button>
+          )}
         </p>
       )}
 
-      <div className="builder">
+      {/* The way back to an empty board, and the only control down here.
+       *
+       * Below the board rather than in the strip above it, and alone. Every
+       * other control on this screen adds something; this one throws away an
+       * evening. Put among them it would sit under a cursor already moving
+       * between deals, which is the one place a hundred-square undo should
+       * never be. The dialog asks for the game's name either way -- this is
+       * about not reaching it by accident in the first place.
+       *
+       * Hidden on an empty board, where it has nothing to do and would only be
+       * a red button to misread. */}
+      <div className={`builder${held ? ' is-holding' : ''}`}>
         <BuilderGrid
           tiles={byPosition}
           live={live}
           playerView={playerView}
           at={at}
           onPick={(row, col, source) => {
+            // Holding a tile makes a square something you fill, not something
+            // you select -- so the selection is left exactly where it was and
+            // the panel goes on describing what is in your hand.
+            if (held) { paint(row, col); return; }
             setAt({ row, col });
             setEditing(null);
             // Pointer only. The keyboard path moves focus to the cell it lands
@@ -542,7 +868,43 @@ export default function BoardBuilder({
             </p>
           )}
 
-          {editing ? (
+          {held ? (
+            /* The panel has one job at a time. While a tile is held it is not
+               about a square -- there is no selected square to be about -- so
+               it is about the hand: what is in it, and how to change it. */
+            <>
+              <div className="row builder-head">
+                <h3>In hand</h3>
+                <button className="ghost" onClick={() => setHeld(null)}>Put it down</button>
+              </div>
+              <div className="builder-current">
+                <div className="builder-current-tile">
+                  <TileIcon slug={held.icon} fallback={null} />
+                  <div>
+                    <b>{held.name}</b>
+                    <span className="muted">{ruleSummary(held)}</span>
+                  </div>
+                </div>
+                <p className="muted">
+                  Click squares on the board to fill them. A square a team has
+                  locked in is left alone.
+                </p>
+              </div>
+
+              <LibrarySearch
+                query={query} setQuery={setQuery}
+                tag={tag} setTag={setTag} tags={tags}
+                count={matches.length} total={library.length}
+              />
+              <CatalogueList
+                entries={matches}
+                mode="hold"
+                busy={busy}
+                heldId={held.id}
+                onHold={(entry) => setHeld(entry)}
+              />
+            </>
+          ) : editing ? (
             <>
               <h3>
                 {editing.what === 'square'
@@ -738,196 +1100,15 @@ export default function BoardBuilder({
                   ? 'Pick a square to fix it. Dealing, clearing and loading a '
                     + 'whole board are for before the game starts.'
                   : library.length === 0
-                    ? 'Empty so far. Import a board that already exists, or add tiles one at a time.'
+                    ? 'Empty so far. Load a saved board above, or add tiles one at a time.'
                     : `${library.length} task${library.length === 1 ? '' : 's'}, most-used first.`}
               </p>
 
-              {/* Saved boards.
-
-                  A board is an evening's work and, until this existed, a thing
-                  that lived in one place with "Remove all 100 tiles" beneath
-                  it. Nothing could rebuild one either: the random deal cannot
-                  repeat a tile, so a board that uses eighteen squares on four
-                  repeated tiles is not something any amount of re-dealing will
-                  produce again.
-
-                  Above the deal buttons because it outranks them: the first
-                  question on a fresh board is "do I already have one", and the
-                  answer being yes makes everything below it unnecessary. */}
-              <div className="builder-presets" hidden={live}>
-                <h4>Saved boards</h4>
-
-                {presets.length > 0 && (
-                  <div className="row">
-                    <select
-                      value={presetId}
-                      onChange={(e) => setPresetId(e.target.value)}
-                      aria-label="Saved board"
-                    >
-                      <option value="">Choose a saved board…</option>
-                      {presets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} — {p.squares} square{p.squares === 1 ? '' : 's'}
-                          {p.grid_size !== GRID ? ` (${p.grid_size}×${p.grid_size})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      disabled={busy || !presetId}
-                      onClick={async () => {
-                        const preset = presets.find((p) => p.id === presetId);
-                        setUndo(null);
-                        await onLoadBoard(preset);
-                      }}
-                    >
-                      Load
-                    </button>
-                    <button
-                      className="ghost danger"
-                      disabled={busy || !presetId}
-                      onClick={async () => {
-                        const preset = presets.find((p) => p.id === presetId);
-                        if (await onDeleteBoard(preset)) {
-                          setPresetId('');
-                          await reloadPresets();
-                        }
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-
-                {/* Saving is offered only when there is something to save, and
-                    an existing name overwrites rather than making "V4 (2)" —
-                    which is what makes this usable as a running save while a
-                    board is being built, rather than a thing you do once. */}
-                {tiles.length > 0 && (
-                  <div className="row">
-                    <input
-                      value={saveName}
-                      onChange={(e) => setSaveName(e.target.value)}
-                      placeholder="Name this board"
-                      maxLength={80}
-                    />
-                    <button
-                      className="ghost"
-                      disabled={busy || !saveName.trim()}
-                      onClick={async () => {
-                        const name = saveName.trim();
-                        const existing = presets.find(
-                          (p) => p.name.trim().toLowerCase() === name.toLowerCase()
-                        );
-                        if (await onSaveBoard(name, existing)) {
-                          setSaveName('');
-                          await reloadPresets();
-                        }
-                      }}
-                    >
-                      Save these {tiles.length} square{tiles.length === 1 ? '' : 's'}
-                    </button>
-                  </div>
-                )}
-
-                {presets.length === 0 && tiles.length === 0 && (
-                  <p className="muted">
-                    No saved boards yet. Build one and it can be kept here.
-                  </p>
-                )}
-              </div>
-
-              {/* The label the random deal draws from — a subset of the
-                  catalogue for this game, same as the tag filter on the list
-                  below does for picking by hand. Shown above the two deal
-                  buttons so it reads as scoping them, not as part of the
-                  browse list further down. All labels by default, which deals
-                  from the whole catalogue exactly as before this existed. */}
-              {!live && tags.length > 0 && (
-                <label className="field builder-deal-tag">
-                  <span>Include only tiles labelled</span>
-                  <select value={tag} onChange={(e) => setTag(e.target.value)}>
-                    <option value="">All labels</option>
-                    {tags.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </label>
-              )}
-
-              {/* Deals into the empty squares only, which is what makes it safe
-                  to press on a board somebody has already worked on -- and why
-                  it needs no confirmation. It is the first draft of a board,
-                  not the finished one: the point is to spend the evening on the
-                  dozen squares worth arguing about instead of all hundred. */}
-              {!live && tiles.length < need && (
-                <button
-                  disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
-                  onClick={() => { setUndo(null); onAutofillBoard(tag); }}
-                  title={tagPool.length === 0
-                    ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
-                    : undefined}
-                >
-                  Fill the {need - tiles.length} empty square
-                  {need - tiles.length === 1 ? '' : 's'} at random
-                  {tag && ` from "${tag}"`}
-                </button>
-              )}
-
-              {/* Two ways to want a different board, and they are not the same
-                  question.
-
-                  SHUFFLE re-arranges the tiles that are on the board already.
-                  It never consults the catalogue, so it cannot leave a square
-                  empty, it keeps a task that is deliberately placed three
-                  times, and a one-off typed straight onto a square survives it.
-                  Nothing it does is recoverable from the catalogue and nothing
-                  it does needs to be: the hundred tiles coming out are the
-                  hundred that went in. Hence no dialog -- rearranging is the
-                  whole of what the button says it does.
-
-                  RE-DEAL throws the board away and draws a new one. On a
-                  hundred-square board from an eighty-six entry label that is
-                  eighty-six tiles and fourteen holes, because the deal will not
-                  repeat an entry. Worth having -- it is the only way to
-                  different TILES rather than different places -- and worth a
-                  dialog, which it has.
-
-                  In a .row rather than bare in the panel, which is a grid and
-                  would stretch them edge to edge. The full width belongs to the
-                  autofill above -- the press this panel is built around -- and
-                  a second bar the same size reads as a second primary action.
-                  Sized to their text, they sit with the other secondary buttons
-                  instead. */}
-              {!live && tiles.length > 0 && (
-                <div className="row">
-                  {tiles.length > 1 && (
-                    <button
-                      className="ghost"
-                      disabled={busy}
-                      onClick={() => { setUndo(null); onShuffleBoard(); }}
-                      title={'Moves the tiles already on the board between the '
-                             + 'squares they occupy. Nothing is added or removed.'}
-                    >
-                      Shuffle the {tiles.length} tiles on the board
-                    </button>
-                  )}
-                  <button
-                    className="ghost"
-                    disabled={busy || tagPool.length === 0 || Boolean(libraryError)}
-                    onClick={() => { setUndo(null); onReshuffleBoard(tag); }}
-                    title={tagPool.length === 0
-                      ? (tag ? `No tiles are labelled "${tag}"` : 'The catalogue has no tiles to deal')
-                      : 'Clears the board and draws a new one from the catalogue.'}
-                  >
-                    Randomize
-                  </button>
-                </div>
-              )}
-
+              {/* Back beside the catalogue, where it was always about to be.
+                  It writes a tile with no square in mind yet -- nothing to do
+                  with the board, which is what the strip above the grid is
+                  for, and everything to do with the list underneath it. */}
               <div className="row">
-                {/* The paste box now files every name it does not already
-                    recognise, the same way a square typed here does -- so
-                    this is the only way left to add a tile with no square in
-                    mind yet. Disabled on the same terms as everything else
-                    that writes to the catalogue. */}
                 <button
                   className="ghost"
                   disabled={Boolean(libraryError)}
@@ -938,26 +1119,6 @@ export default function BoardBuilder({
                   New tile
                 </button>
               </div>
-
-              {/* The undo for a board you have decided against -- most often
-                  one autofill dealt. Clearing a square at a time is right for a
-                  mistake and absurd for a hundred of them. Deliberately down
-                  here with nothing beside it, rather than in the row above:
-                  every other button on this panel adds something, and a
-                  destructive one is the last thing that should sit under a
-                  cursor already moving. Hidden on an empty board, where it has
-                  nothing to do and would only be a red button to misread. */}
-              {!live && tiles.length > 0 && (
-                <div className="row builder-clear">
-                  <button
-                    className="ghost danger"
-                    disabled={busy}
-                    onClick={() => { setUndo(null); onClearBoard(); }}
-                  >
-                    Remove all {tiles.length} tile{tiles.length === 1 ? '' : 's'}
-                  </button>
-                </div>
-              )}
 
               {library.length > 0 && (
                 <>
@@ -980,6 +1141,18 @@ export default function BoardBuilder({
           )}
         </div>
       </div>
+
+      {!live && tiles.length > 0 && (
+        <div className="row builder-clear">
+          <button
+            className="ghost danger"
+            disabled={busy}
+            onClick={() => { setUndo(null); onClearBoard(); }}
+          >
+            Remove all {tiles.length} tile{tiles.length === 1 ? '' : 's'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -1362,20 +1535,34 @@ function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, on
  * to be read first. That is what makes the swap impossible rather than merely
  * unlikely: the position that holds Edit while placing holds nothing while
  * browsing.
+ *
+ * Three modes now rather than two, and the third arrived without argument --
+ * which is the point of having done it this way. A list whose meaning is a
+ * stated prop can grow a meaning; two hard-coded copies could only have grown
+ * a third copy.
  */
-function CatalogueList({ entries, mode, busy, placedAt, onPlace, onEdit, at }) {
+function CatalogueList({
+  entries, mode, busy, placedAt, onPlace, onEdit, onHold, at, heldId,
+}) {
   const placing = mode === 'place';
+  const holding = mode === 'hold';
+
+  const caption = placing
+    ? <>Click a tile to put it on <b>{at}</b>.</>
+    : holding
+      ? <>Click a tile to hold that one instead.</>
+      : <>Click a tile to edit a copy of it. The original stays as it is.</>;
+
+  const activate = (entry) => (
+    placing ? onPlace(entry) : holding ? onHold(entry) : onEdit(entry)
+  );
 
   return (
     <>
       {/* What a press will do, said where the press is. The panel's heading
           names the square; this names the consequence, which is the half that
           was only ever implied by which state the panel happened to be in. */}
-      <p className="muted library-caption">
-        {placing
-          ? <>Click a tile to put it on <b>{at}</b>.</>
-          : <>Click a tile to edit a copy of it. The original stays as it is.</>}
-      </p>
+      <p className="muted library-caption">{caption}</p>
 
       <ul className="library-list">
         {entries.map((entry) => {
@@ -1395,12 +1582,16 @@ function CatalogueList({ entries, mode, busy, placedAt, onPlace, onEdit, at }) {
           return (
             <li key={entry.id}>
               <button
-                className="library-pick"
-                // Browsing opens a form and writes nothing, so a refresh in
-                // flight is no reason to refuse it. Placing is a write.
+                // The one in your hand, marked: with no selected square and no
+                // form open, this row is the only thing on screen that says
+                // which tile the next click will lay down.
+                className={`library-pick${holding && entry.id === heldId ? ' on' : ''}`}
+                // Browsing and holding open or swap and write nothing, so a
+                // refresh in flight is no reason to refuse them. Placing is a
+                // write.
                 disabled={placing && busy}
                 title={already ? `Already on ${already}` : undefined}
-                onClick={() => (placing ? onPlace(entry) : onEdit(entry))}
+                onClick={() => activate(entry)}
               >
                 <TileIcon slug={entry.icon} fallback={null} />
                 <span className="library-text">

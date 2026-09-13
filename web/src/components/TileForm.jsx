@@ -59,6 +59,33 @@ export default function TileForm({
     options: draft.options.map((o, i) => (i === index ? { ...o, ...patch } : o)),
   });
 
+  const blankDrop = () => ({ label: '', points: '1', grp: '', maxTimes: '' });
+  const addDrop = () => set({ options: [...draft.options, blankDrop()] });
+
+  /**
+   * Enter starts the next drop.
+   *
+   * A ten-drop set was ten trips to a button with the mouse, between bursts of
+   * typing -- the one shape of form where the hands should never have to leave
+   * the keyboard. Only from the last row: pressing Enter halfway up a list
+   * means "I have finished editing this one", not "give me an eleventh", and
+   * appending there would put the new row somewhere nobody is looking.
+   *
+   * The focus is moved after the render that creates the row, by the same
+   * `requestAnimationFrame` trick the board's arrow keys use, and lands on the
+   * first box the row actually has -- which is the set name for a set rule and
+   * the drop itself for everything else.
+   */
+  function onDropKeyDown(e, index) {
+    if (e.key !== 'Enter' || index !== draft.options.length - 1) return;
+    e.preventDefault();
+    addDrop();
+    requestAnimationFrame(() => {
+      const rows = document.querySelectorAll('.drop-rows li');
+      rows[rows.length - 1]?.querySelector('input')?.focus();
+    });
+  }
+
   return (
     <div className="tile-form">
       <label className="field">
@@ -157,9 +184,7 @@ export default function TileForm({
           {rule !== 'value' && (
             <button
               type="button" className="ghost"
-              onClick={() => set({
-                options: [...draft.options, { label: '', points: '1', grp: '', maxTimes: '' }],
-              })}
+              onClick={addDrop}
             >
               Add drop
             </button>
@@ -178,13 +203,26 @@ export default function TileForm({
           </p>
         ) : (
           <>
-            {/* The two number boxes on each row are easy to mix up, and the
-                second one is new. Said once, above the list, rather than as a
-                label on every row — which is what the column widths are for. */}
+            {/* The boxes on a row carry no labels of their own, and the two
+                numbers are easy to mix up. This used to be a sentence above the
+                list -- "what it is worth, then how many times it may count" --
+                which is a thing to remember rather than a thing to read, and
+                the remembering got harder the further down the list you were.
+                Headings sit over the boxes they name instead. */}
+            <div className="drop-heads" aria-hidden="true">
+              {rule !== 'points' && <span className="drop-grp">Set</span>}
+              <span className="drop-label">Drop</span>
+              {(rule === 'points' || rule === 'points_per_set') && (
+                <>
+                  <span className="drop-points">Worth</span>
+                  <span className="drop-max">Max</span>
+                </>
+              )}
+              <span className="drop-remove">&times;</span>
+            </div>
             {(rule === 'points' || rule === 'points_per_set') && (
               <p className="muted tile-form-hint">
-                Two numbers per drop: what it is worth, then how many times it
-                may count. Leave the second blank for no limit.
+                Leave <b>Max</b> blank for a drop that may count any number of times.
               </p>
             )}
             <ul className="drop-rows">
@@ -195,6 +233,7 @@ export default function TileForm({
                     className="drop-grp"
                     value={option.grp}
                     onChange={(e) => setOption(index, { grp: e.target.value })}
+                    onKeyDown={(e) => onDropKeyDown(e, index)}
                     placeholder="Set"
                     maxLength={40}
                   />
@@ -203,6 +242,7 @@ export default function TileForm({
                   className="drop-label"
                   value={option.label}
                   onChange={(e) => setOption(index, { label: e.target.value })}
+                  onKeyDown={(e) => onDropKeyDown(e, index)}
                   placeholder="Drop"
                   maxLength={80}
                 />
@@ -213,6 +253,7 @@ export default function TileForm({
                       type="number" min="1" max="30"
                       value={option.points}
                       onChange={(e) => setOption(index, { points: e.target.value })}
+                      onKeyDown={(e) => onDropKeyDown(e, index)}
                       aria-label="Points"
                     />
                     {/* Empty means uncapped, which is why the placeholder is a
@@ -226,6 +267,7 @@ export default function TileForm({
                       placeholder="∞"
                       value={option.maxTimes ?? ''}
                       onChange={(e) => setOption(index, { maxTimes: e.target.value })}
+                      onKeyDown={(e) => onDropKeyDown(e, index)}
                       aria-label={`How many times ${option.label || 'this drop'} may count`}
                       title="How many times this drop may count. Blank for no limit."
                     />
