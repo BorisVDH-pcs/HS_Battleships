@@ -67,90 +67,56 @@ export function useGame(gameId, session) {
   const shownId = useRef(gameId);
   shownId.current = gameId;
 
+  const uid = session?.user?.id ?? null;
+
   const load = useCallback(async () => {
-    if (!supabase || !gameId || !session) return;
+    if (!supabase || !gameId || !uid) return;
     const seq = ++loadSeq.current;
     try {
-      const uid = session.user.id;
+      // One request for the whole board, where this used to make ten: three to
+      // work out which team the player is on, five for the board, then evidence
+      // and the enemy's shots. Every open board repeated the set on every event.
+      //
+      // board_for_me is `security invoker`, so each table it reads is still
+      // filtered by exactly the RLS policies these queries passed through when
+      // they were separate requests -- the function cannot widen what a player
+      // sees. tiles_for_me, team_scores and my_evidence are called inside it as
+      // the `security definer` functions they already were.
+      const { data, error } = await supabase.rpc('board_for_me', { p_game_id: gameId });
+      if (error) throw new Error(error.message);
+      const board = data ?? {};
 
-      const [{ data: game }, { data: teams }, { data: memberships }] = await Promise.all([
-        supabase.from('games').select('*').eq('id', gameId).single(),
-        supabase.from('teams').select('*').eq('game_id', gameId).order('name'),
-        supabase.from('team_members').select('team_id, role').eq('profile_id', uid),
-      ]);
-
+      const teams = board.teams ?? [];
+      const memberships = board.memberships ?? [];
       const myTeamId =
-        teams?.find((t) => memberships?.some((m) => m.team_id === t.id))?.id ?? null;
+        teams.find((t) => memberships.some((m) => m.team_id === t.id))?.id ?? null;
       // Captains may place their own fleet — place_fleet() has always allowed it.
-      const myRole = memberships?.find((m) => m.team_id === myTeamId)?.role ?? null;
-      const enemyTeamId = teams?.find((t) => t.id !== myTeamId)?.id ?? null;
-
-      const [
-        { data: tiles }, { data: myShipCells }, { data: myFleet },
-        { data: events }, { data: scores },
-      ] = await Promise.all([
-        // tiles_for_me and team_scores are `security definer` FUNCTIONS, not
-        // views — see 0010. They already order their own rows.
-        supabase.rpc('tiles_for_me', { p_game_id: gameId }),
-        // RLS already limits both to my own teams, but "my teams" spans every
-        // game I have ever been in. Without the filter a second game would draw
-        // the other game's ships onto this board, and miscount shipsPlaced.
-        myTeamId
-          ? supabase.from('ship_cells').select('*').eq('team_id', myTeamId)
-          : supabase.from('ship_cells').select('*'),
-        // Team-filtered for the same reason, and it is the stricter of the two:
-        // ship_status carries one row per ship, so a player sitting in both
-        // teams of this game counted ten hulls afloat against a five-ship
-        // fleet. The cells above hid it whenever the two fleets overlapped.
-        myTeamId
-          ? supabase.from('ship_status').select('*').eq('game_id', gameId).eq('team_id', myTeamId)
-          : supabase.from('ship_status').select('*').eq('game_id', gameId),
-        supabase
-          .from('game_events')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('created_at', { ascending: false })
-          .limit(50),
-        supabase.rpc('team_scores', { p_game_id: gameId }),
-      ]);
-
-      // Evidence is team-scoped by the function itself, so it needs no filter
-      // here — but it does need the game id, or a second game's uploads would
-      // appear against this board's claims.
-      const { data: evidence } = await supabase.rpc('my_evidence', { p_game_id: gameId });
-
-      // Enemy shots land on my board: their fired claims, resolved to coordinates.
-      let enemyShots = [];
-      if (enemyTeamId) {
-        const { data } = await supabase
-          .from('tile_claims')
-          .select('tile_id, result, status')
-          .eq('team_id', enemyTeamId)
-          .eq('status', 'fired');
-        enemyShots = data ?? [];
-      }
+      const myRole = memberships.find((m) => m.team_id === myTeamId)?.role ?? null;
 
       if (seq !== loadSeq.current || gameId !== shownId.current) return;
       setState({
         loading: false,
         error: null,
-        game: game ?? null,
-        teams: teams ?? [],
+        game: board.game ?? null,
+        teams,
         myTeamId,
         myRole,
-        tiles: tiles ?? [],
-        myShipCells: myShipCells ?? [],
-        myFleet: myFleet ?? [],
-        enemyShots,
-        events: events ?? [],
-        scores: scores ?? [],
-        evidence: evidence ?? [],
+        tiles: board.tiles ?? [],
+        myShipCells: board.myShipCells ?? [],
+        myFleet: board.myFleet ?? [],
+        enemyShots: board.enemyShots ?? [],
+        events: board.events ?? [],
+        scores: board.scores ?? [],
+        evidence: board.evidence ?? [],
       });
     } catch (err) {
       if (seq !== loadSeq.current || gameId !== shownId.current) return;
       setState((s) => ({ ...s, loading: false, error: err.message }));
     }
-  }, [gameId, session]);
+    // Keyed on the user id rather than the session object. The board needs only
+    // who the player is -- the server reads auth.uid() for itself now -- and a
+    // plain string cannot churn the way a re-emitted session object can.
+  }, [gameId, uid]);
 
   // Clear the board the moment the game changes, ahead of the refetch.
   //
