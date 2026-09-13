@@ -889,6 +889,12 @@ export default function Admin() {
             onRemove={(teamId, profileId) =>
               run(() => adminRemoveMember(teamId, profileId), 'Player removed.')
             }
+            onAddMany={(teamId, profileIds) =>
+              run(
+                () => Promise.all(profileIds.map((id) => adminSetMember(teamId, id, 'member'))),
+                `${profileIds.length} player${profileIds.length === 1 ? '' : 's'} added.`
+              )
+            }
           />
 
           {/* Setting up, not running: it belongs with Tiles and Roster rather
@@ -999,15 +1005,114 @@ function NewGame({ busy, onCreate }) {
   );
 }
 
-function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
-  const [pick, setPick] = useState({});
+/**
+ * The free-player list for one team: a search field over a checkbox list,
+ * so drafting ten people onto a team is ten ticks and one press rather than
+ * ten repeats of "open the picker, find the name, press Add". Selection is
+ * local to this component and keyed by team, not lifted to Roster — once a
+ * batch lands the picker forgets it, same as the old single-select did.
+ */
+function TeamAddPicker({ team, free, busy, onAddMany }) {
+  const [query, setQuery] = useState('');
+  const [checked, setChecked] = useState(() => new Set());
 
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? free.filter((p) => p.display_name.toLowerCase().includes(q))
+    : free;
+  // Stale ids (picked, then filtered out by a new search, or added by someone
+  // else in another tab) never make it into the batch below — this is
+  // recomputed against the live `free` list every render, not trusted from
+  // whenever the tick happened.
+  const selected = matches.filter((p) => checked.has(p.id));
+  const allMatchesChecked = matches.length > 0 && selected.length === matches.length;
+
+  function toggle(id) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllMatches() {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (allMatchesChecked) matches.forEach((p) => next.delete(p.id));
+      else matches.forEach((p) => next.add(p.id));
+      return next;
+    });
+  }
+
+  return (
+    <div className="team-add">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={`Search ${free.length} player${free.length === 1 ? '' : 's'}…`}
+        disabled={free.length === 0}
+      />
+      {free.length === 0 ? (
+        <p className="muted">Everyone available is already on a team.</p>
+      ) : (
+        <>
+          <ul className="team-add-list">
+            {matches.map((p) => (
+              <li key={p.id}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={checked.has(p.id)}
+                    onChange={() => toggle(p.id)}
+                  />
+                  {p.display_name}
+                </label>
+              </li>
+            ))}
+            {matches.length === 0 && (
+              <li className="muted">Nothing matches “{query}”.</li>
+            )}
+          </ul>
+          <div className="team-add-footer">
+            <label className="team-add-all">
+              <input
+                type="checkbox"
+                checked={allMatchesChecked}
+                onChange={toggleAllMatches}
+                disabled={matches.length === 0}
+              />
+              Select all{q && ' matching'}
+            </label>
+            <button
+              disabled={busy || selected.length === 0}
+              onClick={() => {
+                onAddMany(team.id, selected.map((p) => p.id));
+                setChecked(new Set());
+              }}
+            >
+              Add {selected.length > 0 ? selected.length : ''} to {team.name}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Roster({ gameTeams, profiles, members, busy, onSet, onRemove, onAddMany }) {
   return (
     <section className="card">
       <h2>Roster</h2>
       <div className="columns">
         {gameTeams.map((t) => {
-          const mine = members.filter((m) => m.team_id === t.id);
+          // Captains first: they're who an organiser is scanning for when
+          // something needs fixing mid-event, and a long roster shouldn't
+          // make them hunt. Sort is stable, so within each group (captain,
+          // then everyone else) members stay in the order they joined.
+          const mine = members
+            .filter((m) => m.team_id === t.id)
+            .sort((a, b) => (b.role === 'captain') - (a.role === 'captain'));
           const taken = new Set(
             members
               .filter((m) => gameTeams.some((g) => g.id === m.team_id))
@@ -1018,7 +1123,7 @@ function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
           const free = profiles.filter((p) => !taken.has(p.id) && !p.is_admin);
           return (
             <div key={t.id}>
-              <h3>{t.name}</h3>
+              <h3>{t.name} <span className="team-count">{mine.length}</span></h3>
               <ul className="roster">
                 {mine.map((m) => {
                   const p = profiles.find((x) => x.id === m.profile_id);
@@ -1043,26 +1148,7 @@ function Roster({ gameTeams, profiles, members, busy, onSet, onRemove }) {
                 })}
                 {mine.length === 0 && <li className="muted">Nobody yet.</li>}
               </ul>
-              <div className="row" style={{ marginTop: '.6rem' }}>
-                <label>
-                  Add player
-                  <select
-                    value={pick[t.id] ?? ''}
-                    onChange={(e) => setPick({ ...pick, [t.id]: e.target.value })}
-                  >
-                    <option value="">Choose…</option>
-                    {free.map((p) => (
-                      <option key={p.id} value={p.id}>{p.display_name}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  disabled={busy || !pick[t.id]}
-                  onClick={() => { onSet(t.id, pick[t.id], 'member'); setPick({ ...pick, [t.id]: '' }); }}
-                >
-                  Add
-                </button>
-              </div>
+              <TeamAddPicker team={t} free={free} busy={busy} onAddMany={onAddMany} />
             </div>
           );
         })}

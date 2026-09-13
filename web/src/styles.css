@@ -1898,6 +1898,21 @@ label {
 .pill.active   { color: var(--strike); background: rgba(48, 209, 88, .18); }
 .pill.finished { color: var(--label-2); background: var(--fill); }
 
+/* A count, not a status -- neutral fill rather than the gold/green/red the
+   other small badges in this file use for state, since an empty team isn't
+   wrong, just not built yet. */
+.team-count {
+  display: inline-block;
+  min-width: 1.35rem;
+  padding: .05rem .4rem;
+  border-radius: var(--r-pill);
+  background: var(--fill);
+  color: var(--label-2);
+  font-size: .75rem;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+}
 .roster { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: 0; }
 .roster li {
   display: flex; justify-content: space-between; align-items: center; gap: .6rem;
@@ -1907,6 +1922,45 @@ label {
 .roster li:last-child { border-bottom: none; }
 .roster .captain { color: var(--gold); font-weight: 600; }
 .roster .meta { color: var(--label-2); font-size: .8125rem; margin-top: .1rem; }
+
+/* ---- team add picker ----
+ *
+ * Search over a tick list rather than a picker per name: drafting several
+ * people onto a team used to be one open-pick-Add cycle per person, which is
+ * fine for one captain and tedious for ten. The list caps its own height and
+ * scrolls rather than growing the card, since a full player pool sitting
+ * fully expanded in both team columns is most of the page. */
+.team-add { margin-top: .7rem; }
+.team-add input[type="search"] { font-size: .875rem; }
+.team-add-list {
+  list-style: none; margin: .5rem 0 0; padding: 0;
+  max-height: 11rem; overflow-y: auto;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--fill-3);
+}
+.team-add-list li {
+  border-bottom: 1px solid var(--hairline);
+}
+.team-add-list li:last-child { border-bottom: none; }
+.team-add-list li.muted { padding: .55rem .7rem; }
+.team-add-list label {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .5rem .7rem;
+  font-size: .875rem;
+  cursor: pointer;
+  transition: background .15s var(--ease-out);
+}
+.team-add-list label:hover { background: var(--fill-2); }
+.team-add-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin-top: .55rem;
+}
+.team-add-all {
+  display: flex; align-items: center; gap: .45rem;
+  color: var(--label-2); font-size: .8125rem;
+  cursor: pointer;
+}
 
 /* ---- switch ----
  *
