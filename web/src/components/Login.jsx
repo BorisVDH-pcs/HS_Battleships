@@ -91,6 +91,7 @@ export default function Login() {
       <div className="login-radar" aria-hidden="true" />
       <div className="login-content">
         <Wordmark />
+        <p className="login-tagline">Team-vs-team Battleships on a 100-tile OSRS task grid.</p>
 
         <section className="login-card" aria-labelledby="login-title">
           <header className="login-intro">

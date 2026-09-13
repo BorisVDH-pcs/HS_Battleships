@@ -1504,6 +1504,7 @@ label {
   animation: login-arrive .65s var(--ease-out) both;
 }
 .login h1 { text-align: center; font-size: 1.75rem; font-weight: 700; letter-spacing: -.022em; }
+.login-tagline { margin: -.5rem 0 0; text-align: center; color: var(--label-2); font-size: .875rem; }
 .login-card {
   padding: clamp(1.35rem, 4vw, 2rem);
   border: 1px solid rgba(242, 193, 78, .34);
@@ -1980,6 +1981,39 @@ label {
   color: var(--label-2); font-size: .8125rem;
   cursor: pointer;
 }
+
+/* ---- accounts ---- */
+
+.account-list {
+  list-style: none; padding: 0; margin: .7rem 0 0; display: grid; gap: 0;
+  max-height: 20rem; overflow-y: auto;
+}
+.account-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: .6rem;
+  font-size: .9375rem; padding: .5rem .1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.account-list li:last-child { border-bottom: none; }
+.account-list li.muted { padding: .55rem .1rem; }
+
+/* Collapsed by default so a screen an admin opens to reset one password does
+   not also greet them with a scrollable history every time. */
+.account-log {
+  margin-top: 1.1rem; padding-top: .9rem; border-top: 1px solid var(--hairline);
+}
+.account-log summary {
+  cursor: pointer; color: var(--label-2); font-size: .8125rem; font-weight: 600;
+  letter-spacing: .02em; text-transform: uppercase;
+}
+.account-log summary:hover { color: var(--gold-lit); }
+.account-log ul { list-style: none; margin: .7rem 0 0; padding: 0; }
+.account-log li {
+  display: flex; justify-content: space-between; gap: .6rem;
+  padding: .4rem 0; font-size: .8125rem; color: var(--label-2);
+  border-bottom: 1px solid var(--hairline);
+}
+.account-log li:last-child { border-bottom: none; }
+.account-log strong { color: var(--text); font-weight: 600; }
 
 /* ---- switch ----
  *

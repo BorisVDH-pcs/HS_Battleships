@@ -120,6 +120,19 @@ export const adminListShipCells = (gameId) =>
  */
 export const adminGameReadiness = () => rpc('admin_game_readiness', {});
 
+/**
+ * Set a player's password directly — the one thing an admin cannot fix any
+ * other way, since these accounts have no real mailbox to send a reset link
+ * to. Same mechanism as the manual SQL snippet it replaces (pgcrypto, not the
+ * service-role Admin API), and every call is logged (see below).
+ */
+export const adminResetPassword = (profileId, newPassword) =>
+  rpc('admin_reset_password', { p_profile_id: profileId, p_new_password: newPassword });
+
+/** Recent resets, newest first — who reset whose password, and when. */
+export const adminListPasswordResets = (limit = 20) =>
+  rpc('admin_list_password_resets', { p_limit: limit });
+
 // ---- the tile library, and boards built one square at a time ----
 
 /**
