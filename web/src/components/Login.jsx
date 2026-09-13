@@ -91,7 +91,18 @@ export default function Login() {
       <div className="login-radar" aria-hidden="true" />
       <div className="login-content">
         <Wordmark />
-        <p className="login-tagline">Team-vs-team Battleships on a 100-tile OSRS task grid.</p>
+        <div className="login-credits">
+          <span>
+            High Society platform created by{' '}
+            <span className="credit-creator">BludgenMaker</span>{' '}
+            and{' '}
+            <span className="credit-creator">Soft Papi</span>
+          </span>
+          <a className="credit-star credit-star-compact" href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
+            <span aria-hidden="true">★</span>
+            GitHub
+          </a>
+        </div>
 
         <section className="login-card" aria-labelledby="login-title">
           <header className="login-intro">
@@ -191,18 +202,6 @@ export default function Login() {
           )}
         </section>
 
-        <footer className="login-credits">
-          <span>
-            High Society platform created by{' '}
-            <span className="credit-creator">BludgenMaker</span>{' '}
-            and{' '}
-            <span className="credit-creator">Soft Papi</span>
-          </span>
-          <a className="credit-star" href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
-            <span aria-hidden="true">★</span>
-            Star on GitHub
-          </a>
-        </footer>
 
       </div>
     </div>
