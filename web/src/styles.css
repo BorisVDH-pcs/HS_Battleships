@@ -1630,7 +1630,7 @@ label {
   line-height: 1.45;
   text-align: center;
 }
-.login-credits { margin: -.5rem auto 0; flex-wrap: nowrap; gap: .35rem; font-size: clamp(.6rem, 1.7vw, .72rem); white-space: nowrap; }
+.login-credits { margin: -.42rem auto 0; flex-wrap: wrap; gap: .4rem .55rem; font-size: clamp(.72rem, 1.9vw, .82rem); }
 .player-credits {
   margin: 2.5rem auto .25rem;
   padding-top: 1.15rem;
