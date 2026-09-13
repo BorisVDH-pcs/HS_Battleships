@@ -58,7 +58,7 @@ request a player can craft to peek or cheat.
 ```
 docs/handover.md                  pick-it-up-cold notes; session log at the bottom
 docs/v4-handover.md               tile completion rules and the V4 board
-docs/tile-fixes-handover.md       UNFINISHED: five tile edits, a grouping bug, the value unit
+docs/tile-fixes-handover.md       why value tiles count in tenths, and the each_set grouping trap
 docs/architecture.md              schema + design decisions
 docs/how-the-spreadsheet-worked.md  reference notes on the Sheets original
 docs/website-review.md            the 2026-09-07 UI review and its triage
@@ -93,6 +93,11 @@ mirrors it so the interface can predict the same answer.
 | `each_set` | every group has N **distinct** options |
 | `points_per_set` | every group has N points; **repeats count** |
 | `value` | the submitter types what each drop was worth, and the total reaches the target |
+
+A `value` tile is typed in **millions** and stored in **tenths** of one, so half a
+million is a real submission: `0.5` and `0,5` both work, `0.55` is refused. Every
+screen divides back — only the database sees the tenths. See
+[docs/tile-fixes-handover.md](docs/tile-fixes-handover.md).
 
 Cutting across all five, a **drop may cap its own repeats**: `tile_options.max_times`
 is how many times that one drop may count, and null — every option saved before

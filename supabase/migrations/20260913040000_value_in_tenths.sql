@@ -591,3 +591,147 @@ update board_presets p
    and exists (
          select 1 from jsonb_array_elements(p.squares) s
           where s -> 'tile' ->> 'rule' = 'value');
+
+-- ============================================================
+-- 8. The tester speaks the same unit
+-- ============================================================
+-- `admin_test_tile` plays picks through the real `claim_is_complete()`, which
+-- is what makes it worth trusting -- but its own value branch carried the old
+-- bounds and the old label. It would have refused an amount over 100m that
+-- `add_evidence` accepts, and printed half a million as "5m". The one tool
+-- whose job is to catch the two copies of the rules drifting apart must not be
+-- the thing that drifts.
+
+create or replace function admin_test_tile(p_tile_id uuid, p_picks jsonb default '[]'::jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tile   tiles%rowtype;
+  v_team   uuid;
+  v_claim  uuid;
+  v_steps  jsonb := '[]'::jsonb;
+  v_done   boolean := false;
+  v_at     int;
+  v_total  int := 0;
+  v_count  int := 0;
+  v_n      int := 0;
+  v_pick   jsonb;
+  v_opt    tile_options%rowtype;
+  v_award  int;
+  v_refuse text;
+  v_label  text;
+  v_error  text;
+begin
+  if not is_admin() then raise exception 'Admins only'; end if;
+
+  select * into v_tile from tiles where id = p_tile_id;
+  if not found then raise exception 'No such tile'; end if;
+
+  -- Any team in the game will do: nothing here is scored against them and none
+  -- of it survives the block. A game with no teams yet has nothing to hang a
+  -- claim on, which is worth saying plainly rather than failing on a not-null.
+  select id into v_team from teams where game_id = v_tile.game_id
+   order by slot nulls last, created_at limit 1;
+  if v_team is null then
+    raise exception 'This game has no teams yet, so there is nothing to test a claim against';
+  end if;
+
+  begin
+    insert into tile_claims (tile_id, team_id, status)
+    values (p_tile_id, v_team, 'active')
+    returning id into v_claim;
+
+    for v_pick in
+      select value from jsonb_array_elements(
+        case when jsonb_typeof(p_picks) = 'array' then p_picks else '[]'::jsonb end)
+    loop
+      v_n     := v_n + 1;
+      v_opt   := null;
+      v_refuse := null;
+      v_award := 1;
+
+      if v_tile.completion = 'value' then
+        v_award := coalesce((nullif(btrim(v_pick ->> 'amount'), ''))::int, 0);
+        -- Tenths of a million, and the same bounds add_evidence enforces. Both
+        -- halves of this mattered: the old ceiling refused anything over 100m
+        -- that a player could really submit, and the old label called half a
+        -- million "5m".
+        v_label := value_m(v_award) || 'm';
+        if v_award < 1 or v_award > 10000 then
+          v_refuse := 'That value must be between 0.1m and 1000m';
+        end if;
+
+      elsif exists (select 1 from tile_options where tile_id = p_tile_id) then
+        select * into v_opt from tile_options
+         where id = (nullif(btrim(v_pick ->> 'option_id'), ''))::uuid
+           and tile_id = p_tile_id;
+        if not found then
+          v_label  := '(no drop chosen)';
+          v_refuse := 'Say which drop this screenshot shows';
+        else
+          v_label  := v_opt.label;
+          v_refuse := evidence_refusal(v_claim, v_opt.id);
+          v_award  := case when v_tile.completion in ('one_set', 'each_set')
+                           then 1 else v_opt.points end;
+        end if;
+
+      else
+        -- A plain tile banks a point per screenshot and asks nothing else.
+        v_label := 'Screenshot';
+      end if;
+
+      if v_refuse is null then
+        insert into tile_evidence (claim_id, team_id, storage_path,
+                                   uploaded_by_name, option_id, points)
+        values (v_claim, v_team, 'dry-run/' || v_n, 'tile test',
+                case when v_opt.id is null then null else v_opt.id end, v_award);
+        v_total := v_total + v_award;
+        v_count := v_count + 1;
+        if not v_done and claim_is_complete(v_claim) then
+          v_done := true;
+          v_at   := v_n;
+        end if;
+      end if;
+
+      v_steps := v_steps || jsonb_build_object(
+        'n',        v_n,
+        'label',    v_label,
+        'awarded',  case when v_refuse is null then v_award else 0 end,
+        'total',    v_total,
+        'count',    v_count,
+        'complete', v_done,
+        'refused',  v_refuse
+      );
+    end loop;
+
+    -- Unwinds everything above. See the note on this function.
+    raise exception 'dry run complete' using errcode = 'HS001';
+
+  exception
+    when sqlstate 'HS001' then
+      null;
+    when others then
+      -- A trigger said no -- the active-claim limit, most likely, if this game
+      -- is under way and the chosen team already has its hands full. Reported
+      -- rather than thrown, so the builder can say which part failed.
+      v_error := sqlerrm;
+  end;
+
+  return jsonb_build_object(
+    'rule',              v_tile.completion::text,
+    'required',          coalesce(v_tile.required_evidence, 1),
+    'per_set',           v_tile.per_set,
+    'priced',            exists (select 1 from tile_options where tile_id = p_tile_id),
+    'complete',          v_done,
+    'completed_at_step', v_at,
+    'points_total',      v_total,
+    'accepted',          v_count,
+    'steps',             v_steps,
+    'error',             v_error
+  );
+end;
+$$;
+
+revoke execute on function admin_test_tile(uuid, jsonb) from public, anon;
+grant  execute on function admin_test_tile(uuid, jsonb) to authenticated;
+
