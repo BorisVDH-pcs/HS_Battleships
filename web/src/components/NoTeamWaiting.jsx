@@ -38,7 +38,7 @@ export default function NoTeamWaiting({ displayName }) {
     <section className="waiting" aria-labelledby="waiting-title">
       <div className="waiting-radar" aria-hidden="true"><span /></div>
       <p className="waiting-kicker">Fleet assembly in progress</p>
-      <h1 id="waiting-title">Your orders are coming</h1>
+      <h1 id="waiting-title">Please await orders</h1>
       <p className="waiting-lead">
         You are not assigned to a team yet. Keep this channel open — an admin
         will place you aboard automatically.
