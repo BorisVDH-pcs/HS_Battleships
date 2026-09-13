@@ -1,5 +1,11 @@
 -- Labels leave the catalogue.
 --
+-- The timestamp is the moment this was applied to the live project by hand,
+-- not a round number chosen when it was written. That is deliberate: the
+-- applied version is what `supabase_migrations.schema_migrations` holds, and a
+-- file numbered anything else is a migration `supabase db push` believes is
+-- still pending and tries to run a second time.
+--
 -- A tile could carry free-text labels, and a label could scope the random deal
 -- and filter the catalogue list. The catalogue held exactly one of them,
 -- "Battleships V4" on 86 entries -- and the distinct tiles of the saved board
@@ -27,8 +33,15 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. The deal stops taking a label.
+--
+-- Both signatures dropped, not just the old two-argument one. Dropping only
+-- what this migration replaces is the obvious way to write it and the wrong
+-- one: replayed against a database that already has the new function, a bare
+-- `create` fails on a signature nothing dropped. Which is exactly how this
+-- migration failed its first CI run.
 -- ---------------------------------------------------------------------------
 drop function if exists admin_autofill_board(uuid, text);
+drop function if exists admin_autofill_board(uuid);
 
 create function admin_autofill_board(p_game_id uuid)
 returns jsonb
@@ -255,6 +268,8 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 4. The column itself. Last, so nothing above is reading it when it goes.
---    No index and no constraint depends on it.
+--    No index and no constraint depends on it. `if exists` for the same reason
+--    as the drops above: a migration that cannot be replayed is a migration
+--    that only works once, on one database.
 -- ---------------------------------------------------------------------------
-alter table tile_library drop column tags;
+alter table tile_library drop column if exists tags;
