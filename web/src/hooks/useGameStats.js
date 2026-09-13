@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { subscribeToGameEvents } from '../lib/gameEvents.js';
 
 /**
  * The full event history for a game, separate from useGame's `events` (which
@@ -32,18 +33,13 @@ export function useGameStats(gameId) {
   }, [gameId]);
 
   useEffect(() => {
-    if (!supabase || !gameId) return;
-    const channel = supabase
-      .channel(`stats:${gameId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
-        (payload) => setEvents((prev) => (
-          prev.some((e) => e.id === payload.new.id) ? prev : [...prev, payload.new]
-        ))
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+    if (!supabase || !gameId) return undefined;
+    // Shares one channel with useGame and App -- see lib/gameEvents.js. The
+    // guard against a duplicate id stays: the initial fetch above and a row
+    // arriving here can overlap.
+    return subscribeToGameEvents(gameId, (row) => setEvents((prev) => (
+      prev.some((e) => e.id === row.id) ? prev : [...prev, row]
+    )));
   }, [gameId]);
 
   // Stable across renders that don't touch `events`/`profiles`, which is the

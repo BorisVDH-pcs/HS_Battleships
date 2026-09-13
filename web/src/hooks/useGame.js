@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { subscribeToGameEvents } from '../lib/gameEvents.js';
 import { REVEAL_DELAY_MS } from '../lib/fireEffect.js';
 
 // Spreads the refetch that answers an event across a window, instead of every
@@ -203,35 +204,32 @@ export function useGame(gameId, session) {
     // status events are still in flight.
     let current = true;
     setLive('connecting');
-    const channel = supabase
-      .channel(`game:${gameId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
-        ({ new: row }) => {
-          // Tracked so a game switch cancels a refetch still waiting out its
-          // offset -- it would otherwise land against the game just left. Each
-          // timer drops itself once it has fired: every event waits now, not
-          // just the occasional shot, so a list that only emptied on teardown
-          // would grow for the length of the game.
-          const schedule = (delay) => {
-            const id = setTimeout(() => {
-              pendingTimers.current = pendingTimers.current.filter((t) => t !== id);
-              load();
-            }, delay);
-            pendingTimers.current.push(id);
-          };
-          schedule(row?.type === 'shot_fired' ? REVEAL_DELAY_MS + jitter() : jitter());
-        }
-      )
-      .subscribe((status) => {
+    const unsubscribe = subscribeToGameEvents(
+      gameId,
+      (row) => {
+        // Tracked so a game switch cancels a refetch still waiting out its
+        // offset -- it would otherwise land against the game just left. Each
+        // timer drops itself once it has fired: every event waits now, not
+        // just the occasional shot, so a list that only emptied on teardown
+        // would grow for the length of the game.
+        const schedule = (delay) => {
+          const id = setTimeout(() => {
+            pendingTimers.current = pendingTimers.current.filter((t) => t !== id);
+            load();
+          }, delay);
+          pendingTimers.current.push(id);
+        };
+        schedule(row?.type === 'shot_fired' ? REVEAL_DELAY_MS + jitter() : jitter());
+      },
+      (status) => {
         if (!current) return;
         if (status === 'SUBSCRIBED') { setLive('live'); load(); }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLive('offline');
-      });
+      }
+    );
     return () => {
       current = false;
-      supabase.removeChannel(channel);
+      unsubscribe();
       pendingTimers.current.forEach(clearTimeout);
       pendingTimers.current = [];
     };

@@ -3,6 +3,7 @@ import Guide from './components/Guide.jsx';
 import NextMove from './components/NextMove.jsx';
 import { supabase, isSupabaseConfigured, claimTile, spendPetJar } from './lib/supabase.js';
 import { useGame } from './hooks/useGame.js';
+import { subscribeToGameEvents } from './lib/gameEvents.js';
 import { coordLabel, fromPosition, sunkShipIds } from './lib/board.js';
 import Login from './components/Login.jsx';
 import EnemyGrid from './components/EnemyGrid.jsx';
@@ -207,18 +208,11 @@ export default function App() {
   // moment it lands rather than only the team that pulled the trigger.
   useEffect(() => {
     if (!supabase || !gameId) return undefined;
-    const channel = supabase
-      .channel(`shots:${gameId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
-        ({ new: row }) => {
-          if (row.type !== 'shot_fired') return;
-          setShot({ nonce: Date.now(), result: row.payload?.result });
-        }
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+    // Shares one channel with useGame and useGameStats -- see lib/gameEvents.js.
+    return subscribeToGameEvents(gameId, (row) => {
+      if (row.type !== 'shot_fired') return;
+      setShot({ nonce: Date.now(), result: row.payload?.result });
+    });
   }, [gameId]);
 
   // Signed up, but no captain has picked them yet. Showing the board here would
