@@ -701,6 +701,19 @@ export default function App() {
           )}
         </>
       )}
+      {!waitingScreen && (
+        <footer className="player-credits">
+          <span>
+            High Society platform created by{' '}
+            <span className="credit-creator">BludgenMaker</span>{' '}
+            and{' '}
+            <span className="credit-creator">Soft Papi</span>
+          </span>
+          <a href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
+            View on GitHub
+          </a>
+        </footer>
+      )}
       </>}
 
       {/* Last in the tree and fixed-position, so it sits over whichever view is
