@@ -49,6 +49,23 @@ export default function NoTeamWaiting({ gameName, startsAt, assigned = false, te
             ? 'Standing by for the order to start.'
             : `Battle stations open ${DATE_FORMAT.format(new Date(startsAt))}`}
       </p>
+      <footer className="waiting-credits">
+        <span>
+          High Society platform created by{' '}
+          <span className="waiting-creator">BludgenMaker</span>{' '}
+          and{' '}
+          <span className="waiting-creator">Soft Papi</span>
+        </span>
+        <a
+          className="waiting-star"
+          href="https://github.com/BorisVDH-pcs/HS_Battleships"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span aria-hidden="true">★</span>
+          Star on GitHub
+        </a>
+      </footer>
     </section>
   );
 }
