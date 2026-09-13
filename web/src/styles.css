@@ -1630,19 +1630,23 @@ label {
   line-height: 1.45;
   text-align: center;
 }
-.login-credits { margin: -.45rem auto 0; }
+.login-credits {
+  margin: .15rem auto 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(242, 193, 78, .14);
+}
 .player-credits {
   margin: 2.5rem auto .25rem;
   padding-top: 1.15rem;
   border-top: 1px solid var(--hairline);
 }
 .credit-creator { color: var(--gold-lit); font-weight: 700; }
-.login-credits a,
-.player-credits a { color: var(--gold-dim); font-weight: 600; text-decoration: none; }
-.login-credits a:hover,
-.login-credits a:focus-visible,
-.player-credits a:hover,
-.player-credits a:focus-visible { color: var(--gold-lit); text-decoration: underline; text-underline-offset: .2em; }
+.waiting-star,
+.credit-star { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .55rem; border: 1px solid rgba(242, 193, 78, .4); border-radius: 999px; color: var(--gold-lit); font-weight: 700; text-decoration: none; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+.waiting-star:hover,
+.waiting-star:focus-visible,
+.credit-star:hover,
+.credit-star:focus-visible { border-color: var(--gold-lit); background: rgba(242, 193, 78, .12); color: var(--text); transform: translateY(-1px); }
 
 @keyframes login-arrive {
   from { opacity: 0; transform: translateY(10px); }
@@ -2202,8 +2206,6 @@ label {
 .launch-marker { margin-right: .45rem; color: var(--gold); font-size: .55rem; }
 .waiting-credits { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .35rem .75rem; margin: 2.25rem auto 0; padding-top: 1.15rem; border-top: 1px solid rgba(242, 193, 78, .14); color: var(--label-3); font-size: .72rem; line-height: 1.45; }
 .waiting-creator { color: var(--gold-lit); font-weight: 700; }
-.waiting-star { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .55rem; border: 1px solid rgba(242, 193, 78, .4); border-radius: 999px; color: var(--gold-lit); font-weight: 700; text-decoration: none; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
-.waiting-star:hover, .waiting-star:focus-visible { border-color: var(--gold-lit); background: rgba(242, 193, 78, .12); color: var(--text); transform: translateY(-1px); }
 @media (max-width: 520px) {
   .waiting { min-height: 0; margin-top: 2.5rem; padding: 2.4rem 1rem 1.7rem; }
   .waiting-lead { font-size: .9rem; }
