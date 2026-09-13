@@ -141,6 +141,10 @@ export const adminListPasswordResets = (limit = 20) =>
 export const adminDeleteAccount = (profileId) =>
   rpc('admin_delete_account', { p_profile_id: profileId });
 
+/** Recent deletions, newest first — who deleted which account, and when. */
+export const adminListAccountDeletions = (limit = 20) =>
+  rpc('admin_list_account_deletions', { p_limit: limit });
+
 // ---- the tile library, and boards built one square at a time ----
 
 /**

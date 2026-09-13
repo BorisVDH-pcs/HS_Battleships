@@ -8,6 +8,7 @@ import {
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminSetTile, adminClearTile, adminAutofillBoard, adminShuffleBoard,
   adminClearBoard, adminGameReadiness, adminResetPassword, adminListPasswordResets,
+  adminListAccountDeletions,
   adminSaveBoardPreset, adminApplyBoardPreset, adminDeleteBoardPreset,
 } from '../lib/supabase.js';
 import BoardBuilder from './BoardBuilder.jsx';
@@ -132,8 +133,9 @@ export default function Admin() {
   // than putting a red line above it.
   const [readiness, setReadiness] = useState({});
   // Loaded only once the Accounts pane is opened: nobody else on the console
-  // needs to know who has ever had their password reset.
+  // needs to know who has ever had their password reset or account deleted.
   const [passwordResets, setPasswordResets] = useState([]);
+  const [accountDeletions, setAccountDeletions] = useState([]);
   const [gameId, setGameId] = useState(null);
   // Which section is on screen. The console used to be one long scroll of eight
   // cards, so finding Roster meant paging past the whole board overview.
@@ -251,6 +253,14 @@ export default function Admin() {
       // Not loaded yet, or the migration hasn't landed — the disclosure below
       // just stays empty rather than putting a red line above the account list.
       setPasswordResets([]);
+    }
+  }, []);
+
+  const loadAccountDeletions = useCallback(async () => {
+    try {
+      setAccountDeletions((await adminListAccountDeletions()) ?? []);
+    } catch {
+      setAccountDeletions([]);
     }
   }, []);
 
@@ -608,7 +618,8 @@ export default function Admin() {
           busy={busy}
           confirm={confirm}
           resets={passwordResets}
-          onOpenLog={loadPasswordResets}
+          deletions={accountDeletions}
+          onOpenLog={() => { loadPasswordResets(); loadAccountDeletions(); }}
           onReset={async (profileId, password) => {
             const result = await run(
               () => adminResetPassword(profileId, password),
@@ -618,9 +629,15 @@ export default function Admin() {
             if (worked(result)) loadPasswordResets();
             return result;
           }}
-          onDelete={(profileId, name) =>
-            run(() => adminDeleteAccount(profileId), `${name} was deleted.`, { refresh: ['games'] })
-          }
+          onDelete={async (profileId, name) => {
+            const result = await run(
+              () => adminDeleteAccount(profileId),
+              `${name} was deleted.`,
+              { refresh: ['games'] }
+            );
+            if (worked(result)) loadAccountDeletions();
+            return result;
+          }}
         />
       )}
 
@@ -1234,9 +1251,17 @@ function TeamAddPicker({ team, free, busy, onAddMany }) {
  * everyone who plays across every game is a candidate, not just this game's
  * two teams.
  */
-function Accounts({ profiles, busy, confirm, onReset, onDelete, resets, onOpenLog }) {
+function Accounts({ profiles, busy, confirm, onReset, onDelete, resets, deletions, onOpenLog }) {
   const [query, setQuery] = useState('');
   const [target, setTarget] = useState(null);
+
+  // One feed rather than two disclosures — the whole point of the log is a
+  // quick "did I actually do that", and reset vs delete is one word to add,
+  // not a reason to make an admin open two panels to find an entry.
+  const activity = [
+    ...resets.map((r) => ({ ...r, kind: 'reset' })),
+    ...deletions.map((d) => ({ ...d, kind: 'delete' })),
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   // Same reasoning as the roster picker: an admin account is not a player.
   const players = profiles.filter((p) => !p.is_admin);
@@ -1291,15 +1316,18 @@ function Accounts({ profiles, busy, confirm, onReset, onDelete, resets, onOpenLo
       {/* Closed by default: opening Accounts to reset one password should not
           also hand back a scrollable history every single time. */}
       <details className="account-log" onToggle={(e) => { if (e.target.open) onOpenLog(); }}>
-        <summary>Recent resets</summary>
-        {resets.length === 0 ? (
+        <summary>Recent activity</summary>
+        {activity.length === 0 ? (
           <p className="muted">Nothing yet.</p>
         ) : (
           <ul>
-            {resets.map((r) => (
-              <li key={r.id}>
-                <span><strong>{r.target_display_name}</strong></span>
-                <span>{new Date(r.created_at).toLocaleString()}</span>
+            {activity.map((a) => (
+              <li key={`${a.kind}-${a.id}`}>
+                <span>
+                  {a.kind === 'delete' ? 'Deleted ' : 'Reset password for '}
+                  <strong>{a.target_display_name}</strong>
+                </span>
+                <span>{new Date(a.created_at).toLocaleString()}</span>
               </li>
             ))}
           </ul>
