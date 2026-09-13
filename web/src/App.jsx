@@ -399,7 +399,7 @@ export default function App() {
     <main className={`app game-app${waitingScreen ? ' waiting-app' : ''}`}>
       <header className="top" id="app-header">
         <Wordmark />
-        {!isAdmin && game.game && !waitingScreen && (
+        {!isAdmin && game.game && (!waitingScreen || myGames.length > 1) && (
           <p className="status header-status">
             <GamePicker
               games={myGames}
