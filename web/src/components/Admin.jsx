@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetMember, adminRemoveMember,
-  adminOpenPlacement, adminListTiles, adminDeleteGame, adminResetGame,
+  adminOpenPlacement, adminSetStartTime, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminSetTile, adminClearTile, adminAutofillBoard, adminShuffleBoard,
@@ -485,8 +485,12 @@ export default function Admin() {
       )}
 
       {activePane === 'games' && <>
-      <NewGame busy={busy} onCreate={(...args) =>
-        run(() => adminCreateGame(...args), 'Game created. Add its tiles next.')
+      <NewGame busy={busy} onCreate={(name, a, b, startsAt) =>
+        run(async () => {
+          const id = await adminCreateGame(name, a, b);
+          if (id && startsAt) await adminSetStartTime(id, startsAt);
+          return id;
+        }, 'Game created. Add its tiles next.')
           .then((id) => { if (worked(id) && id) { setGameId(id); setPane('configure'); } })
       } />
 
@@ -582,6 +586,19 @@ export default function Admin() {
                 Start game
               </button>
             </div>
+
+            {/* Display-only: nothing here gates Start game, which stays
+                available the moment its own checklist is met — earlier than
+                this if you're ready, later if you're not. It just gives
+                players rostered ahead of time something to count down to. */}
+            {game.status !== 'active' && game.status !== 'finished' && (
+              <StartTimeEditor
+                game={game}
+                busy={busy}
+                onSave={(iso) => run(() => adminSetStartTime(game.id, iso),
+                  iso ? 'Start time saved.' : 'Start time cleared.')}
+              />
+            )}
 
             {/* The way back out of a started game. Without it the only undo was
                 Delete, which takes the 100 tiles and the roster with it. */}
@@ -987,6 +1004,7 @@ function NewGame({ busy, onCreate }) {
   const [name, setName] = useState('');
   const [a, setA] = useState('');
   const [b, setB] = useState('');
+  const [startsAt, setStartsAt] = useState('');
   return (
     <section className="card">
       <h2>New game</h2>
@@ -994,14 +1012,61 @@ function NewGame({ busy, onCreate }) {
         <label>Game name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Battleships V4" /></label>
         <label>Team one<input value={a} onChange={(e) => setA(e.target.value)} placeholder="Team Alpha" /></label>
         <label>Team two<input value={b} onChange={(e) => setB(e.target.value)} placeholder="Team Bravo" /></label>
+        {/* Optional: teams can be rostered and fleets placed well before this
+            moment. Left blank, players just see "time to be announced" until
+            one is set from Configure. */}
+        <label>Start time <span className="muted">(optional)</span>
+          <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+        </label>
         <button
           disabled={busy || !name.trim() || !a.trim() || !b.trim()}
-          onClick={() => { onCreate(name, a, b); setName(''); setA(''); setB(''); }}
+          onClick={() => {
+            onCreate(name, a, b, startsAt ? new Date(startsAt).toISOString() : null);
+            setName(''); setA(''); setB(''); setStartsAt('');
+          }}
         >
           Create
         </button>
       </div>
     </section>
+  );
+}
+
+/** Configure-pane counterpart to the "Start time" field on New game — sets or
+ * clears `starts_at` on a game that already exists. Reports through the
+ * console's own error/notice banner rather than a local receipt, same as
+ * every other button on this pane. */
+function StartTimeEditor({ game, busy, onSave }) {
+  const toLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    // datetime-local wants "YYYY-MM-DDTHH:mm" in the input's own timezone,
+    // which toISOString (UTC) does not give — build it from local fields.
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const [value, setValue] = useState(() => toLocalInput(game.starts_at));
+
+  useEffect(() => { setValue(toLocalInput(game.starts_at)); }, [game.id, game.starts_at]);
+
+  const nextIso = value ? new Date(value).toISOString() : null;
+  const changed = nextIso !== (game.starts_at ?? null);
+
+  return (
+    <div className="row start-time-editor">
+      <label>Start time <span className="muted">(shown to players as a countdown)</span>
+        <input type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} />
+      </label>
+      <button disabled={busy || !changed} onClick={() => onSave(nextIso)}>
+        Save start time
+      </button>
+      {game.starts_at && (
+        <button className="ghost" disabled={busy} onClick={() => { setValue(''); onSave(null); }}>
+          Clear
+        </button>
+      )}
+    </div>
   );
 }
 

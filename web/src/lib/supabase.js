@@ -93,6 +93,10 @@ export const adminRemoveMember = (teamId, profileId) =>
 export const adminOpenPlacement = (gameId) =>
   rpc('admin_open_placement', { p_game_id: gameId });
 
+/** `startsAt` is an ISO string, or null to clear a previously set time. */
+export const adminSetStartTime = (gameId, startsAt) =>
+  rpc('admin_set_start_time', { p_game_id: gameId, p_starts_at: startsAt });
+
 export const adminListTiles = (gameId) =>
   rpc('admin_list_tiles', { p_game_id: gameId });
 

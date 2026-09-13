@@ -12,6 +12,7 @@ import ActiveTiles from './components/ActiveTiles.jsx';
 import FireEffect from './components/FireEffect.jsx';
 import EventFeed from './components/EventFeed.jsx';
 import CaptainPlacement from './components/CaptainPlacement.jsx';
+import StartTimeBadge from './components/StartTimeBadge.jsx';
 import Admin from './components/Admin.jsx';
 import TeamNameEditor from './components/TeamNameEditor.jsx';
 import Wordmark from './components/Wordmark.jsx';
@@ -220,6 +221,18 @@ export default function App() {
   const waitingForTeam =
     !isAdmin && !game.loading && Boolean(game.game) && !game.myTeamId;
 
+  // Rostered ahead of time, but nothing to do yet: preparation may not even
+  // be open, or it is open but placing the fleet is the captain's job, not
+  // this player's. Either way the alternative is a placement screen that
+  // says "nothing for you to do", which is the same waiting room by another
+  // name — so it gets the waiting room, and stays there until the battle
+  // itself opens. Only a captain gets in earlier, to actually place ships.
+  const notYetOpen =
+    !isAdmin && !game.loading && Boolean(game.game) && Boolean(game.myTeamId) &&
+    game.game.status !== 'active' && game.game.status !== 'finished' &&
+    game.myRole !== 'captain';
+  const waitingScreen = waitingForTeam || notYetOpen;
+
   // Being added to a team writes no game_event, so the Realtime subscription
   // never fires for it. Poll while waiting so the page lets them in by itself
   // rather than needing to be told to refresh. Must sit above the early returns
@@ -371,10 +384,10 @@ export default function App() {
   const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
 
   return (
-    <main className={`app game-app${waitingForTeam ? ' waiting-app' : ''}`}>
+    <main className={`app game-app${waitingScreen ? ' waiting-app' : ''}`}>
       <header className="top" id="app-header">
         <Wordmark />
-        {!isAdmin && game.game && !waitingForTeam && (
+        {!isAdmin && game.game && !waitingScreen && (
           <p className="status header-status">
             <GamePicker
               games={myGames}
@@ -431,7 +444,7 @@ export default function App() {
       {!isAdmin && (
         <Guide
           ref={guideRef}
-          autoShow={!loading && Boolean(game.game) && !waitingForTeam}
+          autoShow={!loading && Boolean(game.game) && !waitingScreen}
           onTabNeed={setBoardTab}
           // So the guide states this game's rules rather than the ones that
           // were true when it was written.
@@ -457,11 +470,16 @@ export default function App() {
 
       {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
 
-      {waitingForTeam && (
-        <NoTeamWaiting displayName={displayName} />
+      {waitingScreen && (
+        <NoTeamWaiting
+          displayName={displayName}
+          startsAt={game.game?.starts_at}
+          assigned={notYetOpen}
+          teamName={myTeam?.name}
+        />
       )}
 
-      {game.game && !waitingForTeam && (
+      {game.game && !waitingScreen && (
         <>
           {/* The name/status/team line and its "reconnecting" warning moved up
               into the sticky header (#app-header) — see the GamePicker there. */}
@@ -470,6 +488,13 @@ export default function App() {
             <p className="banner">
               {teams.find((t) => t.id === game.game.winner_team_id)?.name} wins.
             </p>
+          )}
+
+          {/* Placement can happen well ahead of the scheduled time, but the
+              time itself is still worth a captain keeping an eye on while
+              arranging ships — it says nothing changes if it runs out. */}
+          {isPreparation && myTeamId && (
+            <StartTimeBadge startsAt={game.game.starts_at} />
           )}
 
           {/* Prep only, and first: naming the team is the opening move, and

@@ -1,31 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useCountdown, pad } from '../lib/countdown.js';
 
-// The event time is explicitly CET (UTC+01:00), rather than the browser's
-// local timezone, so every player sees the same launch moment.
-const START_TIME = Date.parse('2026-09-25T19:00:00+01:00');
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+});
 
-function remainingParts() {
-  const totalSeconds = Math.max(0, Math.floor((START_TIME - Date.now()) / 1000));
-  return {
-    days: Math.floor(totalSeconds / 86400),
-    hours: Math.floor((totalSeconds % 86400) / 3600),
-    minutes: Math.floor((totalSeconds % 3600) / 60),
-    seconds: totalSeconds % 60,
-    started: totalSeconds === 0,
-  };
-}
-
-function pad(value) {
-  return String(value).padStart(2, '0');
-}
-
-export default function NoTeamWaiting({ displayName }) {
-  const [remaining, setRemaining] = useState(remainingParts);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setRemaining(remainingParts()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+/**
+ * The full-screen holding pen: for a player with no team yet, and — once a
+ * game has a scheduled `starts_at` — for one who has a team but whose game
+ * has not been opened for placement yet. `assigned` only changes the copy;
+ * the countdown itself is identical, because neither case has anything to
+ * click on the board yet.
+ */
+export default function NoTeamWaiting({ displayName, startsAt, assigned = false, teamName }) {
+  const remaining = useCountdown(startsAt);
 
   const units = [
     ['days', remaining.days, 'Days'],
@@ -40,20 +27,27 @@ export default function NoTeamWaiting({ displayName }) {
       <p className="waiting-kicker">Fleet assembly in progress</p>
       <h1 id="waiting-title">Please await orders</h1>
       <p className="waiting-lead">
-        You are not assigned to a team yet. Keep this channel open — an admin
-        will place you aboard automatically.
+        {assigned
+          ? `You're aboard ${teamName ?? 'your team'}. Keep this channel open — the board opens once an admin gives the order.`
+          : 'You are not assigned to a team yet. Keep this channel open — an admin will place you aboard automatically.'}
       </p>
-      <div className="countdown" aria-live="polite" aria-label={remaining.started ? 'The battle has started' : `Battle begins in ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, and ${remaining.seconds} seconds`}>
-        {units.map(([key, value, label]) => (
-          <div className="countdown-unit" key={key}>
-            <span className="countdown-value">{key === 'days' ? value : pad(value)}</span>
-            <span className="countdown-label">{label}</span>
-          </div>
-        ))}
-      </div>
+      {remaining.set && (
+        <div className="countdown" aria-live="polite" aria-label={remaining.started ? 'The battle has started' : `Battle begins in ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, and ${remaining.seconds} seconds`}>
+          {units.map(([key, value, label]) => (
+            <div className="countdown-unit" key={key}>
+              <span className="countdown-value">{key === 'days' ? value : pad(value)}</span>
+              <span className="countdown-label">{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <p className="waiting-launch">
         <span className="launch-marker" aria-hidden="true">◆</span>
-        {remaining.started ? 'The battle is underway.' : 'Battle stations open Friday 25 September · 19:00 CET'}
+        {!remaining.set
+          ? 'An admin will announce a start time soon.'
+          : remaining.started
+            ? 'Standing by for the order to start.'
+            : `Battle stations open ${DATE_FORMAT.format(new Date(startsAt))}`}
       </p>
       <p className="muted">Signed in as <strong>{displayName}</strong></p>
     </section>
