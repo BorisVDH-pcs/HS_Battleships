@@ -17,6 +17,7 @@ import EvidencePanel from './components/EvidencePanel.jsx';
 import BoardLegend from './components/BoardLegend.jsx';
 import PetJar from './components/PetJar.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
+import NoTeamWaiting from './components/NoTeamWaiting.jsx';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import GamePicker from './components/GamePicker.jsx';
 import { listMyGames, readGamePick, writeGamePick } from './lib/games.js';
@@ -357,7 +358,7 @@ export default function App() {
   const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
 
   return (
-    <main className="app">
+    <main className={`app${waitingForTeam ? ' waiting-app' : ''}`}>
       <header className="top" id="app-header">
         <Wordmark />
         <div className="who">
@@ -415,16 +416,7 @@ export default function App() {
       {!loading && !game.game && <p>No game yet. An admin needs to create one.</p>}
 
       {waitingForTeam && (
-        <section className="card waiting">
-          <p className="lead">
-            You are not assigned to a team yet.<br />
-            Come back once teams have been made.
-          </p>
-          <p className="muted">
-            Signed in as <strong>{displayName}</strong> — this page will let you
-            in on its own once an admin adds you.
-          </p>
-        </section>
+        <NoTeamWaiting displayName={displayName} />
       )}
 
       {game.game && !waitingForTeam && (
