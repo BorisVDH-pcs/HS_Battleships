@@ -188,6 +188,25 @@ body {
 
 .app { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
 
+/* A shared naval atmosphere for the dense player/admin views.
+   It stays far quieter than the no-team scene: the board and its cards remain
+   the visual foreground. */
+.game-app:not(.waiting-app) { position: relative; isolation: isolate; min-height: 100vh; }
+.game-app:not(.waiting-app)::before {
+  content: ''; position: fixed; z-index: -1; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(rgba(87, 145, 172, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(87, 145, 172, .055) 1px, transparent 1px),
+    radial-gradient(ellipse 85% 70% at 50% 5%, rgba(9, 62, 88, .46), transparent 75%);
+  background-size: 72px 72px, 72px 72px, auto;
+}
+.game-app:not(.waiting-app)::after {
+  content: ''; position: fixed; z-index: -1; pointer-events: none;
+  width: min(72vw, 780px); height: min(72vw, 780px); right: -28vw; bottom: -30vw;
+  border: 1px solid rgba(87, 145, 172, .11); border-radius: 50%;
+  box-shadow: 0 0 0 34px rgba(87, 145, 172, .04), 0 0 0 88px rgba(87, 145, 172, .025);
+}
+
 /* The admin console is the one screen here that is a layout rather than a
    document: a sticky nav beside a column of panels, and inside the board
    builder a hundred-square grid beside the picker that fills it. The 1440px cap

@@ -358,7 +358,7 @@ export default function App() {
   const openTile = tiles.find((t) => t.id === openTileId && t.revealed) ?? null;
 
   return (
-    <main className={`app${waitingForTeam ? ' waiting-app' : ''}`}>
+    <main className={`app game-app${waitingForTeam ? ' waiting-app' : ''}`}>
       <header className="top" id="app-header">
         <Wordmark />
         <div className="who">
