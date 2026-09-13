@@ -2509,6 +2509,42 @@ button.cell.picked:not(.hit):not(.miss) { background: rgba(242, 193, 78, .14); }
   border-radius: var(--r-lg);
 }
 
+/* Beside the board a whole tier earlier than it used to be.
+ *
+ * 1580px is the width at which the board can keep a readable NAME in every
+ * cell and still have the picker beside it. Below that the two used to stop
+ * competing the wrong way round: the panel dropped underneath ten rows of
+ * squares, where a click on a square updates something off screen and reads as
+ * having done nothing.
+ *
+ * Measured, not derived: at 1280 the panel takes 320 and the board is left
+ * with 578, which is 56px a square -- exactly the minimum below, so the board
+ * stops shrinking there and the wrap scrolls instead. A name does not survive
+ * 56px: three clamped lines of about eight characters, which is not a shorter
+ * answer but a different and wrong one. So it goes, and the cell becomes what
+ * the builder grid has always said it is -- a target, carrying its coordinate
+ * and its artwork, with the tile legible in the panel beside it and in the
+ * title on hover.
+ *
+ * Names come back at 1500, where they fit. */
+@media (min-width: 1280px) {
+  .builder { grid-template-columns: minmax(0, 1fr) minmax(18rem, 20rem); }
+
+  .builder-panel {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+
+  .builder-board {
+    grid-template-columns: 1.4rem repeat(10, minmax(56px, 1fr));
+    min-width: 0;
+  }
+
+  .builder-cell { min-height: 3.9rem; }
+}
+
 @media (min-width: 1580px) {
   .builder { grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); }
 
@@ -2569,6 +2605,39 @@ button.builder-cell.empty:hover { border-style: solid; }
   -webkit-box-orient: vertical;
 }
 
+/* The tile's name in the cell, which is the thing that does not fit once the
+ * picker sits beside the board below 1500.
+ *
+ * DOWN HERE, not in the layout blocks above, and the reason is the whole of why
+ * this rule is worth a comment: a media query carries no extra specificity, so
+ * `.builder-cell span` inside one and `.builder-cell span` outside one are
+ * settled by source order alone. Stated up there it lost to the four lines
+ * immediately above, silently, with the build perfectly happy.
+ *
+ * Hidden rather than clamped harder: eight characters of "Three Different Raids
+ * Armour Pieces" is not a shorter answer, it is a different and wrong one. The
+ * cell keeps its coordinate and its artwork -- which is what the builder grid
+ * has always said a square is -- and the name is in the panel beside it, in the
+ * title on hover, and back in the cell at 1500 where it fits. */
+@media (min-width: 1280px) {
+  .builder-cell span { display: none; }
+}
+
+/* 1500, not 1580, because that is where `.app:has(.admin-split)` lifts its own
+   max-width to 1800 and hands this card the room in one step: a square goes
+   from 70.1px at 1499 to 74.6px at 1500, against 78.2px at 1600.
+ *
+ * Measured on the hundred-square board rather than argued: 19 of 100 names
+ * clamp at 1500 and 12 of 100 still clamp at 1600, so clamping is the normal
+ * condition of this cell at every width that shows a name at all, and the 1500
+ * tier is seven names worse than the tier above it. Seven clamped names beats a
+ * hundred hidden ones, which is what leaving this at 1580 would have meant for
+ * the whole 1500-1579 band. */
+@media (min-width: 1500px) {
+  .builder-cell span { display: -webkit-box; }
+  .builder-cell { min-height: 4.6rem; }
+}
+
 .builder-current {
   display: grid; gap: .5rem;
   padding: .6rem;
@@ -2590,6 +2659,12 @@ button.builder-cell.empty:hover { border-style: solid; }
 }
 
 /* ---- the catalogue list ---- */
+
+/* What a press on the list below will do. Sits tight under the search box it
+   belongs to, so it reads as a caption on the list rather than as another of
+   the panel's muted paragraphs. */
+.library-caption { margin: -.25rem 0 0; }
+.library-caption b { color: var(--label); font-weight: 600; }
 
 .library-search { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .library-search input[type="search"] { flex: 1 1 9rem; }

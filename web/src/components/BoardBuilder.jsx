@@ -7,6 +7,7 @@ import TileIcon from './TileIcon.jsx';
 import TileInfo from './TileInfo.jsx';
 import TileForm from './TileForm.jsx';
 import { statusLabel } from '../lib/status.js';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion.js';
 import {
   tileGroups, replayTile, unavailableSetOptionIds, completedEachSetGroupNames,
   tileShowsPrices, pointsLabel,
@@ -307,6 +308,37 @@ export default function BoardBuilder({
    */
   const [undo, setUndo] = useState(null);   // { row, col, label, prev } | null
 
+  /**
+   * Bring the panel into view when it is underneath the board rather than
+   * beside it.
+   *
+   * Below the wide breakpoint the panel stacks under ten rows of squares, far
+   * enough down that clicking a square updates something off screen -- which
+   * reads as the click having done nothing at all.
+   *
+   * Only on a square chosen DELIBERATELY. The auto-advance after each placement
+   * sets `at` directly and deliberately does not come through here: a board
+   * filled a square at a time would otherwise scroll the page on every press.
+   *
+   * Lands the panel just under halfway down, not at the top, so the bottom of
+   * the board stays visible above it -- the next square to click is on it.
+   */
+  const panelRef = useRef(null);
+  const reducedMotion = usePrefersReducedMotion();
+
+  function revealPanel() {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    // Already on screen enough to be read: leave the scroll where it is rather
+    // than nudging the page on every click.
+    if (rect.top < window.innerHeight * 0.8) return;
+    window.scrollTo({
+      top: Math.max(0, rect.top + window.scrollY - window.innerHeight * 0.45),
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }
+
   function remember(row, col) {
     setUndo({
       row, col,
@@ -480,10 +512,18 @@ export default function BoardBuilder({
           live={live}
           playerView={playerView}
           at={at}
-          onPick={(row, col) => { setAt({ row, col }); setEditing(null); }}
+          onPick={(row, col, source) => {
+            setAt({ row, col });
+            setEditing(null);
+            // Pointer only. The keyboard path moves focus to the cell it lands
+            // on, and the browser scrolls a focused element into view -- so a
+            // reveal here would be immediately undone, and the two would fight
+            // over the scroll position on every arrow press.
+            if (source === 'pointer') revealPanel();
+          }}
         />
 
-        <div className="builder-panel">
+        <div className="builder-panel" ref={panelRef}>
           {/* Shown in every state of the panel, because the catalogue is what
               all three of them are about. A missing function is named for what
               it almost always is — the migration has not been pushed yet —
@@ -547,17 +587,34 @@ export default function BoardBuilder({
                 onCancel={() => setEditing(null)}
                 extraErrors={clashMessage ? [clashMessage] : []}
                 extraActions={editing.from ? (
-                  // The way back to editing in place. Kept because the entries
-                  // imported from old boards carry no tags and some carry the
-                  // wording of a hurried spreadsheet, and a catalogue you can
-                  // only ever add to is one that fills up with near-duplicates.
-                  <button
-                    className="ghost"
-                    disabled={busy}
-                    onClick={() => saveLibrary(editing.from.id)}
-                  >
-                    Update {editing.from.name} instead
-                  </button>
+                  <>
+                    {/* The way back to editing in place. Kept because the
+                        entries imported from old boards carry no tags and some
+                        carry the wording of a hurried spreadsheet, and a
+                        catalogue you can only ever add to is one that fills up
+                        with near-duplicates. */}
+                    <button
+                      className="ghost"
+                      disabled={busy}
+                      onClick={() => saveLibrary(editing.from.id)}
+                    >
+                      Update {editing.from.name} instead
+                    </button>
+                    {/* Deleting used to sit on the catalogue row, in the very
+                        position that holds Edit once a square is selected. Here
+                        the entry it removes is named above and spelled out in
+                        front of you, and the console's confirm dialog still
+                        asks before anything goes. */}
+                    <button
+                      className="ghost danger"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (await onDeleteLibraryTile(editing.from)) setEditing(null);
+                      }}
+                    >
+                      Delete from the catalogue
+                    </button>
+                  </>
                 ) : null}
               />
             </>
@@ -643,55 +700,25 @@ export default function BoardBuilder({
               )}
 
               {!(live && current?.claimed) && (
-                <LibrarySearch
-                  query={query} setQuery={setQuery}
-                  tag={tag} setTag={setTag} tags={tags}
-                  count={matches.length} total={library.length}
-                />
+                <>
+                  <LibrarySearch
+                    query={query} setQuery={setQuery}
+                    tag={tag} setTag={setTag} tags={tags}
+                    count={matches.length} total={library.length}
+                  />
+                  <CatalogueList
+                    entries={matches}
+                    mode="place"
+                    at={coordLabel(at.row, at.col)}
+                    busy={busy}
+                    placedAt={placedAt}
+                    onPlace={place}
+                    onEdit={(entry) => setEditing({
+                      what: 'library', id: null, from: entry, draft: draftFromRow(entry),
+                    })}
+                  />
+                </>
               )}
-
-              <ul className="library-list" hidden={live && current?.claimed}>
-                {matches.map((entry) => {
-                  // Where this task already is, if it is — said, not enforced.
-                  //
-                  // Putting one tile on several squares is deliberate: a slayer
-                  // tile spread across ten of them, or a placeholder standing
-                  // in while the board is still being decided. So this reports
-                  // and gets out of the way. The one place duplicates are
-                  // refused is the shuffle, which excludes every name the board
-                  // already holds — a deal that repeated itself would be
-                  // filling a board by accident rather than by choice.
-                  const already = placedAt.get(nameKey(entry.name));
-                  return (
-                  <li key={entry.id}>
-                    <button
-                      className="library-pick"
-                      disabled={busy}
-                      title={already ? `Already on ${already}` : undefined}
-                      onClick={() => place(entry)}
-                    >
-                      <TileIcon slug={entry.icon} fallback={null} />
-                      <span className="library-text">
-                        <span className="library-name">{entry.name}</span>
-                        <span className="library-rule muted">
-                          {ruleSummary(entry)}
-                          {already && <span className="library-placed"> · on {already}</span>}
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      className="ghost library-edit"
-                      onClick={() => setEditing({
-                        what: 'library', id: null, from: entry, draft: draftFromRow(entry),
-                      })}
-                      aria-label={`Edit ${entry.name}`}
-                    >
-                      Edit
-                    </button>
-                  </li>
-                  );
-                })}
-              </ul>
 
               <button
                 className="ghost"
@@ -939,36 +966,14 @@ export default function BoardBuilder({
                     tag={tag} setTag={setTag} tags={tags}
                     count={matches.length} total={library.length}
                   />
-                  <ul className="library-list">
-                    {matches.map((entry) => (
-                      <li key={entry.id}>
-                        <button
-                          className="library-pick"
-                          onClick={() => setEditing({
-                            what: 'library', id: null, from: entry, draft: draftFromRow(entry),
-                          })}
-                        >
-                          <TileIcon slug={entry.icon} fallback={null} />
-                          <span className="library-text">
-                            <span className="library-name">{entry.name}</span>
-                            {/* The use count used to sit here. It is the least
-                                useful thing on the row and it was taking its
-                                width from the name, which is the whole reason
-                                you are reading the row at all. */}
-                            <span className="library-rule muted">{ruleSummary(entry)}</span>
-                          </span>
-                        </button>
-                        <button
-                          className="ghost library-edit danger"
-                          disabled={busy}
-                          onClick={() => onDeleteLibraryTile(entry)}
-                          aria-label={`Delete ${entry.name}`}
-                        >
-                          Delete
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <CatalogueList
+                    entries={matches}
+                    mode="browse"
+                    busy={busy}
+                    onEdit={(entry) => setEditing({
+                      what: 'library', id: null, from: entry, draft: draftFromRow(entry),
+                    })}
+                  />
                 </>
               )}
             </>
@@ -1339,6 +1344,94 @@ function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, on
   );
 }
 
+/**
+ * The catalogue, as rows you press.
+ *
+ * One component for both of the panel's lists, because they were two copies of
+ * the same markup doing opposite things. With a square selected a press PLACED
+ * the tile; with no square selected the identical-looking press opened an
+ * editor -- and the button beside it swapped between Edit and Delete in the
+ * same position, so the one press that cannot be taken back sat exactly where a
+ * harmless one had been a moment earlier. Nothing on the row said which list
+ * you were looking at: the only cue was a gold ring on a grid that may well
+ * have been scrolled off screen.
+ *
+ * So the mode is a prop, it is said in words above the list, and the second
+ * button exists in `place` mode only. Browsing has no secondary button at all
+ * -- deleting moved into the form, where the entry it would remove is on screen
+ * to be read first. That is what makes the swap impossible rather than merely
+ * unlikely: the position that holds Edit while placing holds nothing while
+ * browsing.
+ */
+function CatalogueList({ entries, mode, busy, placedAt, onPlace, onEdit, at }) {
+  const placing = mode === 'place';
+
+  return (
+    <>
+      {/* What a press will do, said where the press is. The panel's heading
+          names the square; this names the consequence, which is the half that
+          was only ever implied by which state the panel happened to be in. */}
+      <p className="muted library-caption">
+        {placing
+          ? <>Click a tile to put it on <b>{at}</b>.</>
+          : <>Click a tile to edit a copy of it. The original stays as it is.</>}
+      </p>
+
+      <ul className="library-list">
+        {entries.map((entry) => {
+          // Where this task already is, if it is -- said, not enforced.
+          //
+          // Putting one tile on several squares is deliberate: a slayer tile
+          // spread across ten of them, or a placeholder standing in while the
+          // board is still being decided. So this reports and gets out of the
+          // way. The one place duplicates are refused is the shuffle, which
+          // excludes every name the board already holds -- a deal that repeated
+          // itself would be filling a board by accident rather than by choice.
+          //
+          // Only while placing: browsing the catalogue with no square selected,
+          // "on B4" is about a board the reader is not currently pointing at.
+          const already = placing ? placedAt?.get(nameKey(entry.name)) : null;
+
+          return (
+            <li key={entry.id}>
+              <button
+                className="library-pick"
+                // Browsing opens a form and writes nothing, so a refresh in
+                // flight is no reason to refuse it. Placing is a write.
+                disabled={placing && busy}
+                title={already ? `Already on ${already}` : undefined}
+                onClick={() => (placing ? onPlace(entry) : onEdit(entry))}
+              >
+                <TileIcon slug={entry.icon} fallback={null} />
+                <span className="library-text">
+                  {/* The use count used to sit here. It is the least useful
+                      thing on the row and it was taking its width from the
+                      name, which is the whole reason you are reading the row
+                      at all. */}
+                  <span className="library-name">{entry.name}</span>
+                  <span className="library-rule muted">
+                    {ruleSummary(entry)}
+                    {already && <span className="library-placed"> · on {already}</span>}
+                  </span>
+                </span>
+              </button>
+              {placing && (
+                <button
+                  className="ghost library-edit"
+                  onClick={() => onEdit(entry)}
+                  aria-label={`Edit ${entry.name}`}
+                >
+                  Edit
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 function LibrarySearch({ query, setQuery, tag, setTag, tags, count, total }) {
   return (
     <div className="library-search">
@@ -1422,7 +1515,7 @@ function BuilderGrid({ tiles, at, onPick, playerView = false, live = false }) {
     const position = toPosition(row, col);
     if (position === focusPos) return;
     setFocusPos(position);
-    onPick(row, col);
+    onPick(row, col, 'keyboard');
     requestAnimationFrame(() => {
       gridRef.current?.querySelector(`[data-pos="${position}"]`)?.focus();
     });
@@ -1464,7 +1557,7 @@ function BuilderGrid({ tiles, at, onPick, playerView = false, live = false }) {
                     // ninety-nine squares of noise around nothing.
                     live && tile?.claimed ? 'claimed' : '',
                   ].filter(Boolean).join(' ')}
-                  onClick={() => onPick(row, col)}
+                  onClick={() => onPick(row, col, 'pointer')}
                   title={live && tile?.claimed
                     ? `${tile.name} — locked in by a team`
                     : tile ? tile.name : `${coordLabel(row, col)} — empty`}

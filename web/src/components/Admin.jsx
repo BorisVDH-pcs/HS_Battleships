@@ -638,10 +638,11 @@ export default function Admin() {
             )}
           </section>
 
-          {/* Before the paste box, because it is now the way most boards get
-              built. The paste box stays below it for a board that already
-              exists as text — the two write the same rows through the same
-              validation, and neither is a mode you have to commit to. */}
+          {/* The whole of how a board gets built. The paste box that used to
+              sit below this is gone: it existed for boards that already existed
+              as spreadsheet text, and everything it could do -- including
+              filing a tile it did not recognise in the catalogue -- the builder
+              now does one square at a time, against a catalogue it can search. */}
           <BoardBuilder
             game={game}
             tiles={tiles}
@@ -771,7 +772,7 @@ export default function Admin() {
               ).then((ok) => ok && run(
                 () => adminDeleteLibraryTile(entry.id), 'Removed from the catalogue.',
                 { refresh: ['library'] }
-              ))
+              ).then(worked))
             }
             onAutofillBoard={(tag) =>
               run(() => adminAutofillBoard(game.id, tag),
