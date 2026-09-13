@@ -2,6 +2,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { REVEAL_DELAY_MS } from '../lib/fireEffect.js';
 
+// Spreads the refetch that answers an event across a window, instead of every
+// open board firing it on the same millisecond.
+//
+// One game_events row reaches all fifty players at once, and each board answers
+// it with the ten queries in `load` below -- five hundred requests through
+// PostgREST's pool in a single instant. `shot_fired` is the worst of it:
+// REVEAL_DELAY_MS is a constant, so every client wakes on exactly the same tick
+// rather than merely near it. A random offset turns that spike into a ramp.
+//
+// Nobody waits longer for their own action. onClaim awaits `refresh` directly
+// once claimTile resolves, so the acting player's board updates immediately and
+// only the watching boards are staggered; the cannon animation is untouched too,
+// since FireEffect runs off App's own `shots:` channel rather than this timer.
+const JITTER_MS = 800;
+const jitter = () => Math.random() * JITTER_MS;
+
 const BLANK = {
   loading: true,
   error: null,
@@ -193,11 +209,19 @@ export function useGame(gameId, session) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'game_events', filter: `game_id=eq.${gameId}` },
         ({ new: row }) => {
-          if (row?.type === 'shot_fired') {
-            pendingTimers.current.push(setTimeout(load, REVEAL_DELAY_MS));
-          } else {
-            load();
-          }
+          // Tracked so a game switch cancels a refetch still waiting out its
+          // offset -- it would otherwise land against the game just left. Each
+          // timer drops itself once it has fired: every event waits now, not
+          // just the occasional shot, so a list that only emptied on teardown
+          // would grow for the length of the game.
+          const schedule = (delay) => {
+            const id = setTimeout(() => {
+              pendingTimers.current = pendingTimers.current.filter((t) => t !== id);
+              load();
+            }, delay);
+            pendingTimers.current.push(id);
+          };
+          schedule(row?.type === 'shot_fired' ? REVEAL_DELAY_MS + jitter() : jitter());
         }
       )
       .subscribe((status) => {
