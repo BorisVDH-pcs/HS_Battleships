@@ -1995,6 +1995,7 @@ label {
 }
 .account-list li:last-child { border-bottom: none; }
 .account-list li.muted { padding: .55rem .1rem; }
+.account-actions { display: flex; gap: .4rem; flex-shrink: 0; }
 
 /* Collapsed by default so a screen an admin opens to reset one password does
    not also greet them with a scrollable history every time. */

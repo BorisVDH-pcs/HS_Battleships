@@ -133,6 +133,14 @@ export const adminResetPassword = (profileId, newPassword) =>
 export const adminListPasswordResets = (limit = 20) =>
   rpc('admin_list_password_resets', { p_limit: limit });
 
+/**
+ * Remove a player's account outright — for troll signups that never join a
+ * game. Refused server-side for an admin account, and for a player who has
+ * already submitted or spent a pet jar (real game activity on record).
+ */
+export const adminDeleteAccount = (profileId) =>
+  rpc('admin_delete_account', { p_profile_id: profileId });
+
 // ---- the tile library, and boards built one square at a time ----
 
 /**

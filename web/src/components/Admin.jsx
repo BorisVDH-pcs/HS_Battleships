@@ -3,6 +3,7 @@ import {
   supabase, startGame,
   adminCreateGame, adminSetMember, adminRemoveMember,
   adminOpenPlacement, adminSetStartTime, adminSetFeaturedGame, adminListTiles, adminDeleteGame, adminResetGame,
+  adminDeleteAccount,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminSetTile, adminClearTile, adminAutofillBoard, adminShuffleBoard,
@@ -605,6 +606,7 @@ export default function Admin() {
         <Accounts
           profiles={profiles}
           busy={busy}
+          confirm={confirm}
           resets={passwordResets}
           onOpenLog={loadPasswordResets}
           onReset={async (profileId, password) => {
@@ -616,6 +618,9 @@ export default function Admin() {
             if (worked(result)) loadPasswordResets();
             return result;
           }}
+          onDelete={(profileId, name) =>
+            run(() => adminDeleteAccount(profileId), `${name} was deleted.`, { refresh: ['games'] })
+          }
         />
       )}
 
@@ -1229,7 +1234,7 @@ function TeamAddPicker({ team, free, busy, onAddMany }) {
  * everyone who plays across every game is a candidate, not just this game's
  * two teams.
  */
-function Accounts({ profiles, busy, onReset, resets, onOpenLog }) {
+function Accounts({ profiles, busy, confirm, onReset, onDelete, resets, onOpenLog }) {
   const [query, setQuery] = useState('');
   const [target, setTarget] = useState(null);
 
@@ -1242,8 +1247,8 @@ function Accounts({ profiles, busy, onReset, resets, onOpenLog }) {
     <section className="card">
       <h2>Accounts</h2>
       <p className="muted">
-        Reset a player’s password directly — for when they’re locked out and
-        there is no mailbox here to send a reset link to.
+        Reset a player’s password directly, or remove an account entirely —
+        useful for a troll signup with no place in a game.
       </p>
 
       <input
@@ -1257,9 +1262,27 @@ function Accounts({ profiles, busy, onReset, resets, onOpenLog }) {
         {matches.map((p) => (
           <li key={p.id}>
             <span>{p.display_name}</span>
-            <button className="ghost" disabled={busy} onClick={() => setTarget(p)}>
-              Reset password
-            </button>
+            <span className="account-actions">
+              <button className="ghost" disabled={busy} onClick={() => setTarget(p)}>
+                Reset password
+              </button>
+              <button
+                className="danger"
+                disabled={busy}
+                onClick={async () => {
+                  // Same guard as deleting a game: hold the confirm button
+                  // disabled until the name is typed, so a stray click can
+                  // never wipe a real player's account.
+                  if (!(await confirm(
+                    `Delete ${p.display_name}'s account — their profile, team membership and any locked-in tiles.`,
+                    { title: 'Delete this account?', confirmLabel: 'Delete it', danger: true, requireText: p.display_name }
+                  ))) return;
+                  onDelete(p.id, p.display_name);
+                }}
+              >
+                Delete
+              </button>
+            </span>
           </li>
         ))}
         {matches.length === 0 && <li className="muted">Nothing matches “{query}”.</li>}
