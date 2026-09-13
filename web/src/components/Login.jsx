@@ -198,8 +198,9 @@ export default function Login() {
             and{' '}
             <span className="credit-creator">Soft Papi</span>
           </span>
-          <a href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
-            View on GitHub
+          <a className="credit-star" href="https://github.com/BorisVDH-pcs/HS_Battleships" target="_blank" rel="noreferrer">
+            <span aria-hidden="true">★</span>
+            Star on GitHub
           </a>
         </footer>
 
