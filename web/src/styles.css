@@ -2175,6 +2175,10 @@ label {
 .countdown-label { display: block; margin-top: .4rem; color: var(--label-3); font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; }
 .waiting-launch { margin: 1.45rem 0 .4rem; color: var(--label-2); font-size: .8rem; }
 .launch-marker { margin-right: .45rem; color: var(--gold); font-size: .55rem; }
+.waiting-credits { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .35rem .75rem; margin: 2.25rem auto 0; padding-top: 1.15rem; border-top: 1px solid rgba(242, 193, 78, .14); color: var(--label-3); font-size: .72rem; line-height: 1.45; }
+.waiting-creator { color: var(--gold-lit); font-weight: 700; }
+.waiting-star { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .55rem; border: 1px solid rgba(242, 193, 78, .4); border-radius: 999px; color: var(--gold-lit); font-weight: 700; text-decoration: none; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+.waiting-star:hover, .waiting-star:focus-visible { border-color: var(--gold-lit); background: rgba(242, 193, 78, .12); color: var(--text); transform: translateY(-1px); }
 @media (max-width: 520px) {
   .waiting { min-height: 0; margin-top: 2.5rem; padding: 2.4rem 1rem 1.7rem; }
   .waiting-lead { font-size: .9rem; }
@@ -2182,6 +2186,7 @@ label {
   .countdown-unit { padding-inline: .15rem; }
   .countdown-label { font-size: .55rem; letter-spacing: .07em; }
   .waiting-launch { line-height: 1.4; }
+  .waiting-credits { margin-top: 1.75rem; }
 }
 
 /* ---- admin board overview ---- */
