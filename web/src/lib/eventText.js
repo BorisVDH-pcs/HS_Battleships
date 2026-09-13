@@ -1,3 +1,5 @@
+import { millionsLabel } from './millions.js';
+
 /** Describe a team-private evidence event without treating every rule as points. */
 export function evidenceEventText(payload = {}, fallbackWho = 'Someone') {
   const by = payload.uploaded_by_name ?? fallbackWho;
@@ -14,8 +16,10 @@ export function evidenceEventText(payload = {}, fallbackWho = 'Someone') {
     return `${by} submitted ${payload.option_label} for ${tile}.`;
   }
   if (rule === 'value') {
-    return `${by} submitted a drop worth ${payload.points_awarded}m for ${tile} ` +
-      `(${payload.points_total}/${need}m).`;
+    // Every number in a value event is in tenths of a million, including the
+    // target — see lib/millions.js.
+    return `${by} submitted a drop worth ${millionsLabel(payload.points_awarded)}m for ${tile} ` +
+      `(${millionsLabel(payload.points_total)}/${millionsLabel(need)}m).`;
   }
   if (payload.option_label) {
     return `${by} submitted ${payload.option_label} for ${tile} — ` +

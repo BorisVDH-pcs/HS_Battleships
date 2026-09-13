@@ -28,6 +28,8 @@
 // `points_per_set` is "two uniques from each boss" with no such qualifier. So
 // they group identically and diverge on one question — does a repeat count.
 
+import { MAX_VALUE, MIN_VALUE, toMillions } from './millions.js';
+
 /**
  * Do this tile's prices say anything worth printing?
  *
@@ -183,15 +185,23 @@ export function tileProgress(tile, staged = {}) {
     ? (tile.evidence_points ?? 0)
     : (tile.evidence_count ?? 0);
 
+  // A value tile counts in tenths of a million (see lib/millions.js), so the
+  // numbers going out of here are divided back into millions and can carry a
+  // decimal. `done` is decided BEFORE the division, on the integers the
+  // database is comparing, so 0.1 + 0.2 never gets a vote on whether a shot
+  // fires.
+  const done = have + stagedPoints >= need;
+  const scale = rule === 'value' ? toMillions : (n) => n;
+
   return {
     rule,
     groups: tileGroups(options),
-    done: have + stagedPoints >= need,
+    done,
     unit: rule === 'value' ? 'Value' : (options.length > 0 ? 'Points' : 'Evidence'),
     suffix: rule === 'value' ? 'm' : '',
-    have,
-    need,
-    staged: stagedPoints,
+    have: scale(have),
+    need: scale(need),
+    staged: scale(stagedPoints),
   };
 }
 
@@ -314,7 +324,10 @@ export function replayTile(tile, picks = []) {
       : option
         ? (isSet ? 1 : (option.points ?? 1))
         : 1;
-    if (isValue && (award < 1 || award > 1000)) return;
+    // `amount` is in the stored unit, tenths of a million, because `picks` is
+    // the shape admin_test_tile() takes and it is the database's units all the
+    // way down. The box the builder types into does the converting.
+    if (isValue && (award < MIN_VALUE || award > MAX_VALUE)) return;
 
     state = {
       ...state,

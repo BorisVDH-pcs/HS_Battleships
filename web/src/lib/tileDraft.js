@@ -11,6 +11,7 @@
 // "what does amount mean under the `value` rule" is exactly the kind of drift
 // `claim_is_complete()` exists to prevent on the server side.
 
+import { PER_MILLION, millionsLabel, millionsToTenths } from './millions.js';
 import { validateTileRow } from './tileParser.js';
 
 export const RULES = [
@@ -67,7 +68,12 @@ export function draftFromRow(row) {
     icon: row.icon ?? '',
     description: row.description ?? '',
     rule: row.completion ?? 'points',
-    amount: String(row.required_evidence ?? 1),
+    // A value tile's target is stored in tenths of a million (lib/millions.js)
+    // and the form asks for millions, so this is the one field whose units
+    // differ between the row and the draft.
+    amount: row.completion === 'value'
+      ? millionsLabel(row.required_evidence ?? PER_MILLION)
+      : String(row.required_evidence ?? 1),
     perSet: String(row.per_set ?? 1),
     options: (row.options ?? []).map((o) => ({
       label: o.label ?? '',
@@ -91,7 +97,12 @@ export function draftFromRow(row) {
  */
 export function payloadFromDraft(draft, extra = {}) {
   const rule = draft.rule ?? 'points';
-  const amount = Number(draft.amount);
+  // Back into tenths for a value tile, so what the form calls 15 is the 150
+  // the database compares evidence against. A target that will not parse
+  // falls back to one million rather than to one tenth of one.
+  const amount = rule === 'value'
+    ? (millionsToTenths(draft.amount) ?? PER_MILLION)
+    : Number(draft.amount);
   const perSet = Number(draft.perSet);
   // The two rules that actually read an option's price keep it; the ones that
   // count options rather than points would only be storing a number nothing
@@ -154,7 +165,8 @@ export function ruleSummary(row) {
   const rule = row.completion ?? 'points';
   const options = row.options ?? [];
 
-  if (rule === 'value') return `${row.required_evidence}m total`;
+  // Stored in tenths, said in millions.
+  if (rule === 'value') return `${millionsLabel(row.required_evidence)}m total`;
   if (rule === 'one_set') return 'any one full set';
   if (rule === 'each_set') {
     const per = row.per_set ?? 1;

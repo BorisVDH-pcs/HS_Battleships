@@ -12,6 +12,7 @@ import {
   tileShowsPrices, pointsLabel,
 } from '../lib/tileProgress.js';
 import { adminTestTile, adminListBoardPresets } from '../lib/supabase.js';
+import { millionsLabel, millionsToTenths } from '../lib/millions.js';
 
 /**
  * Building a board by pointing at it.
@@ -1096,7 +1097,7 @@ function EvidencePreview({ tile, shown = tile, onSession }) {
     try {
       const server = await adminTestTile(tile.id, next.map((p) => ({
         ...(p.optionId ? { option_id: p.optionId } : {}),
-        ...(p.amount ? { amount: Number(p.amount) } : {}),
+        ...(p.amount ? { amount: p.amount } : {}),
       })));
       const client = replayTile(tile, next);
       setResult({ server, client });
@@ -1149,10 +1150,12 @@ function EvidencePreview({ tile, shown = tile, onSession }) {
           : 'Pick a drop and submit it, as a player would. Nothing here is saved.'}
       </p>
       {isValue && (
+        /* Text, decimal comma allowed, exactly as the player's own box takes
+           it -- a tester that would not accept 0,5 could not rehearse the
+           submission a player is most likely to get wrong. */
         <input
-          type="number"
-          min="1"
-          max="1000"
+          type="text"
+          inputMode="decimal"
           placeholder="Worth, in millions"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -1181,14 +1184,18 @@ function EvidencePreview({ tile, shown = tile, onSession }) {
         picks={picks}
         onSubmit={() => {
           if (isValue) {
-            if (value) { submit({ amount: value }); setValue(''); }
+            // Into tenths here, so every pick in the list is already in the
+            // units admin_test_tile() and replayTile() read.
+            const tenths = millionsToTenths(value);
+            if (tenths !== null) { submit({ amount: tenths }); setValue(''); }
           } else if (picksNothing) {
             submit({});
           } else if (value) {
             submit({ optionId: value });
           }
         }}
-        canSubmit={picksNothing || Boolean(value)}
+        canSubmit={picksNothing
+          || (isValue ? millionsToTenths(value) !== null : Boolean(value))}
         label={label}
         busy={busy}
         result={result}
@@ -1280,9 +1287,9 @@ function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, on
           ) : (
             <p className="muted">
               Accepted{last && last.awarded > 0
-                ? ` — worth ${last.awarded}${server.rule === 'value'
-                    ? 'm'
-                    : ` pt${last.awarded === 1 ? '' : 's'}`}`
+                ? ` — worth ${server.rule === 'value'
+                    ? `${millionsLabel(last.awarded)}m`
+                    : `${last.awarded} pt${last.awarded === 1 ? '' : 's'}`}`
                 : ''}.
             </p>
           )}
@@ -1313,7 +1320,7 @@ function TileTester({ picks, onSubmit, canSubmit, label, busy, result, error, on
                 const step = server.steps?.[i];
                 return (
                   <li key={i} className={step?.refused ? 'refused' : undefined}>
-                    <span>{p.amount ? `${p.amount}m` : label(p.optionId)}</span>
+                    <span>{p.amount ? `${millionsLabel(p.amount)}m` : label(p.optionId)}</span>
                     {step?.refused
                       ? <em className="muted">turned away</em>
                       : step?.n === server.completed_at_step
