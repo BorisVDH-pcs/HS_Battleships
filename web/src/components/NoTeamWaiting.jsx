@@ -11,7 +11,7 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
  * the countdown itself is identical, because neither case has anything to
  * click on the board yet.
  */
-export default function NoTeamWaiting({ displayName, gameName, startsAt, assigned = false, teamName }) {
+export default function NoTeamWaiting({ gameName, startsAt, assigned = false, teamName }) {
   const remaining = useCountdown(startsAt);
 
   const units = [
@@ -24,7 +24,6 @@ export default function NoTeamWaiting({ displayName, gameName, startsAt, assigne
   return (
     <section className="waiting" aria-labelledby="waiting-title">
       <div className="waiting-radar" aria-hidden="true"><span /></div>
-      <p className="waiting-kicker">Fleet assembly in progress</p>
       <h1 id="waiting-title">Please await orders</h1>
       {gameName && <p className="waiting-game">{gameName}</p>}
       <p className="waiting-lead">
@@ -50,7 +49,6 @@ export default function NoTeamWaiting({ displayName, gameName, startsAt, assigne
             ? 'Standing by for the order to start.'
             : `Battle stations open ${DATE_FORMAT.format(new Date(startsAt))}`}
       </p>
-      <p className="muted">Signed in as <strong>{displayName}</strong></p>
     </section>
   );
 }
