@@ -29,7 +29,7 @@ export default function NoTeamWaiting({ gameName, startsAt, assigned = false, te
       <p className="waiting-lead">
         {assigned
           ? `You're aboard ${teamName ?? 'your team'}. Keep this channel open — the board opens once an admin gives the order.`
-          : "You haven't been placed on a team yet. An admin will assign you once the teams are set."}
+          : "You haven't been placed on a team yet. An admin will assign you once the teams are formed."}
       </p>
       {remaining.set && (
         <div className="countdown" aria-live="polite" aria-label={remaining.started ? 'The battle has started' : `Battle begins in ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, and ${remaining.seconds} seconds`}>
