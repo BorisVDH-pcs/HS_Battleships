@@ -113,8 +113,9 @@ export default function App() {
   // Which game to show.
   //
   // Rostered players get their own games, newest first, with their last pick
-  // restored. Everyone else keeps the original behaviour -- newest game that
-  // exists, membership or not -- and that fallback is load-bearing twice over:
+  // restored. Everyone else -- a fresh signup on no roster anywhere, or an
+  // admin with no team of their own -- gets whichever game the admin has
+  // flagged `is_featured`, and that fallback is load-bearing twice over:
   //
   //   * an admin has no team, and `gameId` also drives the shot-sound channel
   //     below, which sits outside the isAdmin split on purpose so the organiser
@@ -122,6 +123,9 @@ export default function App() {
   //   * `waitingForTeam` needs a game to be loaded before it will show the
   //     waiting room. With no gameId a fresh signup gets "No game yet. An admin
   //     needs to create one." instead -- true of nobody, and alarming.
+  //
+  // Falls back to newest-by-created_at when nothing is featured yet, so an
+  // admin who has never touched the new toggle sees the same thing as before.
   const loadGames = useCallback(async ({ throttle = false } = {}) => {
     if (!supabase || !uid) return;
     if (throttle && Date.now() - gamesAt.current < 1500) return;
@@ -155,6 +159,14 @@ export default function App() {
       setGameId(pick);
       return;
     }
+
+    const { data: featured } = await supabase
+      .from('games')
+      .select('id')
+      .eq('is_featured', true)
+      .limit(1);
+    if (seq !== gamesSeq.current) return;
+    if (featured?.[0]?.id) { setGameId(featured[0].id); return; }
 
     const { data } = await supabase
       .from('games')

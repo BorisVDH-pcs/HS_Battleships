@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   supabase, startGame,
   adminCreateGame, adminSetMember, adminRemoveMember,
-  adminOpenPlacement, adminSetStartTime, adminListTiles, adminDeleteGame, adminResetGame,
+  adminOpenPlacement, adminSetStartTime, adminSetFeaturedGame, adminListTiles, adminDeleteGame, adminResetGame,
   adminListShipCells, adminListWebhooks,
   adminListLibrary, adminSaveLibraryTile, adminDeleteLibraryTile,
   adminSetTile, adminClearTile, adminAutofillBoard, adminShuffleBoard,
@@ -506,6 +506,11 @@ export default function Admin() {
                 <div>
                   <strong>{g.name}</strong>{' '}
                   <span className={`pill ${g.status}`}>{statusLabel(g.status)}</span>
+                  {g.is_featured && (
+                    <span className="pill" title="Unassigned players see this game's countdown">
+                      ★ Featured
+                    </span>
+                  )}
                   <div className="meta">
                     {names.join(' vs ') || 'no teams'}
                     {/* Named, not counted. "3" would send you into the game to
@@ -530,6 +535,19 @@ export default function Admin() {
                     }}
                   >
                     {g.id === gameId ? 'Close' : 'Manage'}
+                  </button>
+                  {/* The one thing an unassigned signup ever sees, so toggling
+                      it is a plain on/off here rather than another confirm
+                      dialog -- there is nothing destructive to walk back. */}
+                  <button
+                    className="ghost"
+                    disabled={busy}
+                    onClick={() => run(
+                      () => adminSetFeaturedGame(g.is_featured ? null : g.id),
+                      g.is_featured ? 'No game is featured now.' : `"${g.name}" is now featured.`
+                    )}
+                  >
+                    {g.is_featured ? 'Unfeature' : 'Feature'}
                   </button>
                   <button
                     className="danger"

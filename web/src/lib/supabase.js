@@ -97,6 +97,13 @@ export const adminOpenPlacement = (gameId) =>
 export const adminSetStartTime = (gameId, startsAt) =>
   rpc('admin_set_start_time', { p_game_id: gameId, p_starts_at: startsAt });
 
+/**
+ * The one game an unassigned player is shown. Setting a new game unfeatures
+ * whatever held it before; passing null just clears it.
+ */
+export const adminSetFeaturedGame = (gameId) =>
+  rpc('admin_set_featured_game', { p_game_id: gameId });
+
 export const adminListTiles = (gameId) =>
   rpc('admin_list_tiles', { p_game_id: gameId });
 
