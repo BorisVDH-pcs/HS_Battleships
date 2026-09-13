@@ -84,10 +84,10 @@ differently. A price is printed only where the tile's drops are **not all worth
 the same single point**.
 
 Twenty-six of the board's forty-one priced tiles list drops that are all worth 1
-— "any Inquisitor's piece", "Sarachnis pet or jar". There, points and
+— "a single-point drop", "a single-point drop". There, points and
 screenshots are the same number, the counter already says it, and a column of
 "1 pt" repeats the target on every line. On the fifteen mixed tiles every price
-stays, the 1s most of all: on I9's list "1 pt" would mean *this is the cheap
+stays, the 1s most of all: on a mixed-price list "1 pt" would mean *this is the cheap
 one*, and hiding it there would leave a price to be inferred from the absence of
 a price. Hence tile-wide, never per-option — the old `points_per_set` rule was
 per-option and is now folded into this one.
@@ -137,19 +137,19 @@ simulated row — `replayTile().state`, shaped exactly like a `tiles_for_me()`
 row — is held in `PlayerSquarePreview` and handed to the card, the `?` panel and
 the drop picker alike, because that is how a real player's three views stay in
 step: they are one row. So the panel's sets fill in as you submit, and a
-finished group collapses to *"General Graardor — ✓ Done"* in the picker.
+finished group collapses to *"a boss group — ✓ Done"* in the picker.
 
 Holding that row one level up has a trap, which was duly fallen into:
 `PlayerSquarePreview` must be **keyed per square and per tile**, or React reuses
 the instance when you click a different square and the new tile inherits the old
-one's simulated row — H1 offering a set belonging to the tile tested before it.
+one's simulated row — a board position offering a set belonging to the tile tested before it.
 `EvidencePreview`'s own `key={tile.id}` resets its picks but cannot reset state
 held above it. `shown` also checks the row's id matches the tile, so a stale
 session is inert rather than convincing.
 
 Before that, the preview listed every drop unconditionally and was **more
-permissive than the interface it previewed** — on H2 you could submit a third
-Bandos hilt into a General Graardor that was already full and watch the tile not
+permissive than the interface it previewed** — on a board position you could submit a third
+a boss drop into a a boss group that was already full and watch the tile not
 move. Which is how **20260912235000** was found.
 
 **20260912235000 — a full group takes no more.** `points_per_set` closed the
@@ -173,7 +173,7 @@ tester that only asked `tileProgress.js` would be asking the mirror whether the
 mirror agrees with itself — the drift this repo has been one careless edit away
 from since 0049 is exactly what it needs to catch.
 
-Before `points_per_set` existed, H2 faked it with an extra option per group
+Before `points_per_set` existed, a board position faked it with an extra option per group
 ("any second Graardor unique (duplicate)"). If you ever see an option like that
 again, the tile wants this rule, not another fake option.
 
@@ -248,7 +248,7 @@ card. `enforce_evidence_before_fire` is back to one route through it:
 
 ## The V4 board itself
 
-Built on the **Test** game, 100 squares, row-major (A1→J1, A2→J2, …). Every
+Built on the **Test** game, 100 squares in row-major order. Every
 catalogue entry it uses carries the tag **`Battleships V4`** — 86 of them.
 
 > **Correction.** This section used to say the board could be rebuilt on another
@@ -282,7 +282,7 @@ follow later catalogue edits. Changing a drop list means updating both, and the
 
 ## Decisions already taken (do not re-ask)
 
-- Coordinate prefixes (`D1.`) are stripped from tile names; the board draws the
+- Coordinate prefixes in imported names are stripped from tile names; the board draws the
   coordinate already.
 - The sheet's "Options" column is the *explanation*, not options.
 - The `Slayer item | Points` table on the right of the sheet is the option list
