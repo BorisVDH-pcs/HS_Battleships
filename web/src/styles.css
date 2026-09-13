@@ -1618,6 +1618,31 @@ label {
   font-size: .8125rem;
 }
 .login-help span { color: var(--text); }
+.login-credits,
+.player-credits {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .35rem .75rem;
+  color: var(--label-3);
+  font-size: .75rem;
+  line-height: 1.45;
+  text-align: center;
+}
+.login-credits { margin: -.45rem auto 0; }
+.player-credits {
+  margin: 2.5rem auto .25rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--hairline);
+}
+.credit-creator { color: var(--gold-lit); font-weight: 700; }
+.login-credits a,
+.player-credits a { color: var(--gold-dim); font-weight: 600; text-decoration: none; }
+.login-credits a:hover,
+.login-credits a:focus-visible,
+.player-credits a:hover,
+.player-credits a:focus-visible { color: var(--gold-lit); text-decoration: underline; text-underline-offset: .2em; }
 
 @keyframes login-arrive {
   from { opacity: 0; transform: translateY(10px); }
