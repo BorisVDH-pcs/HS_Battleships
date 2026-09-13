@@ -11,6 +11,7 @@ import { useState } from 'react';
  */
 export default function Wordmark({ subtitle = 'Battleships' }) {
   const [failed, setFailed] = useState(false);
+  const [subtitleFailed, setSubtitleFailed] = useState(false);
 
   if (failed) return <h1>HS {subtitle}</h1>;
 
@@ -24,7 +25,17 @@ export default function Wordmark({ subtitle = 'Battleships' }) {
         onError={() => setFailed(true)}
         draggable="false"
       />
-      <span className="sub">{subtitle}</span>
+      {subtitleFailed ? (
+        <span className="sub sub-fallback">{subtitle}</span>
+      ) : (
+        <img
+          className="wordmark-subtitle"
+          src={`${import.meta.env.BASE_URL}battleships-wordmark.png`}
+          alt={subtitle}
+          onError={() => setSubtitleFailed(true)}
+          draggable="false"
+        />
+      )}
     </h1>
   );
 }

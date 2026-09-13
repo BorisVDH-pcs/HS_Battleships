@@ -28,6 +28,16 @@ export default function Login() {
   const mismatch = signingUp && confirmPassword.length > 0
     && password !== confirmPassword;
 
+  function changeMode(nextMode) {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setMessage(null);
+    // Dropped rather than carried across: it belongs to a form that is no
+    // longer on screen, and leaving it filled would let a mismatch survive
+    // into the mode that cannot show it.
+    setConfirmPassword('');
+  }
+
   async function submit(e) {
     e.preventDefault();
     setMessage(null);
@@ -78,94 +88,108 @@ export default function Login() {
 
   return (
     <div className="login">
-      <Wordmark />
-      <form onSubmit={submit}>
-        <label>
-          Username
-          <input
-            type="text"
-            value={username}
-            required
-            autoComplete="username"
-            placeholder="Your RuneScape name"
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <span className="password-field">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              required
-              minLength={8}
-              autoComplete={signingUp ? 'new-password' : 'current-password'}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {/* Inside the label, so pressing it does not steal the click from
-                the field it belongs to. type="button" because everything in a
-                form submits it otherwise, and this one is here precisely to
-                stop people submitting a password they cannot see. */}
+      <div className="login-radar" aria-hidden="true" />
+      <div className="login-content">
+        <Wordmark />
+
+        <section className="login-card" aria-labelledby="login-title">
+          <header className="login-intro">
+            <h2 id="login-title">Welcome aboard</h2>
+            <p>{signingUp ? 'Create your account to join the battle.' : 'Sign in to join the battle.'}</p>
+          </header>
+
+          <div className="login-mode" role="group" aria-label="Account mode">
             <button
               type="button"
-              className="link password-reveal"
-              aria-pressed={showPassword}
-              onClick={() => setShowPassword((s) => !s)}
+              className={!signingUp ? 'on' : ''}
+              aria-pressed={!signingUp}
+              disabled={busy}
+              onClick={() => changeMode('signin')}
             >
-              {showPassword ? 'Hide' : 'Show'}
+              Sign in
             </button>
-          </span>
-        </label>
+            <button
+              type="button"
+              className={signingUp ? 'on' : ''}
+              aria-pressed={signingUp}
+              disabled={busy}
+              onClick={() => changeMode('signup')}
+            >
+              Create account
+            </button>
+          </div>
 
-        {signingUp && (
-          <label>
-            Confirm password
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              required
-              autoComplete="new-password"
-              aria-invalid={mismatch || undefined}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-            {mismatch && (
-              <span className="field-error">The two passwords do not match.</span>
+          <form onSubmit={submit}>
+            <label>
+              Username
+              <input
+                type="text"
+                value={username}
+                required
+                autoComplete="username"
+                placeholder="Your RuneScape name"
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <span className="password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  required
+                  minLength={8}
+                  autoComplete={signingUp ? 'new-password' : 'current-password'}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {/* Inside the label, so pressing it does not steal the click from
+                    the field it belongs to. type="button" because everything in a
+                    form submits it otherwise. */}
+                <button
+                  type="button"
+                  className="link password-reveal"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((s) => !s)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </span>
+            </label>
+
+            {signingUp && (
+              <label>
+                Confirm password
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  required
+                  autoComplete="new-password"
+                  aria-invalid={mismatch || undefined}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                {mismatch && (
+                  <span className="field-error">The two passwords do not match.</span>
+                )}
+              </label>
             )}
-          </label>
-        )}
 
-        <button type="submit" disabled={busy || mismatch}>
-          {busy
-            ? (signingUp ? 'Creating account…' : 'Signing in…')
-            : (signingUp ? 'Create account' : 'Sign in')}
-        </button>
-      </form>
+            <button className="login-submit" type="submit" disabled={busy || mismatch}>
+              {busy
+                ? (signingUp ? 'Creating account…' : 'Signing in…')
+                : (signingUp ? 'Create account' : 'Enter the battle')}
+            </button>
+          </form>
 
-      <button
-        className="link"
-        onClick={() => {
-          setMode(signingUp ? 'signin' : 'signup');
-          setMessage(null);
-          // Dropped rather than carried across: it belongs to a form that is
-          // no longer on screen, and leaving it filled would let a mismatch
-          // survive into the mode that cannot show it.
-          setConfirmPassword('');
-        }}
-      >
-        {signingUp ? 'Already have an account?' : 'Need an account?'}
-      </button>
+          {/* role="alert" because this is the only report a failed sign-in gets. */}
+          {message && <p className="message" role="alert">{message}</p>}
 
-      {/* role="alert" because this is the only report a failed sign-in gets.
-          Without it the message is painted into a corner of the page that a
-          screen reader has already read past, and someone who has zoomed in
-          on the form never learns the press did anything at all. */}
-      {message && <p className="message" role="alert">{message}</p>}
-
-      {!signingUp && (
-        <p className="muted forgot">
-          Forgotten your password? There is no reset email — ask an admin to set a new one.
-        </p>
-      )}
+          {!signingUp && (
+            <p className="login-help">
+              <span>Forgot password?</span> Contact an admin
+            </p>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
