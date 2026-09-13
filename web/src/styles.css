@@ -231,7 +231,14 @@ h1, h2, h3 { font-family: var(--display); }
 
 /* The logo is a stacked two-line wordmark, not a single line, so it needs
    real height: at 38px each line would land under 20px. */
-.wordmark img { height: 54px; width: auto; display: block; }
+.wordmark > img:first-child { height: 54px; width: auto; display: block; }
+.wordmark .wordmark-subtitle {
+  display: block;
+  width: 166px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(242, 193, 78, .22));
+}
 /*
  * The one place decoration is allowed, because it is the brand's own name
  * sitting beside the brand's own mark — a logotype, not interface text. Apple
@@ -281,14 +288,21 @@ h1, h2, h3 { font-family: var(--display); }
     drop-shadow(0 0 10px rgba(255, 197, 66, .45))
     drop-shadow(0 0 26px rgba(255, 146, 26, .28));
 }
-.login .wordmark { flex-direction: column; align-items: center; gap: .55rem; }
-.login .wordmark img { height: 120px; }
-/* Under a 120px mark the header size reads as a caption, so the sign-in
-   lockup scales with the artwork above it. */
+.login .wordmark { flex-direction: column; align-items: center; gap: .35rem; margin: 0; }
+.login .wordmark > img:first-child { height: 126px; }
+.login .wordmark .wordmark-subtitle {
+  width: min(340px, 78vw);
+  filter: drop-shadow(0 0 13px rgba(242, 193, 78, .34));
+}
+/* Under a 126px mark the fallback header reads as a real part of the lockup,
+   not as a caption for the artwork above it. */
 .login .wordmark .sub { font-size: 2rem; letter-spacing: .02em; }
 @media (max-width: 520px) {
-  .wordmark img { height: 42px; }
+  .wordmark > img:first-child { height: 42px; }
+  .wordmark .wordmark-subtitle { width: 132px; }
   .wordmark .sub { font-size: 1.05rem; }
+  .login .wordmark > img:first-child { height: 106px; }
+  .login .wordmark .wordmark-subtitle { width: min(300px, 82vw); }
   .login .wordmark .sub { font-size: 1.5rem; }
 }
 /* A gradient clipped to the glyphs is exactly the sort of low-contrast
@@ -1370,9 +1384,129 @@ label {
 
 /* ---- login ---- */
 
-.login { max-width: 340px; margin: 4rem auto; }
+.app:has(> .login) {
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+.login {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: clamp(2rem, 5vw, 4.5rem) 1.25rem;
+  overflow: hidden;
+}
+/* A board waiting to be played. The grid is deliberately quieter than every
+   control, so it adds place without becoming information. */
+.login::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: -2px;
+  background-image:
+    linear-gradient(rgba(242, 193, 78, .052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242, 193, 78, .052) 1px, transparent 1px),
+    radial-gradient(ellipse 42% 26% at 50% 12%, rgba(242, 193, 78, .13), transparent 72%);
+  background-size: clamp(58px, 8vw, 104px) clamp(58px, 8vw, 104px),
+                   clamp(58px, 8vw, 104px) clamp(58px, 8vw, 104px),
+                   auto;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .8), rgba(0, 0, 0, .38) 78%, transparent);
+}
+.login-radar {
+  position: absolute;
+  z-index: -1;
+  top: clamp(2rem, 8vw, 7rem);
+  left: calc(50% + clamp(170px, 27vw, 440px));
+  width: clamp(210px, 30vw, 430px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(242, 193, 78, .09);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 20%, rgba(242, 193, 78, .08) 20.25% 20.6%, transparent 20.85% 40%),
+    conic-gradient(from -24deg, rgba(242, 193, 78, .12), transparent 13% 100%);
+  opacity: .72;
+}
+.login-radar::before,
+.login-radar::after {
+  content: '';
+  position: absolute;
+  background: rgba(242, 193, 78, .085);
+}
+.login-radar::before { width: 1px; inset-block: 0; left: 50%; }
+.login-radar::after { height: 1px; inset-inline: 0; top: 50%; }
+
+.login-content {
+  width: min(100%, 450px);
+  display: grid;
+  justify-items: stretch;
+  gap: clamp(1.25rem, 3vh, 2rem);
+  animation: login-arrive .65s var(--ease-out) both;
+}
 .login h1 { text-align: center; font-size: 1.75rem; font-weight: 700; letter-spacing: -.022em; }
-.login form { display: grid; gap: .9rem; margin: 1.5rem 0; }
+.login-card {
+  padding: clamp(1.35rem, 4vw, 2rem);
+  border: 1px solid rgba(242, 193, 78, .34);
+  border-radius: var(--r-2xl);
+  background: linear-gradient(155deg, rgba(44, 41, 32, .76), rgba(20, 20, 21, .86) 42%);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, .055);
+  -webkit-backdrop-filter: blur(22px) saturate(115%);
+  backdrop-filter: blur(22px) saturate(115%);
+}
+.login-intro { text-align: center; }
+.login-intro h2 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+.login-intro p { margin: .35rem 0 0; color: var(--label-2); font-size: .9375rem; }
+
+.login-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  margin-top: 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: rgba(8, 8, 9, .52);
+}
+.login-mode button {
+  min-height: 44px;
+  padding: .55rem .65rem;
+  border-radius: calc(var(--r-lg) - 3px);
+  background: transparent;
+  color: var(--label-2);
+  box-shadow: none;
+}
+.login-mode button:not(.on):hover:not(:disabled) {
+  background: var(--fill-3);
+  color: var(--text);
+  filter: none;
+}
+.login-mode button.on {
+  background: linear-gradient(180deg, var(--gold-lit), var(--gold));
+  color: var(--on-gold);
+  box-shadow: 0 4px 13px rgba(242, 193, 78, .18), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.login-mode button.on:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--gold-lit), var(--gold));
+  color: var(--on-gold);
+  filter: brightness(1.04);
+}
+
+.login form { display: grid; gap: 1rem; margin: 1.3rem 0 0; }
+.login form input { min-height: 48px; background: rgba(8, 8, 9, .46); }
+.login form input:hover { border-color: var(--line); }
+.login-submit {
+  min-height: 50px;
+  margin-top: .2rem;
+  background: linear-gradient(180deg, var(--gold-lit), var(--gold));
+  box-shadow: 0 7px 22px rgba(242, 193, 78, .16), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
 
 /* Show/hide, sat inside the field rather than beside it.
  *
@@ -1406,7 +1540,54 @@ label {
   font-size: .8125rem;
 }
 .message { color: var(--label-2); font-size: .875rem; }
-.login .forgot { margin-top: 1.5rem; line-height: 1.45; }
+.login .message {
+  margin: 1rem 0 0;
+  padding: .65rem .75rem;
+  border-left: 2px solid var(--gold);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--fill-3);
+}
+.login-help {
+  display: flex;
+  justify-content: center;
+  gap: .3rem;
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--hairline);
+  color: var(--label-2);
+  font-size: .8125rem;
+}
+.login-help span { color: var(--text); }
+
+@keyframes login-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 520px) {
+  .login { align-items: start; padding-top: 1.4rem; }
+  .login-content { gap: 1rem; }
+  .login-card { padding: 1.25rem; border-radius: var(--r-xl); }
+  .login-mode { margin-top: 1.1rem; }
+  .login-intro h2 { font-size: 1.65rem; }
+  .login-radar { left: 58%; opacity: .45; }
+}
+@media (max-height: 760px) and (min-width: 521px) {
+  .login { padding-block: 1rem; }
+  .login-content { gap: .7rem; }
+  .login .wordmark > img:first-child { height: 76px; }
+  .login .wordmark .wordmark-subtitle { width: 230px; }
+  .login-card { padding: 1.1rem 1.5rem; }
+  .login-intro h2 { font-size: 1.65rem; }
+  .login-intro p { margin-top: .15rem; }
+  .login-mode { margin-top: .75rem; }
+  .login form { gap: .65rem; margin-top: .75rem; }
+  .login form input { min-height: 43px; }
+  .login-submit { min-height: 44px; }
+  .login-help { margin-top: .75rem; padding-top: .7rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-content { animation: none; }
+}
 
 /* ---- admin ---- */
 
@@ -2671,6 +2852,7 @@ button.builder-cell.empty:hover { border-style: solid; }
 
 .library-search { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .library-search input[type="search"] { flex: 1 1 9rem; }
+.library-search select { flex: 0 1 8rem; }
 
 .library-list {
   list-style: none; margin: 0; padding: 0;
@@ -2757,6 +2939,15 @@ button.builder-cell.empty:hover { border-style: solid; }
   margin: 0 0 .8rem;
 }
 .builder-view-toggle b { color: var(--label); font-weight: 600; }
+
+/* Scopes the two deal buttons below it, so it sits with them rather than with
+   the browse list further down that has its own copy of the same filter. */
+.builder-deal-tag {
+  display: flex; align-items: center; gap: .5rem;
+  margin: 0;
+  font-size: .8125rem; color: var(--label-2);
+}
+.builder-deal-tag select { flex: 0 1 10rem; }
 
 /* The board as a team meets it: artwork filling the cell, nothing to read.
  *
