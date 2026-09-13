@@ -1912,16 +1912,58 @@ label {
   .webhook-dirty, .webhook-saved { flex-basis: 100%; }
 }
 
-/* ---- waiting room ---- */
+/* ---- no-team waiting room ---- */
 
-.waiting { max-width: 34rem; margin: 3rem auto; text-align: center; }
-.waiting .lead {
-  font-family: var(--display);
-  font-size: 1.2rem; line-height: 1.45; font-weight: 500;
-  letter-spacing: -.014em;
-  color: var(--text); margin: .3rem 0 1rem;
+.waiting-app { position: relative; isolation: isolate; min-height: 100vh; }
+.waiting-app::before,
+.waiting-app::after {
+  content: ''; position: fixed; z-index: -1; pointer-events: none;
 }
+.waiting-app::before {
+  inset: 0;
+  background:
+    linear-gradient(rgba(242, 193, 78, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242, 193, 78, .045) 1px, transparent 1px),
+    radial-gradient(ellipse 85% 70% at 50% 52%, rgba(7, 44, 64, .82), transparent 72%),
+    linear-gradient(135deg, #02090e 0%, #000 55%, #090602 100%);
+  background-size: 58px 58px, 58px 58px, auto, auto;
+}
+.waiting-app::after {
+  width: min(72vw, 840px); height: min(72vw, 840px);
+  right: -16vw; top: 18%; border: 1px solid rgba(242, 193, 78, .14);
+  border-radius: 50%; box-shadow: 0 0 0 32px rgba(242, 193, 78, .025), 0 0 0 86px rgba(242, 193, 78, .018);
+  background: conic-gradient(from 218deg, transparent 0 28%, rgba(242, 193, 78, .09) 29% 34%, transparent 35% 100%);
+}
+.waiting {
+  position: relative; overflow: hidden; max-width: 47rem; min-height: 28rem;
+  margin: clamp(3rem, 13vh, 9rem) auto 2rem; padding: clamp(2rem, 6vw, 4.5rem) clamp(1.2rem, 5vw, 4rem);
+  text-align: center; border: 1px solid rgba(242, 193, 78, .24); border-radius: var(--r-2xl);
+  background: linear-gradient(145deg, rgba(12, 26, 32, .78), rgba(10, 10, 12, .82));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .54), inset 0 1px 0 rgba(255, 255, 255, .07);
+  backdrop-filter: blur(22px) saturate(130%); -webkit-backdrop-filter: blur(22px) saturate(130%);
+}
+.waiting-radar { position: absolute; width: 20rem; height: 20rem; left: 50%; top: -12rem; transform: translateX(-50%); border: 1px solid rgba(242, 193, 78, .12); border-radius: 50%; box-shadow: 0 0 0 32px rgba(242, 193, 78, .025), 0 0 0 68px rgba(242, 193, 78, .02); }
+.waiting-radar::after { content: ''; position: absolute; left: 50%; top: 50%; width: 7rem; height: 1px; transform-origin: left center; transform: rotate(28deg); background: linear-gradient(90deg, rgba(242, 193, 78, .75), transparent); }
+.waiting-radar span { position: absolute; width: .4rem; height: .4rem; top: 37%; left: 66%; border-radius: 50%; background: var(--gold-lit); box-shadow: 0 0 12px var(--gold); }
+.waiting-kicker { margin: 0 0 .7rem; color: var(--gold); font-size: .7rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+.waiting h1 { position: relative; margin: 0; color: var(--text); font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.04em; }
+.waiting-lead { max-width: 34rem; margin: .75rem auto 1.8rem; color: var(--label-2); font-size: 1rem; }
+.countdown { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; max-width: 35rem; margin: 0 auto; }
+.countdown-unit { padding: .75rem .35rem .65rem; border: 1px solid rgba(242, 193, 78, .2); border-radius: var(--r-lg); background: rgba(0, 0, 0, .3); }
+.countdown-value { display: block; color: var(--gold-lit); font: 700 clamp(1.7rem, 5vw, 2.7rem)/1 var(--mono); letter-spacing: -.08em; text-shadow: 0 0 16px rgba(242, 193, 78, .35); }
+.countdown-label { display: block; margin-top: .4rem; color: var(--label-3); font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; }
+.waiting-launch { margin: 1.45rem 0 .4rem; color: var(--label-2); font-size: .8rem; }
+.launch-marker { margin-right: .45rem; color: var(--gold); font-size: .55rem; }
+.waiting > .muted { margin: 0; font-size: .78rem; }
 .waiting strong { color: var(--gold); font-weight: 600; }
+@media (max-width: 520px) {
+  .waiting { min-height: 0; margin-top: 2.5rem; padding: 2.4rem 1rem 1.7rem; }
+  .waiting-lead { font-size: .9rem; }
+  .countdown { gap: .35rem; }
+  .countdown-unit { padding-inline: .15rem; }
+  .countdown-label { font-size: .55rem; letter-spacing: .07em; }
+  .waiting-launch { line-height: 1.4; }
+}
 
 /* ---- admin board overview ---- */
 
