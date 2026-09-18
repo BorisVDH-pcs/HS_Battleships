@@ -711,6 +711,18 @@ button.cell.pet-target:active { transform: scale(.93); transition-duration: .09s
 .cell.ship.active.ready {
   box-shadow: inset 0 0 0 2px rgba(48, 209, 88, .85), var(--glow-md);
 }
+/* Unlocked by an organiser: the tile is still the team's, its evidence is
+   still there, but nobody is working it until it is locked in again. A dashed
+   ring in the same gold, with no fill and no glow — the outline of an active
+   square rather than an active square, which is exactly what it is. The
+   `.claimable` hover on top is what says it can be picked back up. */
+.cell.parked {
+  border-color: rgba(242, 193, 78, .5);
+  border-style: dashed;
+  color: var(--label-2);
+  background: transparent;
+  box-shadow: none;
+}
 .cell.empty  { background: transparent; border-color: transparent; box-shadow: none; }
 
 /* Two boards means ~200 coordinates on screen at once, which drowns out the
@@ -1244,13 +1256,26 @@ button.cell.pet-target:active { transform: scale(.93); transition-duration: .09s
   width: 84px; height: 84px; object-fit: cover;
   border-radius: var(--r-md); border: 1px solid var(--hairline); display: block;
 }
-.evidence-review .meta { display: grid; gap: .15rem; min-width: 0; }
+/* Takes the slack, so the revoke button below can sit against the right edge
+   rather than next to the text. */
+.evidence-review .meta { display: grid; gap: .15rem; min-width: 0; flex: 1 1 auto; }
 .evidence-review .meta strong { font-weight: 600; letter-spacing: -.008em; }
 .evidence-review .meta .muted { font-size: .78rem; }
 .evidence-review .coord {
   color: var(--gold); font-size: .8125rem; font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* What the submitter filed this screenshot as. Drawn as a pill rather than
+   another grey line, because the organiser is scanning the column for the one
+   that disagrees with its picture. */
+.evidence-review .evidence-filed {
+  justify-self: start;
+  padding: .1rem .45rem;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  background: var(--fill-3);
+  font-size: .78rem; font-weight: 600; color: var(--gold-dim);
+}
+.evidence-review .evidence-revoke { flex: 0 0 auto; align-self: center; }
 
 /* ---- feed ---- */
 
@@ -2262,6 +2287,7 @@ label {
 .legend .key.hit.dealt.sunk { background: var(--dead); border-color: var(--dead-lit); }
 .legend .key.miss      { background: var(--miss);   border-color: var(--miss-lit); }
 .legend .key.active    { background: rgba(242, 193, 78, .18); border-color: var(--gold); }
+.legend .key.parked    { background: transparent; border-color: rgba(242, 193, 78, .5); border-style: dashed; }
 
 /* ---- fleet placer ---- */
 

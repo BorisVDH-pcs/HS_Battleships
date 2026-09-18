@@ -1560,3 +1560,259 @@ rolls back and the assertions arrive in the error message. That is how
 - **The migration table earlier in this file stops at `0032`.** There are 64
   migrations. `ls` the directory, not the table.
 - Still nothing checked on a real phone.
+
+## Session log — 2026-09-18, taking one submission back
+
+`admin_revoke_evidence` (`20260918163924`, with its enum value in
+`20260918163739`). Asked for in these words: a team finishing the infernal /
+fire cape / quiver tile picks the wrong drop off the list, presses submit, and
+banks the wrong points — put it back so they can submit again against the right
+one.
+
+Nothing could do that. `admin_release_claim` (0029) is the neighbouring tool and
+is wrong for it twice over: it deletes the whole claim, taking every correct
+screenshot on the tile with it, and it refuses outright once the tile has fired.
+The gap was one *piece* of evidence.
+
+### What had to be unwound, and what unwound itself
+
+Most of it needs no code, and that is worth knowing before touching any of this:
+**almost nothing about a shot is stored.** `team_scores` counts fired claims.
+`ship_status` counts distinct hit cells against the hull's own cells — there is
+no "sunk" column anywhere. `claim_is_complete` and `evidence_refusal` read
+`tile_evidence` rows and nothing else, so deleting one reopens a closed set and
+hands back a spent `max_times` repeat with no help at all. Reverting
+`tile_claims` to active is most of the job.
+
+Three things did need doing by hand:
+
+- **The ring.** A sinking makes `fire_tile` insert a fired `miss` claim on every
+  square around the hull — free reveals, guaranteed water by the no-touching
+  rule. Leaving them after a refloat is worse than leaving them revealed:
+  `unique (team_id, tile_id)` means that team can then *never* claim those
+  squares, and each counts as a miss forever. They are deleted, identified by
+  what only `fire_tile` produces — a fired miss with no `claimed_by`, no
+  `fired_by`, no evidence — and kept if they also ring a different hull that is
+  still down.
+- **The win.** A shot that emptied the board set `status = 'finished'` and a
+  `winner_team_id`. Undoing it has to reopen the game.
+- **The slot.** The active-tile limit is a **BEFORE INSERT** trigger, so an
+  UPDATE back to `'active'` walks straight past it. A team on 3 of 3 can be
+  handed a fourth this way. Allowed rather than refused — an organiser who
+  cannot fix a mistake because the team is busy is the worse failure — but it is
+  in the preview.
+
+### The two decisions worth keeping
+
+**Un-fire only if the tile is genuinely unfinished.** A `points` tile that needed
+10 and banked 12 is still done at 10 once a wrong 2-point pick comes off it, and
+withdrawing that shot would take back something the team earned. So the test is
+`claim_is_complete()` asked again after the delete — the same authority
+`add_evidence` asks before firing, not a second opinion written alongside it.
+
+**No refusals; a preview instead.** Boris chose this over hard-refusing a
+sinking or a win. `p_dry_run` runs the real body and unwinds it with the same
+HS001 trick `admin_test_tile` uses, so the dialog lists consequences produced by
+the code that then performs them. There is no second description to drift out of
+step — which is the failure mode a hand-written "this will probably…" always
+reaches eventually.
+
+The feed is **appended to, not rewritten**: the `shot_fired` and `ship_sunk`
+rows stay, and an `evidence_revoked` event says what was withdrawn. What
+happened is that a shot was fired and then taken back, and the board is derived
+from the claims, so it corrects itself. The event names the tile and the drop,
+so it is team-private — added to `is_team_private_event`, which the `events_read`
+policy calls by name, so replacing the function was the whole change.
+
+Storage objects are left orphaned in the bucket, exactly as 0029 leaves the ones
+it cascades away.
+
+### Also in this change
+
+`admin_list_evidence` now returns the **drop each screenshot was filed as**
+(plus its points, the tile's rule and its target). The review screen could not
+previously show the one thing a mis-pick consists of: the right picture against
+the wrong name. `RETURNS TABLE` cannot be altered, so it is dropped and
+recreated — grants re-applied, see 0014 for what forgetting that costs.
+
+### Verified, and not
+
+Both new migrations parse clean through libpg_query (`pglast`), plpgsql bodies
+included; `npm run test:all` and `vite build` pass. **Neither migration has been
+applied to a database, and no part of this has been exercised against real
+rows.** The rollback paths that matter most — refloating a hull, withdrawing its
+ring, reopening a won game — are exactly the ones that have never run. Rehearse
+them the way `points_per_set` was rehearsed: a `DO` block that fires a claim,
+revokes it, collects the assertions into a string and `raise exception`s the lot
+so the transaction rolls back.
+
+Watch for the `apply_migration` timestamp trap above when applying: apply, read
+back the recorded version, rename the file, then commit.
+
+### A revoked tile is unlocked, not handed back
+
+`20260918170330_parked_claims.sql`, the same day and directly on top of the
+revoke above. The first version of `admin_revoke_evidence` un-fired a claim by
+setting it straight back to `active`, and that was wrong in a way that only
+showed up in use: the team ended up working **four** tiles.
+
+The reason is a five-year-old asymmetry. `tile_claims_active_limit` is a
+**BEFORE INSERT** trigger. Revoking is an UPDATE, so it never ran. And the
+extra slot was real, not cosmetic — firing the tile had freed a slot, the team
+had already spent it on something else, and the revoke handed the old one back
+on top.
+
+Three options were on the table: block the revoke when the team is full (which
+makes an organiser's fix hostage to how busy the team is), let it overflow and
+say so (which is what shipped first, and is just a documented bug), or bring
+the tile back **unlocked**. The third is what the feature should have been all
+along: the claim and all of its evidence survive, the tile stays revealed and
+readable on the board, but it occupies no slot and accepts no evidence until
+the team locks it in again — which costs a slot, exactly as it did the first
+time.
+
+**It is a nullable timestamp, not a third `claim_status`.** 0029 refused a new
+enum value for a reason that still holds: `status = 'active'` is read all over
+the place, and a third value silently changes the meaning of every one of those
+reads. `paused_at` is additive — every row that already existed is `null`,
+which means "not parked" — so nothing that does not ask about it changes at
+all. `fired_rows_complete` already permits the shape (active, no result, no
+`fired_at`), so it was not touched.
+
+The audit that made it a small change: of 23 functions touching `tile_claims`,
+only **three** read the claim's own `'active'` status — `enforce_active_limit`,
+`team_scores`, and a payload field in `add_evidence` (`tiles_left_to_fire`,
+which 0045 stopped printing and nothing reads). The other seven grep hits are
+reading `games.status`, a different table. Every hit, sinking, score and board
+cell filters on `'fired'`, and a parked claim is not fired. `claim_is_complete`
+and `evidence_refusal` read evidence rows and never look at the claim at all.
+
+**Two things needed real care, and both are traps worth naming:**
+
+1. **The limit trigger had to grow an UPDATE arm.** Otherwise re-locking is an
+   UPDATE and takes the team to four — the same hole, moved one step along. Its
+   `WHEN` clause fires only on a transition *into* occupying a slot
+   (`new.status = 'active' and new.paused_at is null and (old.status <> 'active'
+   or old.paused_at is not null)`), so parking is skipped — a parked row must
+   never be refused for a limit it is not consuming — and re-locking is checked.
+2. **`unique (team_id, tile_id)` means re-claiming cannot INSERT.** `claim_tile`
+   now looks up the existing claim `for update`, refuses it if fired or already
+   locked in, and un-parks it otherwise. Miss this and locking in again fails
+   with a constraint error instead of working. The row lock matters: two members
+   pressing at once would otherwise both un-park and slip two claims past a
+   limit with room for one.
+
+`add_evidence` was deliberately **not** modified. The refusal is a BEFORE INSERT
+trigger on `tile_evidence` instead, following 0021's argument: a rule on the
+table cannot be stepped around by an RPC, the service role, or a hand-written
+INSERT — and it keeps 150 lines of completion rules out of the diff.
+
+Rehearsed against the live project inside a `begin ... raise HS001 ... exception`
+block before anything shipped, on Demo Bravo's three real claims: a fourth claim
+while full is refused; parking frees a slot; a fourth is then allowed; re-locking
+while full is refused; re-locking after freeing works; evidence on a parked claim
+is refused; firing a parked claim is refused. All seven correct, all rolled back.
+
+Client side, `paused` is a new column on `tiles_for_me` (`board_for_me` wraps it
+in `to_jsonb`, so it flowed through with no change). `ActiveTiles` drops parked
+tiles from the slot row, `App.jsx`'s `activeCount` excludes them, and `EnemyGrid`
+draws them as a dashed gold outline — an active square's ring with nothing in it
+— that clicks through to claim rather than to the evidence panel when there is a
+free slot.
+
+**Still true, and the reason `ActiveTiles` keeps its `Math.max`:** claims made
+before this migration can still be over the limit. Demo Alpha is sitting at 4/3
+from testing the first version.
+
+### What the other team learns from a revoke
+
+`20260918190000_withdrawal_event_types.sql` + `20260918190100_split_revoke_announcements.sql`.
+
+Found by the user, from the feed itself: revoked submissions were tagged
+**[GLOBAL]** on screen. The gating was never wrong — `is_team_private_event`
+had `evidence_revoked` in it from the start, so RLS and the Discord relay both
+kept it to the team — but `EventFeed.jsx` keeps a **hand-copied duplicate** of
+that list, and it had not been updated. The label said "everyone sees this"
+about a row only the owning team could read.
+
+Worth naming as its own lesson: I had verified the policy and the relay and
+reported it safe, while the thing actually on the user's screen was a third
+copy of the rule. Checking the enforcement twice is not the same as checking
+what the user is looking at. The duplicate now carries a comment saying so; the
+structural fix (have the server mark each row team-private, so the client stops
+guessing) is still open.
+
+That led to the real requirement: the other team should learn **that** a shot
+was taken back, and nothing else — not the square, not the tile, not the drop.
+Note this is *more* than they got before, and deliberately so. A withdrawn shot
+is already visible to them: the un-fired claim leaves `enemyShots`, so the mark
+vanishes off their own fleet. They were being shown a change with no cause,
+which invites exactly the guessing the secrecy exists to prevent.
+
+So the announcement is split by audience rather than trimmed to the weakest
+reader:
+
+| event | audience | carries |
+|---|---|---|
+| `evidence_revoked` | team-private | tile, square, drop, counts |
+| `shot_withdrawn` | **global** | the team that fired. Nothing else. |
+| `tile_relocked` | team-private | who picked it back up, and where |
+
+`tile_relocked` exists because re-locking used to emit `tile_claimed`, which is
+global and names the square — so the enemy would see the same coordinate
+announced twice, a reliable tell that something was rolled back there. Splitting
+it keeps the team's own feed informative (a team of ten needs to know who picked
+it up) and tells the enemy nothing.
+
+`shot_withdrawn` fires **only when the shot actually comes back**. A revoke that
+leaves the claim fired changes nothing the enemy can observe, so announcing it
+would hand them a fact they had no other route to.
+
+Two things to keep true:
+- The `shot_withdrawn` payload is empty by design. `v_at` is in scope in
+  `discord_line` and appending it is the natural-looking edit that would undo
+  the whole migration.
+- The confirm dialog now states the audience outright ("The other team is told
+  a shot was withdrawn — not which square, which tile, or what was on it"), so
+  an organiser mid-event does not have to reason about RLS policies.
+
+Verified by emitting all three events for Demo Alpha inside a rolled-back
+transaction and running `relay_flush`'s own channel selection through
+`discord_line`: the general channel got only the contentless line, Demo Alpha's
+channel got the full two, Demo Bravo's got nothing. Separately, impersonating a
+real non-admin account on no team showed it cannot read `evidence_revoked` rows
+at all.
+
+### The feed asks the server who can read a line
+
+`20260918200000_events_carry_their_audience.sql`, closing the drift above rather
+than patching it again.
+
+`board_for_me` now stamps every event it returns with `team_private`, computed
+from the same `is_team_private_event()` the RLS policy calls. `EventFeed.jsx`
+reads that field and its hand-written Set is deleted. There is one answer now,
+in one place.
+
+Why this spot: `board_for_me` is the **only** route an event takes to the
+client. Realtime is just the signal to refetch — `useGame` replaces state from
+the RPC and never appends a payload — so one field here reaches every reader.
+
+Computed, not stored. It is a property of the event TYPE rather than of the row,
+and a column would be a third copy that could drift from the function the way
+the Set did.
+
+An unmarked event now renders **no tag at all**, rather than falling back to a
+guess. That only happens against a server too old to stamp the field, and the
+entire point is to stop guessing — no tag is honest, a wrong one is what caused
+the bug.
+
+Grants deliberately untouched: `board_for_me` is executable by `anon` and PUBLIC
+as well as `authenticated`, and `create or replace` preserves that. Tightening it
+may well be right — it is an invoker function, so RLS already limits what anon
+can see — but that is a separate decision, and burying it in a migration about
+labels is how an unrelated sign-in path breaks.
+
+Verified through the real RPC, impersonating a real non-admin account: the four
+`evidence_revoked` rows come back `team_private: true` — the exact rows that
+were being labelled [GLOBAL] — alongside `shot_fired`, `tile_claimed` and
+`ship_sunk` at `false`.

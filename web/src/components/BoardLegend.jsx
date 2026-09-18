@@ -27,6 +27,7 @@ export default function BoardLegend({ view }) {
   return (
     <p className="legend">
       <span className="legend-item"><span className="key active" />locked in, not yet fired</span>
+      <span className="legend-item"><span className="key parked" />unlocked — lock it in again</span>
       <span className="legend-item"><span className="key hit dealt" />your hit</span>
       <span className="legend-item"><span className="key hit dealt sunk" />ship sunk</span>
       <span className="legend-item"><span className="key miss" />your miss</span>

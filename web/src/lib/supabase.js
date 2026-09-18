@@ -277,6 +277,32 @@ export const adminReleaseClaim = (claimId) =>
   rpc('admin_release_claim', { p_claim_id: claimId });
 
 /**
+ * Take one submission back (20260918163924).
+ *
+ * The narrow fix `adminReleaseClaim` is too blunt for: a team picks the wrong
+ * drop off the list, banks the wrong points, and wants to resubmit against the
+ * right one. Releasing the claim would destroy every other screenshot on the
+ * tile and refuses outright once it has fired. This removes the one piece and
+ * puts the claim back where it stood before it arrived.
+ *
+ * ALWAYS call it with `dryRun` first and show what comes back. The preview is
+ * the real function run against the real rows and rolled back, so what it
+ * reports is what will happen — there is no second description to drift. It
+ * refuses nothing, so a revoke can withdraw a shot, refloat a ship and reopen
+ * a finished game, and the confirmation is the only thing standing in front of
+ * that.
+ *
+ * Returns `{ unfired, ship_refloated, ship_size, reveals_withdrawn,
+ * game_reopened, still_complete, evidence_left, points_left, over_slot_limit,
+ * active_tiles, max_active_tiles, … }`.
+ */
+export const adminRevokeEvidence = (evidenceId, dryRun = false) =>
+  rpc('admin_revoke_evidence', {
+    p_evidence_id: evidenceId,
+    p_dry_run: dryRun,
+  });
+
+/**
  * Discord webhook config (0040). `teamId` null means the shared/general
  * channel; a team id scopes it to that team's own private channel (evidence
  * and pet-jar submissions route there, never to general — see 0036/0039).

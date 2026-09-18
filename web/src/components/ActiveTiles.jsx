@@ -78,9 +78,27 @@ export default function ActiveTiles({
     return () => clearInterval(id);
   }, []);
 
-  const active = tiles.filter((t) => t.claim_status === 'active');
+  // Parked claims are excluded. A revoked tile keeps its claim and every
+  // screenshot on it, but it is not being worked on until the team locks it in
+  // again — it belongs on the board, where it can be picked back up, not in a
+  // slot card with an uploader that the database would refuse.
+  const active = tiles.filter((t) => t.claim_status === 'active' && !t.paused);
 
-  const slots = Array.from({ length: maxActive }, (_, i) => active[i] ?? null);
+  // Enough slots for every active claim, not just for the limit.
+  //
+  // Parking is what keeps this honest now, but rows predating it can still be
+  // over the limit: `admin_revoke_evidence` used to un-fire a claim with a
+  // plain UPDATE, and the limit trigger was BEFORE INSERT only, so those
+  // claims walked straight past it. A fixed-length row silently dropped the
+  // extra one — the heading read "4/3" and only three cards existed, so the
+  // tile the revoke had handed back was invisible and unworkable.
+  //
+  // `max` rather than a plain length, so the empty placeholders that keep the
+  // row from jumping still appear while a team is under the limit.
+  const slots = Array.from(
+    { length: Math.max(maxActive, active.length) },
+    (_, i) => active[i] ?? null,
+  );
 
   // `asked` is false when the evidence uploader has already confirmed: the
   // last submit and the shot are one action, so it must not ask twice.

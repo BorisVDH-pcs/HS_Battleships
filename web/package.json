@@ -13,7 +13,8 @@
     "test:auth": "node scripts/auth-selftest.mjs",
     "test:tile-rules": "node scripts/tile-rules-selftest.mjs",
     "test:tile-draft": "node scripts/tile-draft-selftest.mjs",
-    "icons:manifest": "node scripts/build-icon-manifest.mjs"
+    "icons:manifest": "node scripts/build-icon-manifest.mjs",
+    "preview:evidence": "vite --config vite.preview.config.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",

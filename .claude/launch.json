@@ -4,8 +4,25 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web"
+      ],
       "port": 5174,
+      "autoPort": true
+    },
+    {
+      "name": "evidence-harness",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview:evidence",
+        "--prefix",
+        "web"
+      ],
+      "port": 5175,
       "autoPort": true
     }
   ]

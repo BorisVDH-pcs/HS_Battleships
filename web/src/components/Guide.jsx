@@ -115,7 +115,10 @@ const TOUR_STEPS = [
       + 'more.<br><br>'
       + 'Each line is tagged <strong>[GLOBAL]</strong> or <strong>[TEAM]</strong>. Global events '
       + '(a shot, a sunk ship, the game ending) are visible to both teams. Team-tagged '
-      + 'events — like evidence being submitted — are only ever shown to your own team.',
+      + 'events — like evidence being submitted, or an organiser taking a submission '
+      + 'back — are only ever shown to your own team. If a withdrawn submission takes '
+      + 'a shot off the board, the other team is told that much and no more: never '
+      + 'which square or which tile.',
   },
   {
     targetId: 'stats-panel-section',

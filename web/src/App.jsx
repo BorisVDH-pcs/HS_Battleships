@@ -368,7 +368,13 @@ export default function App() {
   // stays invisible until the one game whose column is somehow null renders a
   // board with a slot missing.
   const maxActive = game.game?.max_active_tiles ?? 3;
-  const activeCount = tiles.filter((t) => t.claim_status === 'active').length;
+  // A parked tile is active but holds no slot: an organiser revoked the
+  // submission that finished it, so the claim and its evidence survive and the
+  // team has to lock it in again. Counting it here would say a team of three
+  // was full when the database would happily give them a fourth.
+  const activeCount = tiles.filter(
+    (t) => t.claim_status === 'active' && !t.paused,
+  ).length;
   const isActive = game.game?.status === 'active';
   // The database enum still calls this phase `placement`; the players call it
   // preparation. Renaming the value itself would break every guard that
@@ -615,7 +621,9 @@ export default function App() {
                           (openTile.claim_status === 'fired'
                             ? ` · fired, ${openTile.claim_result}` +
                               (openTile.ship_sunk ? ' — ship sunk!' : '')
-                            : ' · not yet fired')
+                            : openTile.paused
+                              ? ' · unlocked by an organiser — lock it in again'
+                              : ' · not yet fired')
                         }
                         items={evidence.filter((e) => e.claim_id === openTile.claim_id)}
                         onClose={() => setOpenTileId(null)}

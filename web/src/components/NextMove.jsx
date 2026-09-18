@@ -23,7 +23,13 @@ export default function NextMove({ activeCount, maxActive, canClaim, isFinished 
     : activeCount > 0
       ? 'Continue an active tile, or claim another'
       : 'Claim a square in enemy waters';
-  const detail = full
+  // Over, not merely full. Nothing produces this any more — a revoke parks the
+  // claim instead of handing it back, and the limit trigger now covers UPDATE
+  // as well as INSERT — but claims made before that fix can still be over, and
+  // "All 3 slots are in use" while holding four reads as a bug.
+  const detail = activeCount > maxActive
+    ? `You are holding ${activeCount} tiles, over the usual limit of ${maxActive}. Finish one before claiming again.`
+    : full
     ? `All ${maxActive} active slots are in use. Upload the required evidence, then fire a shot.`
     : activeCount > 0
       ? `${activeCount} of ${maxActive} active slots are in progress. ${canClaim ? 'You can still claim another square.' : 'Complete one before taking another.'}`

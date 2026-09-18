@@ -139,6 +139,46 @@ replaces a tile's drops wholesale and `tile_evidence.option_id` is
 tile's collected evidence to zero. Release the claim first if it really has to
 change. Whole-board tools (clear, autofill, load a preset) stay pre-game only.
 
+A **wrong submission can be taken back**, one screenshot at a time — the
+*Revoke* button on **Admin → Evidence**. The case it exists for: a team finishes
+a tile, picks the wrong drop off the list, and banks the wrong points. Releasing
+the claim (below) is too blunt for that — it destroys every other screenshot on
+the tile and refuses once the tile has fired — so `admin_revoke_evidence` removes
+the one piece and puts the claim back exactly where it stood before it arrived.
+The team then resubmits against the right drop.
+
+A revoked tile comes back **unlocked, not handed back**. The claim and every
+other screenshot on it survive — nine of ten stays nine of ten, and the task
+stays readable on the board — but it holds none of the team's three slots and
+takes no more evidence until somebody locks it in again. Without that, a revoke
+quietly bought the team a fourth active tile: firing had already freed the slot,
+they had spent it elsewhere, and the active-tile limit is a trigger on INSERT
+that an un-firing UPDATE walked straight past. Re-locking now costs a slot like
+any other claim, and is refused while all three are busy.
+
+Almost nothing about a shot is stored, so most of the rollback is automatic:
+scores count fired claims, and a ship is sunk when its cells are hit rather than
+because a column says so. What the RPC does by hand is un-fire and park the
+claim, take back the free squares revealed around a ship that is no longer sunk,
+and reopen a game whose win rested on the shot.
+
+The other team is told **that** a shot was taken back, and nothing else — no
+square, no tile name, no drop. That is a deliberate middle: saying nothing is
+not the safe option, because a withdrawn shot is already visible to them as a
+mark vanishing off their own fleet, and a change with no cause invites exactly
+the guessing the secrecy exists to prevent. The full account — tile, square,
+drop, counts — goes only to the team it happened to, on their own feed and their
+own Discord channel. Locking the tile back in is team-private too, so the enemy
+never sees the same coordinate announced twice.
+
+It **refuses nothing** — a hit, a sinking,
+and a finished match can all be undone — so every press previews first: the
+dialog lists what will happen, and that list is the real function run against
+the real rows and rolled back, not a second description of it. A claim that
+still meets its target without the revoked piece stays fired, since the team
+earned that shot. The submitting team is told on their own feed and Discord
+channel.
+
 Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).
@@ -153,6 +193,19 @@ npm run test:tile-draft --prefix web
 Nothing runs these in CI. Run both before committing anything that touches tile
 rules — they have been broken by an unrelated deletion before, and a `SyntaxError`
 does not look like a failing assertion.
+
+```bash
+npm run preview:evidence --prefix web    # port 5176, /preview-evidence.html
+```
+
+The **evidence-review harness**: the real `EvidenceReview` and confirm dialog
+against six canned rows, one per thing a revoke can do — in progress, still
+complete without it, un-fires a miss, un-fires a hit, refloats a ship, reopens a
+won game. `vite.preview.config.js` swaps `lib/supabase.js` and `lib/evidence.js`
+for stubs and changes nothing else, so this needs no database and is the way to
+look at the dialog's wording without applying anything. It proves how the screen
+*reads*; it runs none of the SQL, so it says nothing about whether the rollback
+is correct.
 
 ## Setup
 

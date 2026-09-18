@@ -43,7 +43,14 @@ export default function EnemyGrid({
               if (!tile) return <div key={position} className="cell empty" />;
 
               const fired = tile.claim_status === 'fired';
-              const active = tile.claim_status === 'active';
+              // Parked: an organiser revoked the submission that finished this
+              // tile. The claim and its evidence are intact and the task stays
+              // readable, but it holds no slot and takes no more evidence — so
+              // it is drawn as a square to pick up again rather than as one
+              // the team is already working.
+              const parked = tile.claim_status === 'active' && tile.paused;
+              const active = tile.claim_status === 'active' && !parked;
+              const relockable = parked && canClaim;
               const resultIsShowing = shotResult?.tileId === tile.id;
               // While a pet-jar preview is being spent the board answers a
               // different question, so it offers a different set of squares:
@@ -59,7 +66,8 @@ export default function EnemyGrid({
                 // and goes dark, same as MyFleet's own sunk squares.
                 fired && tile.ship_sunk ? 'sunk' : '',
                 active ? 'active' : '',
-                !petPick && !tile.revealed && canClaim ? 'claimable' : '',
+                parked ? 'parked' : '',
+                !petPick && (!tile.revealed || relockable) && canClaim ? 'claimable' : '',
                 petTarget ? 'pet-target' : '',
                 !petPick && tile.revealed ? 'clickable' : '',
                 openTileId === tile.id ? 'picked' : '',
@@ -80,11 +88,20 @@ export default function EnemyGrid({
                     ? (petTarget
                       ? `${label} — spend a preview here`
                       : `${label} — no preview to spend here`)
-                    : (tile.revealed
-                      ? `${label} — ${tile.name} · see evidence`
-                      : `${label} — not yet locked in`)}
+                    : (parked
+                      ? `${label} — ${tile.name} · unlocked by an organiser${
+                          relockable ? ' · lock it in again' : ' · no free slot'}`
+                      : tile.revealed
+                        ? `${label} — ${tile.name} · see evidence`
+                        : `${label} — not yet locked in`)}
                   onClick={() => {
                     if (petPick) { onPetPick?.(tile); return; }
+                    // A parked square is revealed, so the plain `revealed`
+                    // branch would only ever show its evidence — but picking it
+                    // back up is the whole point of it being on the board. With
+                    // no free slot it falls through to the evidence panel,
+                    // which is the honest answer to a square you cannot take.
+                    if (relockable) { onClaim(tile); return; }
                     if (tile.revealed) onInspect?.(tile); else onClaim(tile);
                   }}
                 >
