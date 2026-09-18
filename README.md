@@ -53,33 +53,6 @@ the client would make both reachable. Instead, Row Level Security hides them and
 every mutation goes through an RPC that validates server-side — so there is no
 request a player can craft to peek or cheat.
 
-## Where things are
-
-```
-docs/handover.md                  pick-it-up-cold notes; session log at the bottom
-docs/v4-handover.md               tile completion rules and the V4 board
-docs/tile-fixes-handover.md       why value tiles count in tenths, and the each_set grouping trap
-docs/architecture.md              schema + design decisions
-docs/how-the-spreadsheet-worked.md  reference notes on the Sheets original
-docs/website-review.md            the 2026-09-07 UI review and its triage
-supabase/migrations/              one file per change, applied in filename order
-supabase/admin/                   runbook SQL (player accounts, password resets)
-```
-
-Migrations are numbered `0001…0032` and then by timestamp. They are **not** a
-short list any more — `ls` the directory rather than trusting a table in a doc.
-
-```
-web/src/lib/supabase.js       client + the game RPCs
-web/src/lib/board.js          coordinate helpers (A1..J10 <-> row/col <-> 1..100)
-web/src/lib/tileProgress.js   how far a claimed tile is, per completion rule
-web/src/lib/tileDraft.js      a tile in its three shapes: row, form draft, payload
-web/src/lib/icons.js          GENERATED — `npm run icons:manifest`, never by hand
-web/src/hooks/useGame.js      loads game state, refetches on Realtime events
-web/src/components/           EnemyGrid, MyFleet, ActiveTiles, EventFeed, Login,
-                              BoardBuilder, TileForm, TileInfo, EvidenceUploader
-```
-
 ## How a tile is finished
 
 Each tile carries a **completion rule** deciding when its evidence is enough.
