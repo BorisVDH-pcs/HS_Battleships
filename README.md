@@ -156,30 +156,6 @@ Boards are assembled in the **board builder** against a reusable tile catalogue.
 Details, and the `each_set` / `points_per_set` distinction that is easy to get
 wrong, are in [docs/v4-handover.md](docs/v4-handover.md).
 
-## Tests
-
-```bash
-npm run test:tile-rules --prefix web
-npm run test:tile-draft --prefix web
-```
-
-Nothing runs these in CI. Run both before committing anything that touches tile
-rules — they have been broken by an unrelated deletion before, and a `SyntaxError`
-does not look like a failing assertion.
-
-```bash
-npm run preview:evidence --prefix web    # port 5176, /preview-evidence.html
-```
-
-The **evidence-review harness**: the real `EvidenceReview` and confirm dialog
-against six canned rows, one per thing a revoke can do — in progress, still
-complete without it, un-fires a miss, un-fires a hit, refloats a ship, reopens a
-won game. `vite.preview.config.js` swaps `lib/supabase.js` and `lib/evidence.js`
-for stubs and changes nothing else, so this needs no database and is the way to
-look at the dialog's wording without applying anything. It proves how the screen
-*reads*; it runs none of the SQL, so it says nothing about whether the rollback
-is correct.
-
 ## Setup
 
 The migrations in `supabase/migrations/` are already applied to the **Battleships**
