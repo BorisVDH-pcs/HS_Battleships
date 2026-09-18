@@ -1726,7 +1726,7 @@ from testing the first version.
 
 ### What the other team learns from a revoke
 
-`20260918190000_withdrawal_event_types.sql` + `20260918190100_split_revoke_announcements.sql`.
+`20260918172446_withdrawal_event_types.sql` + `20260918172658_split_revoke_announcements.sql`.
 
 Found by the user, from the feed itself: revoked submissions were tagged
 **[GLOBAL]** on screen. The gating was never wrong — `is_team_private_event`
@@ -1785,7 +1785,7 @@ at all.
 
 ### The feed asks the server who can read a line
 
-`20260918200000_events_carry_their_audience.sql`, closing the drift above rather
+`20260918173107_events_carry_their_audience.sql`, closing the drift above rather
 than patching it again.
 
 `board_for_me` now stamps every event it returns with `team_private`, computed
@@ -1816,3 +1816,39 @@ Verified through the real RPC, impersonating a real non-admin account: the four
 `evidence_revoked` rows come back `team_private: true` — the exact rows that
 were being labelled [GLOBAL] — alongside `shot_fired`, `tile_claimed` and
 `ship_sunk` at `false`.
+
+### The migration-filename trap, hit again — and what actually catches it
+
+Pushing the work above turned `db-push.yml` red while Pages went green.
+
+`apply_migration` (the MCP tool) stamps the migration history with **its own
+timestamp**, not the filename you wrote. So a file called
+`20260918190000_withdrawal_event_types.sql` is recorded as version
+`20260918172446`. Three of the six files were renamed to match; the last three
+were not, which left the two histories disagreeing in both directions at once:
+
+- three versions in `schema_migrations` with no local file, and
+- three local files the CLI believed were unapplied.
+
+`supabase db push --dry-run` refuses on the first of those, which is why the run
+failed at the **preview** step and `Push migrations` was skipped. Nothing was
+applied twice and no data moved — the dry-run step exists for exactly this, and
+it earned its place.
+
+The check that would have caught it before pushing, and is worth running after
+any `apply_migration`:
+
+```sql
+select version, name from supabase_migrations.schema_migrations
+ where version >= '<today>' order by version;
+```
+
+then make the filenames match, character for character, before committing. A
+rename after the fact is free — nothing reads the old name but comments, and
+those are worth fixing in the same pass (`grep -rl <old version>`).
+
+Worth being blunt about the cause: this trap is already documented above, and I
+walked into it anyway by renaming the first batch and forgetting the second when
+the work continued past where I'd expected it to end. The lesson is not "remember
+harder" — it is to read the history back and rename **immediately after each
+apply**, not once at the end of the session.

@@ -14,13 +14,13 @@ import { evidenceEventText } from '../lib/eventText.js';
  *
  * Note that a payload can be redacted at the source rather than at the tag:
  * `shot_withdrawn` is global precisely because it carries no square, tile or
- * drop to give away (20260918190100).
+ * drop to give away (20260918172658).
  */
 /**
  * Whether this line is readable by both teams or only by the team it happened
  * to, as **the server** answered it — `board_for_me` stamps every event with
  * `team_private` from the same `is_team_private_event()` the RLS policy uses
- * (20260918200000).
+ * (20260918173107).
  *
  * This used to be a hand-written Set here, mirroring that function with nothing
  * keeping the two in step, and it drifted the first time it mattered:
