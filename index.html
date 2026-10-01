@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>High Society Events has moved</title>
+    <meta name="robots" content="noindex" />
+    <script>
+      // Keep whatever came after the old name, so a deep link still lands on
+      // the same page of the new site.
+      var rest = location.pathname.replace(/^\/HS_Battleships/i, '');
+      location.replace('https://borisvdh-pcs.github.io/hs-events' + (rest || '/') +
+                       location.search + location.hash);
+    </script>
+    <!-- Without JavaScript: at least land on the new front page. -->
+    <meta http-equiv="refresh" content="0; url=https://borisvdh-pcs.github.io/hs-events/" />
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+             background: #000; color: #f2c14e; font: 16px system-ui, sans-serif; }
+      a { color: #ffe98f; }
+    </style>
+  </head>
+  <body>
+    <p>HS Battleships is now <a href="https://borisvdh-pcs.github.io/hs-events/">High Society Events</a>.</p>
+  </body>
+</html>
